@@ -1,0 +1,60 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/doura/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/doura/docs",
+          "mainDocId": "introduction",
+          "docs": [
+            {
+              "id": "api/index",
+              "path": "/doura/docs/api/"
+            },
+            {
+              "id": "guides/index",
+              "path": "/doura/docs/guides/",
+              "sidebar": "guides"
+            },
+            {
+              "id": "introduction",
+              "path": "/doura/docs/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "playground",
+              "path": "/doura/docs/playground"
+            },
+            {
+              "id": "reference/index",
+              "path": "/doura/docs/reference/"
+            },
+            {
+              "id": "tutorials",
+              "path": "/doura/docs/tutorials"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "docs": {
+              "link": {
+                "path": "/doura/docs/",
+                "label": "introduction"
+              }
+            },
+            "guides": {
+              "link": {
+                "path": "/doura/docs/guides/",
+                "label": "guides/index"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

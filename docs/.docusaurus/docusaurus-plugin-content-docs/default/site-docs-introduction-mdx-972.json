@@ -1,0 +1,23 @@
+{
+  "unversionedId": "introduction",
+  "id": "introduction",
+  "title": "Introduction",
+  "description": "Welcome to the Doura documentation!",
+  "source": "@site/docs/introduction.mdx",
+  "sourceDirName": ".",
+  "slug": "/",
+  "permalink": "/doura/docs/",
+  "draft": false,
+  "editUrl": null,
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "introduction",
+    "title": "Introduction",
+    "slug": "/",
+    "pagination_next": null,
+    "hide_table_of_contents": true,
+    "custom_edit_url": null
+  },
+  "sidebar": "docs"
+}

@@ -1,0 +1,65 @@
+{
+  "name": "doura-react",
+  "version": "0.0.0",
+  "description": "Rematch core with react hooks",
+  "main": "lib/index.js",
+  "module": "esm/index.js",
+  "browser": "esm/index.js",
+  "unpkg": "dist/dourareact.umd.production.min.js",
+  "types": "esm/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "dev": "run-p watch:*",
+    "watch:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm -w",
+    "watch:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib -w",
+    "build": "run-p clean && run-p build:*",
+    "build:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm",
+    "build:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib",
+    "build:umd": "dts build --format umd --tsconfig ./tsconfig.build.json --name douraReact",
+    "clean": "rimraf lib esm dist"
+  },
+  "authors": [
+    "liximomo"
+  ],
+  "keywords": [
+    "doura",
+    "doura",
+    "react",
+    "redux"
+  ],
+  "homepage": "https://dourajs.github.io/doura",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dourajs/doura.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dourajs/doura/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "files": [
+    "esm",
+    "lib",
+    "dist"
+  ],
+  "dependencies": {
+    "use-sync-external-store": "1.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^13.3.0",
+    "@types/react": "^18.0.5",
+    "@types/react-dom": "^18.0.5",
+    "@types/use-sync-external-store": "0.0.3",
+    "doura": "workspace:*",
+    "react": "18.1.0",
+    "react-dom": "18.1.0"
+  },
+  "peerDependencies": {
+    "doura": "workspace:*",
+    "react": ">=16.8",
+    "react-dom": ">=16.8"
+  }
+}

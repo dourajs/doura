@@ -1,0 +1,21 @@
+{
+  "unversionedId": "guides/index",
+  "id": "guides/index",
+  "title": "Guides",
+  "description": "Documentation coming soon...",
+  "source": "@site/docs/guides/index.md",
+  "sourceDirName": "guides",
+  "slug": "/guides/",
+  "permalink": "/doura/docs/guides/",
+  "draft": false,
+  "editUrl": "https://github.com/dourajs/doura/tree/main/docs/guides/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "id": "index",
+    "title": "Guides",
+    "sidebar_position": 1
+  },
+  "sidebar": "guides"
+}

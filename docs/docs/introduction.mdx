@@ -1,0 +1,47 @@
+---
+id: introduction
+title: Introduction
+slug: /
+pagination_next: null
+hide_table_of_contents: true
+custom_edit_url: null
+---
+
+Welcome to the Doura documentation!
+
+## Getting Started
+
+```sh
+npm init doura@latest
+```
+
+import { SimpleDocCardList } from "@site/src/components/SimpleDocCardList";
+
+<SimpleDocCardList
+  items={[
+    {
+      title: "📄️ Quick Start",
+      url: "/docs/tutorials",
+      description:
+        "Spend your first few minutes with doura here and let us introduce some of the core features as quickly as possible. After this you can go explore the docs or dive deeper with the other tutorials. We'll build a little markdown blog with data loading, actions, form validation, redirects, and more.",
+    },
+    {
+      title: "📄️ Guides",
+      url: "/docs/guides",
+      description:
+        "Guides take you through the steps required to solve a specific problem. You'll learn how to solve most problems by a step-by-step guide.",
+    },
+    {
+      title: "📄️ Reference",
+      url: "/docs/reference",
+      description:
+        "Doura has a handful of conventions to make web application development a breeze. You'll spend some time in this document when you're first learning Doura, but probably won't need it much after you get your feet wet.",
+    },
+    {
+      title: "📄️ API",
+      url: "/docs/api",
+      description:
+        "This is probably the doc page you'll visit the most. It's got all of the API that you'll use day-to-day in your app.",
+    },
+  ]}
+/>

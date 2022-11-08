@@ -1,0 +1,20 @@
+{
+  "unversionedId": "reference/index",
+  "id": "reference/index",
+  "title": "Reference",
+  "description": "Documentation coming soon...",
+  "source": "@site/docs/reference/index.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/",
+  "permalink": "/doura/docs/reference/",
+  "draft": false,
+  "editUrl": "https://github.com/dourajs/doura/tree/main/docs/reference/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "id": "index",
+    "title": "Reference",
+    "sidebar_position": 2
+  }
+}

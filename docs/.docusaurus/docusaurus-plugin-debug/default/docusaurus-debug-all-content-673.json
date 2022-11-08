@@ -1,0 +1,177 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "loadedVersions": [
+        {
+          "versionName": "current",
+          "label": "Next",
+          "banner": null,
+          "badge": false,
+          "noIndex": false,
+          "className": "docs-version-current",
+          "path": "/doura/docs",
+          "tagsPath": "/doura/docs/tags",
+          "editUrl": "https://github.com/shuvijs/doura/tree/main/docs",
+          "editUrlLocalized": "https://github.com/shuvijs/doura/tree/main/i18n/en/docusaurus-plugin-content-docs/current",
+          "isLast": true,
+          "routePriority": -1,
+          "sidebarFilePath": "/Users/liximomo/Workspace/github/doura/docs/sidebars.js",
+          "contentPath": "/Users/liximomo/Workspace/github/doura/docs/docs",
+          "contentPathLocalized": "/Users/liximomo/Workspace/github/doura/docs/i18n/en/docusaurus-plugin-content-docs/current",
+          "docs": [
+            {
+              "unversionedId": "api/index",
+              "id": "api/index",
+              "title": "API",
+              "description": "Documentation coming soon...",
+              "source": "@site/docs/api/index.md",
+              "sourceDirName": "api",
+              "slug": "/api/",
+              "permalink": "/doura/docs/api/",
+              "draft": false,
+              "editUrl": "https://github.com/shuvijs/doura/tree/main/docs/api/index.md",
+              "tags": [],
+              "version": "current",
+              "sidebarPosition": 3,
+              "frontMatter": {
+                "id": "index",
+                "title": "API",
+                "sidebar_position": 3
+              }
+            },
+            {
+              "unversionedId": "guides/index",
+              "id": "guides/index",
+              "title": "Guides",
+              "description": "Documentation coming soon...",
+              "source": "@site/docs/guides/index.md",
+              "sourceDirName": "guides",
+              "slug": "/guides/",
+              "permalink": "/doura/docs/guides/",
+              "draft": false,
+              "editUrl": "https://github.com/shuvijs/doura/tree/main/docs/guides/index.md",
+              "tags": [],
+              "version": "current",
+              "sidebarPosition": 1,
+              "frontMatter": {
+                "id": "index",
+                "title": "Guides",
+                "sidebar_position": 1
+              },
+              "sidebar": "guides"
+            },
+            {
+              "unversionedId": "introduction",
+              "id": "introduction",
+              "title": "Introduction",
+              "description": "Welcome to the Shuvi.js documentation!",
+              "source": "@site/docs/introduction.mdx",
+              "sourceDirName": ".",
+              "slug": "/",
+              "permalink": "/doura/docs/",
+              "draft": false,
+              "editUrl": null,
+              "tags": [],
+              "version": "current",
+              "frontMatter": {
+                "id": "introduction",
+                "title": "Introduction",
+                "slug": "/",
+                "pagination_next": null,
+                "hide_table_of_contents": true,
+                "custom_edit_url": null
+              },
+              "sidebar": "docs"
+            },
+            {
+              "unversionedId": "playground",
+              "id": "playground",
+              "title": "Playground",
+              "description": "Documentation coming soon...",
+              "source": "@site/docs/playground.md",
+              "sourceDirName": ".",
+              "slug": "/playground",
+              "permalink": "/doura/docs/playground",
+              "draft": false,
+              "editUrl": "https://github.com/shuvijs/doura/tree/main/docs/playground.md",
+              "tags": [],
+              "version": "current",
+              "frontMatter": {
+                "id": "playground",
+                "title": "Playground"
+              }
+            },
+            {
+              "unversionedId": "reference/index",
+              "id": "reference/index",
+              "title": "Reference",
+              "description": "Documentation coming soon...",
+              "source": "@site/docs/reference/index.md",
+              "sourceDirName": "reference",
+              "slug": "/reference/",
+              "permalink": "/doura/docs/reference/",
+              "draft": false,
+              "editUrl": "https://github.com/shuvijs/doura/tree/main/docs/reference/index.md",
+              "tags": [],
+              "version": "current",
+              "sidebarPosition": 2,
+              "frontMatter": {
+                "id": "index",
+                "title": "Reference",
+                "sidebar_position": 2
+              }
+            },
+            {
+              "unversionedId": "tutorials",
+              "id": "tutorials",
+              "title": "Tutorials",
+              "description": "Documentation coming soon...",
+              "source": "@site/docs/tutorials.md",
+              "sourceDirName": ".",
+              "slug": "/tutorials",
+              "permalink": "/doura/docs/tutorials",
+              "draft": false,
+              "editUrl": "https://github.com/shuvijs/doura/tree/main/docs/tutorials.md",
+              "tags": [],
+              "version": "current",
+              "frontMatter": {
+                "id": "tutorials",
+                "title": "Tutorials"
+              }
+            }
+          ],
+          "drafts": [],
+          "sidebars": {
+            "docs": [
+              {
+                "type": "doc",
+                "id": "introduction"
+              }
+            ],
+            "guides": [
+              {
+                "type": "doc",
+                "id": "guides/index"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "docusaurus-plugin-content-pages": {
+    "default": [
+      {
+        "type": "jsx",
+        "permalink": "/doura/",
+        "source": "@site/src/pages/index.js"
+      }
+    ]
+  },
+  "docusaurus-plugin-debug": {},
+  "docusaurus-theme-classic": {},
+  "docusaurus-theme-search-algolia": {},
+  "docusaurus-plugin-client-redirects": {},
+  "docusaurus-bootstrap-plugin": {},
+  "docusaurus-mdx-fallback-plugin": {}
+}

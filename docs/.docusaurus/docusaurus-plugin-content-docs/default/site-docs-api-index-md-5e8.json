@@ -1,0 +1,20 @@
+{
+  "unversionedId": "api/index",
+  "id": "api/index",
+  "title": "API",
+  "description": "Documentation coming soon...",
+  "source": "@site/docs/api/index.md",
+  "sourceDirName": "api",
+  "slug": "/api/",
+  "permalink": "/doura/docs/api/",
+  "draft": false,
+  "editUrl": "https://github.com/dourajs/doura/tree/main/docs/api/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "id": "index",
+    "title": "API",
+    "sidebar_position": 3
+  }
+}

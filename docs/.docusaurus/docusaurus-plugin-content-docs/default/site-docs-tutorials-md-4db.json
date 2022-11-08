@@ -1,0 +1,18 @@
+{
+  "unversionedId": "tutorials",
+  "id": "tutorials",
+  "title": "Tutorials",
+  "description": "Documentation coming soon...",
+  "source": "@site/docs/tutorials.md",
+  "sourceDirName": ".",
+  "slug": "/tutorials",
+  "permalink": "/doura/docs/tutorials",
+  "draft": false,
+  "editUrl": "https://github.com/dourajs/doura/tree/main/docs/tutorials.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "tutorials",
+    "title": "Tutorials"
+  }
+}

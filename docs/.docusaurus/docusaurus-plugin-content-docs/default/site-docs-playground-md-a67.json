@@ -1,0 +1,18 @@
+{
+  "unversionedId": "playground",
+  "id": "playground",
+  "title": "Playground",
+  "description": "Documentation coming soon...",
+  "source": "@site/docs/playground.md",
+  "sourceDirName": ".",
+  "slug": "/playground",
+  "permalink": "/doura/docs/playground",
+  "draft": false,
+  "editUrl": "https://github.com/dourajs/doura/tree/main/docs/playground.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "playground",
+    "title": "Playground"
+  }
+}
