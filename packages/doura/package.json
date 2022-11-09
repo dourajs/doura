@@ -1,6 +1,6 @@
 {
   "name": "doura",
-  "version": "0.0.0-rc.3",
+  "version": "0.0.0-rc.4",
   "description": "Reactive and intuitive state management",
   "main": "lib/index.js",
   "module": "esm/index.js",
