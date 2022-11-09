@@ -16,6 +16,7 @@ import { createBatchManager } from '../src/batchManager'
 import { IUseModel, IUseStaticModel } from '../src/types'
 import { createUseModel, createUseStaticModel } from '../src/createUseModel'
 import { countModel } from './models/index'
+import { useModel } from '../src/useModel'
 
 let douraStore: ReturnType<typeof doura>
 let batchManager: ReturnType<typeof createBatchManager>

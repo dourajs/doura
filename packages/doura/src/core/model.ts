@@ -6,7 +6,6 @@ import {
   effectScope,
   EffectScope,
   draft,
-  finishDraft,
   watch,
   snapshot,
 } from '../reactivity/index'
@@ -128,7 +127,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     const update: SchedulerJob = () => {
       this.dispatch({
         type: ActionTypes.ACTION,
-        payload: finishDraft(this.stateRef as any).value,
+        payload: snapshot(this.stateRef.value, this.stateRef.value),
       })
     }
     this._draftListenerHandler = watch(this.stateRef, () => {

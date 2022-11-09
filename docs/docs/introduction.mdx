@@ -38,7 +38,7 @@ const todoModel = defineModel({
       // autocompletion! ✨
       return this.todos.filter((todo) => !todo.isFinished)
     },
-    filteredTodos(state) {
+    filteredTodos() {
       if (this.filter === 'unfinished') {
         return this.unfinishedTodos
       }
@@ -70,7 +70,7 @@ export function TodoApp() {
         <label htmlFor="filter">Only show unfinished</label>
       </div>
       <ul>
-        // type of `filteredTodos` are inferred
+        {/* type of `filteredTodos` are inferred */}
         {state.filteredTodos.map((todo) => (
           <li key={todo.id}>
             <input type="checkbox" checked={todo.isFinished} />

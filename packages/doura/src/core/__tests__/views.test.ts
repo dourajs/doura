@@ -1,4 +1,5 @@
 import { defineModel, modelManager } from '../index'
+import { nextTick } from '../scheduler'
 
 let modelMgr: ReturnType<typeof modelManager>
 beforeEach(() => {
@@ -561,6 +562,34 @@ describe('defineModel/views', () => {
       expect(numberStore.double).toBe(2)
       expect(numberOfCalls).toBe(2)
     })
+  })
+
+  it('should return new reference when target is modified', async () => {
+    const model = defineModel({
+      name: 'model',
+      state: {
+        numbers: [1, 2],
+      },
+      actions: {
+        add(n: number) {
+          this.numbers.push(n)
+        },
+      },
+      views: {
+        nums() {
+          return this.numbers
+        },
+      },
+    })
+
+    const store = modelMgr.getModel(model)
+
+    let value = store.nums
+    expect(value).toEqual([1, 2])
+    store.add(3)
+    await nextTick();
+    expect(store.nums).not.toBe(value)
+    expect(store.nums).toEqual([1, 2, 3])
   })
 
   describe('primitive state/array', () => {
