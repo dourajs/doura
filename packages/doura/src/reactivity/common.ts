@@ -1,6 +1,5 @@
 import { shallowCopy, toRawType, def } from '../utils'
 import { DraftState } from './draft'
-import { triggerDraft } from './effect'
 
 export declare const RawSymbol: unique symbol
 
@@ -85,7 +84,6 @@ export function prepareCopy(state: { base: any; copy: any }) {
 export function markChanged(state: DraftState) {
   if (!state.modified) {
     state.modified = true
-    triggerDraft(state)
     if (state.parent) {
       markChanged(state.parent)
     }

@@ -299,7 +299,7 @@ export function triggerView(view: View<any>, newVal?: any) {
   }
 }
 
-export function triggerDraft(state: DraftState) {
+function triggerDraftChange(state: DraftState) {
   const referenceDeps = referenceMap.get(state)
   if (referenceDeps) {
     const effects = [...referenceDeps]
@@ -308,6 +308,14 @@ export function triggerDraft(state: DraftState) {
         effect.view.mightChange = true
       }
     }
+  }
+}
+
+export function triggerDraft(state: DraftState) {
+  let current: DraftState | undefined = state
+  while (current) {
+    triggerDraftChange(state)
+    current = current.parent
   }
 }
 

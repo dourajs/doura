@@ -16,6 +16,7 @@ import {
   ITERATE_KEY,
   pauseTracking,
   resetTracking,
+  triggerDraft,
 } from './effect'
 import { isObject, hasOwn, isSymbol, is, isArray, isIntegerKey } from '../utils'
 import { warn } from '../warning'
@@ -190,6 +191,7 @@ function createSetter() {
       } else if (!is(value, current)) {
         trigger(state, TriggerOpTypes.SET, prop, value, current)
       }
+      triggerDraft(state)
     }
 
     return true

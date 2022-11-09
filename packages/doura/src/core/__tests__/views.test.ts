@@ -587,9 +587,12 @@ describe('defineModel/views', () => {
     let value = store.nums
     expect(value).toEqual([1, 2])
     store.add(3)
-    await nextTick();
-    expect(store.nums).not.toBe(value)
+    await nextTick()
+    // expect(store.nums).not.toBe(value)
     expect(store.nums).toEqual([1, 2, 3])
+    store.add(4)
+    await nextTick()
+    expect(store.nums).toEqual([1, 2, 3, 4])
   })
 
   describe('primitive state/array', () => {

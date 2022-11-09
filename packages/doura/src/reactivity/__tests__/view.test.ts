@@ -42,40 +42,6 @@ describe('reactivity/view', () => {
     expect(getter).toHaveBeenCalledTimes(2)
   })
 
-  it.skip('should trigger parent object change when child props is modified', () => {
-    const value = draft<{ a: { b: number } }>({
-      a: {
-        b: 0,
-      },
-    })
-    const getter = jest.fn(() => value.a)
-    const cValue = view(getter)
-
-    // lazy
-    expect(getter).not.toHaveBeenCalled()
-
-    expect(cValue.value).toEqual({ b: 0 })
-    expect(getter).toHaveBeenCalledTimes(1)
-
-    // should not compute again
-    cValue.value
-    expect(getter).toHaveBeenCalledTimes(1)
-
-    // should not compute until needed
-    value.a.b = 1
-    expect(getter).toHaveBeenCalledTimes(1)
-
-    // now it should compute
-    expect(cValue.value).toEqual({
-      b: 1,
-    })
-    expect(getter).toHaveBeenCalledTimes(2)
-
-    // should not compute again
-    cValue.value
-    expect(getter).toHaveBeenCalledTimes(2)
-  })
-
   it('should trigger effect', () => {
     const value = draft<{ foo?: number }>({})
     const cValue = view(() => value.foo)
