@@ -8,6 +8,7 @@ import {
   latest,
   prepareCopy,
   markChanged,
+  isDraft,
 } from './common'
 import {
   track,
@@ -120,17 +121,15 @@ function createGetter(): ProxyGetter {
       return value
     }
 
-    // Check for existing proxy in modified state.
-    // Assigned values are never proxied. This catches any proxies we created, too.
-    if (value === peek(state.base, prop)) {
+    if (!isDraft(value)) {
       prepareCopy(state)
       const res = (state.copy![prop as any] = draft(value, state))
       const resState = toState(res)
       resState && trackDraft(res[ReactiveFlags.STATE])
       return res
     } else {
-      const resState = toState(value)
-      resState && trackDraft(resState)
+      const resState = toState(value)!
+      trackDraft(resState)
     }
     return value
   }

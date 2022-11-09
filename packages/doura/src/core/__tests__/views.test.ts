@@ -596,7 +596,7 @@ describe('defineModel/views', () => {
   })
 
   describe('array', () => {
-    it('should return new reference when element is modified', async () => {
+    it('should return new reference when an existing element is modified', async () => {
       const model = defineModel({
         state: {
           todos: [{ id: 0, finished: false }],
@@ -621,6 +621,49 @@ describe('defineModel/views', () => {
 
       let value = store.allTodos
       expect(value).toEqual([{ id: 0, finished: false }])
+
+      store.toggle(0)
+      await nextTick()
+      expect(store.allTodos).not.toEqual(value)
+      expect(store.allTodos).toEqual([{ id: 0, finished: true }])
+    })
+
+    it('should return new reference when a new element is modified', async () => {
+      const model = defineModel({
+        state: {
+          todos: [] as { id: number; finished: boolean }[],
+          nextId: 0,
+        },
+        actions: {
+          addTodo() {
+            this.todos.push({
+              id: this.nextId++,
+              finished: false,
+            })
+          },
+          toggle(id: number) {
+            const todo = this.todos.find((i) => i.id === id)
+            if (todo) {
+              todo.finished = !todo.finished
+            }
+          },
+        },
+        views: {
+          allTodos() {
+            return this.todos
+          },
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+
+      expect(store.allTodos).toEqual([])
+      store.addTodo()
+      await nextTick()
+
+      let value = store.allTodos
+      expect(value).toEqual([{ id: 0, finished: false }])
+      expect(store.allTodos).toEqual([{ id: 0, finished: false }])
 
       store.toggle(0)
       await nextTick()

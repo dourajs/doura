@@ -348,7 +348,7 @@ describe('defineModel/actions', () => {
         a: 2,
       }
       store.replace(newState1)
-      expect(store.$state).toBe(newState1)
+      expect(store.$state).toEqual(newState1)
 
       store.replace(2)
       expect(store.$state).toEqual(2)

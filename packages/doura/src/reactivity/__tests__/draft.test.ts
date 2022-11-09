@@ -659,7 +659,7 @@ describe(`reactivity/draft`, () => {
     //   expect(result[0].a).toEqual(2)
     // })
 
-    it('does not draft external data', () => {
+    it('draft external data', () => {
       const externalData = { x: 3 }
       const base = {} as any
       const next = produce(base, (draft) => {
@@ -668,9 +668,9 @@ describe(`reactivity/draft`, () => {
         draft.y.x += 1
         externalData.x += 2
       })
-      expect(next).toEqual({ y: { x: 6 } })
-      expect(externalData.x).toBe(6)
-      expect(next.y).toBe(externalData)
+      expect(next).toEqual({ y: { x: 4 } })
+      expect(externalData.x).toBe(5)
+      expect(next.y).not.toBe(externalData)
     })
 
     it('does not create new state unnecessary, #491', () => {

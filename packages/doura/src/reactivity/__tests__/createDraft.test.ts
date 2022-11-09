@@ -124,12 +124,12 @@ describe('reactivity/createDraft', () => {
     expect('foo' in observed).toBe(false)
   })
 
-  test('setting a property with an unobserved value should not be wrapped with draft', () => {
+  test('setting a property with an unobserved value should be wrapped with draft', () => {
     const observed = draft<{ foo?: object }>({})
-    const raw = {}
+    const raw = { n: Math.random() }
     observed.foo = raw
-    expect(observed.foo).toBe(raw)
-    expect(isReactive(observed.foo)).toBe(false)
+    expect(observed.foo).toEqual(raw)
+    expect(isReactive(observed.foo)).toBe(true)
   })
 
   test('observing already observed value should return same Proxy', () => {
