@@ -314,7 +314,7 @@ function triggerDraftChange(state: DraftState) {
 export function triggerDraft(state: DraftState) {
   let current: DraftState | undefined = state
   while (current) {
-    triggerDraftChange(state)
+    triggerDraftChange(current)
     current = current.parent
   }
 }

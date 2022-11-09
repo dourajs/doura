@@ -595,6 +595,40 @@ describe('defineModel/views', () => {
     expect(store.nums).toEqual([1, 2, 3, 4])
   })
 
+  describe('array', () => {
+    it('should return new reference when element is modified', async () => {
+      const model = defineModel({
+        state: {
+          todos: [{ id: 0, finished: false }],
+          nextId: 0,
+        },
+        actions: {
+          toggle(id: number) {
+            const todo = this.todos.find((i) => i.id === id)
+            if (todo) {
+              todo.finished = !todo.finished
+            }
+          },
+        },
+        views: {
+          allTodos() {
+            return this.todos
+          },
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+
+      let value = store.allTodos
+      expect(value).toEqual([{ id: 0, finished: false }])
+
+      store.toggle(0)
+      await nextTick()
+      expect(store.allTodos).not.toEqual(value)
+      expect(store.allTodos).toEqual([{ id: 0, finished: true }])
+    })
+  })
+
   describe('primitive state/array', () => {
     it("should not be invoked when deps don't change", () => {
       let numberOfCalls = 0
