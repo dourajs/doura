@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+  - 'packages/plugins/*'
+  - 'docs'
+  - 'examples/ssr'
+  - 'examples/spa'
+  - 'examples/tearing'
+  - 'examples/plugins'

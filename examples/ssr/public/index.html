@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!--
+      %BASE_HREF% is a placeholder, that is supposed to be replaced by the
+      server-side renderer. %BASE_HREF% is determined during runtime and can be
+      changed without recompiling making your compiled web app independent of
+      a server / CDN location. The base tag specifies how to resolve relative
+      URLs for CSS files, favicon, etc (notice the trailing slash in the href
+      attribute). Therefore, using %BASE_HREF% only makes sense if all other URL
+      references are kept relative. Alternatively, you can delete the base tag
+      and use %PUBLIC_URL% as documented by create-react-app.
+    -->
+  <base href="%BASE_HREF%/" />
+	<title>Doura Example - Count React TypeScript</title>
+  <meta charset="utf-8" />
+  <link rel="shortcut icon" href="favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <meta name="theme-color" content="#000000" />
+  <!--
+      manifest.json provides metadata used when your web app is added to the
+      homescreen on Android. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+  <script>clientEnv=%CLIENT_ENV%</script>
+  <title>React App</title>
+</head>
+
+<body>
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <div id="root">%ROOT%</div>
+  <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
+</body>
+
+</html>

@@ -1,0 +1,15 @@
+# directories
+lib
+src
+plugins
+packages
+flow-typed
+test
+examples
+scripts
+.vscode
+.coverage
+
+# files
+.gitignore
+.prettierrc

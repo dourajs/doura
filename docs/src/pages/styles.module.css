@@ -1,0 +1,172 @@
+/**
+ * Copyright (c) 2017-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.header {
+  height: 400px;
+  background: url('/img/bg.jpg');
+  text-align: center;
+  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.header h1,
+.header h2 {
+  font-size: 34px;
+  line-height: 48px;
+  color: #f5f6f7;
+}
+
+.header h2 {
+  font-weight: lighter;
+}
+
+.hero {
+  padding: 48px;
+}
+
+.heroInner {
+  margin: 0 auto;
+  max-width: 1100px;
+  padding: 0 20px;
+}
+
+.heroTitleWrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.heroTitle {
+  padding-left: 136px;
+}
+
+.gitHubButtonWrapper {
+  margin-top: 2px;
+  margin-left: 10px;
+  display: flex;
+}
+
+.gitHubButton {
+  overflow: hidden;
+}
+
+.heroTagline {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.heroLogo {
+  animation-duration: 2s;
+  animation-name: jack-in-the-box;
+  float: right;
+  margin-top: 20px;
+  padding: 0 20px 20px;
+  height: auto;
+}
+
+.indexCtas {
+  --ifm-button-size-multiplier: 1.6;
+  --ifm-button-border-color: var(--ifm-color-primary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+/* .indexCtas a,
+.indexCtas a:hover {
+  color: black;
+} */
+
+.indexCtas a:last-of-type {
+  margin: 20px 36px;
+}
+
+.indexCtaTryNowButton:hover {
+  color: var(--ifm-color-primary);
+}
+
+.features {
+  max-width: 960px !important;
+  padding: 3.25rem 0 3.5rem;
+  border-top: 1px solid var(--c-divider);
+  text-align: center;
+}
+
+.feature {
+  width: 22%;
+}
+
+.feature h3 {
+  font-size: 24px;
+  line-height: 24px;
+  font-weight: 300;
+}
+
+.featureContent {
+  font-size: 16px;
+  font-weight: 300;
+}
+
+.header {
+  height: 400px;
+  background: url('/img/bg.jpg');
+  text-align: center;
+  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.header h1,
+.header h2 {
+  font-size: 34px;
+  line-height: 48px;
+  color: #f5f6f7;
+}
+
+.header h2 {
+  font-weight: lighter;
+}
+
+@media only screen and (max-width: 768px) {
+  .hero {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .heroInner {
+    padding: 0;
+  }
+
+  .heroLogo {
+    display: block;
+    float: none;
+    margin: 0 auto;
+  }
+
+  .indexCtas {
+    justify-content: center;
+  }
+
+  .indexCtas a {
+    margin: 20px 36px;
+  }
+
+  .heroTitle {
+    padding-left: 0;
+  }
+
+  .gitHubButton {
+    display: none;
+  }
+}

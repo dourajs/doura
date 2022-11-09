@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"jsx": "react",
+		"allowJs": true,
+    "target": "es6",
+		"module": "esnext",
+		"lib": ["dom", "esnext"],
+		"moduleResolution": "nodenext",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "stripInternal": true,
+    "downlevelIteration": true,
+    "noUnusedLocals": true,
+    "declaration": true,
+    "outDir": "dist"
+	},
+	"include": ["packages/*/src", "packages/plugins/*/src", "packages/*/__tests__"],
+	"exclude": ["node_modules"]
+}

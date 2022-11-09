@@ -1,0 +1,10 @@
+{
+	"extends": "../../tsconfig.build",
+	"compilerOptions": {
+    "rootDir": "./src",
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": ["**/__tests__/**"]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "example-tearing",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "doura-react": "workspace:*",
+    "doura": "workspace:*",
+    "react": "next",
+    "react-dom": "next",
+    "@craco/craco": "6.4.3"
+  },
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build",
+    "test": "craco test",
+    "eject": "craco eject"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
