@@ -15,22 +15,37 @@
 const sidebars = {
   docs: [
     'introduction',
-    // {
-    //   type: "category",
-    //   label: "Getting Stared",
-    //   items: ["tutorials", "playground"],
-    //   link: {
-    //     type: "doc",
-    //     id: "tutorials",
-    //   },
-    //   collapsed: false,
-    //   collapsible: false,
-    // },
-    // {
-    //   type: "doc",
-    //   label: "Guides",
-    //   id: "guides/index",
-    // },
+    {
+      type: 'category',
+      label: 'Getting Stared',
+      items: ['installation', 'playground'],
+      collapsed: false,
+      collapsible: false,
+    },
+    {
+      type: 'category',
+      label: 'Core Concepts',
+      items: [
+        'core-concepts/state',
+        'core-concepts/actions',
+        'core-concepts/views',
+        'core-concepts/store',
+        'core-concepts/plugins',
+      ],
+      collapsed: false,
+      collapsible: false,
+    },
+    {
+      type: 'category',
+      label: 'Guide',
+      items: [],
+      link: {
+        type: 'doc',
+        id: 'guides/index',
+      },
+      collapsed: false,
+      collapsible: false,
+    },
   ],
 
   // By default, Docusaurus generates a sidebar from the docs folder structure

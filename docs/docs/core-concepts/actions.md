@@ -1,6 +1,6 @@
 ---
-id: tutorials
-title: Tutorials
+id: actions
+title: Actions
 ---
 
 Documentation coming soon...

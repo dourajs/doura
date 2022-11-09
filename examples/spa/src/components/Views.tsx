@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { defineModel, ModelSnapshot } from 'doura'
+import { defineModel, ModelData } from 'doura'
 import { useRootModel } from 'doura-react'
 
 const otherDep = defineModel({
@@ -57,7 +57,7 @@ const user = defineModel(
   [otherDep, domeDep]
 )
 
-export type userSelectorParameters = ModelSnapshot<typeof user>
+export type userSelectorParameters = ModelData<typeof user>
 
 const selector = function (stateAndViews: userSelectorParameters) {
   return {

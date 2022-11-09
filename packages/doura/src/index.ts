@@ -8,7 +8,7 @@ export type {
   AnyModel,
   Action,
   Selector,
-  ModelSnapshot,
+  ModelData,
   ModelView,
 } from './core'
 

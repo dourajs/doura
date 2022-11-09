@@ -3,7 +3,7 @@ import { warn } from '../warning'
 import { PublicPropertiesMap, ProxyContext, AccessContext } from './model'
 import { AnyModel, GetActions, GetState } from './defineModel'
 import { State, Views } from './modelOptions'
-import { createView, Selector, ModelView, ModelSnapshot } from './view'
+import { createView, Selector, ModelView, ModelData } from './view'
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $rawState: IModel['state']
@@ -12,7 +12,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $replace(newState: State): void
   $actions: GetActions<IModel>
   $views: Views<IModel['views']>
-  $getSnapshot(): ModelSnapshot<IModel>
+  $getSnapshot(): ModelData<IModel>
   $createSelector: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>

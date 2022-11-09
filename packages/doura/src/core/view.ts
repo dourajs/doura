@@ -3,14 +3,14 @@ import { Views } from './modelOptions'
 import { ModelInternal } from './model'
 import { EmptyObject } from '../types'
 
-export type ModelSnapshot<Model extends AnyModel> = {
+export type ModelData<Model extends AnyModel> = {
   $state: Model['state']
 } & Model['state'] &
   Views<Model['views']> &
   EmptyObject
 
 export type Selector<Model extends AnyModel, TReturn = any> = (
-  stateAndViews: ModelSnapshot<Model>
+  stateAndViews: ModelData<Model>
 ) => TReturn
 
 export interface ModelView<T extends (...args: any[]) => any = any> {

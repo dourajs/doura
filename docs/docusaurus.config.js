@@ -60,24 +60,6 @@ const config = {
             label: 'Docs',
           },
           {
-            type: 'doc',
-            docId: 'guides/index',
-            position: 'right',
-            label: 'Guides',
-          },
-          {
-            type: 'doc',
-            docId: 'reference/index',
-            position: 'right',
-            label: 'Reference',
-          },
-          {
-            type: 'doc',
-            docId: 'api/index',
-            position: 'right',
-            label: 'API',
-          },
-          {
             href: 'https://github.com/dourajs/doura',
             position: 'right',
             className: 'header-github-link',

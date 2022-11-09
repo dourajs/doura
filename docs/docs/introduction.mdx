@@ -1,47 +1,84 @@
 ---
 id: introduction
-title: Introduction
+title: What is Doura?
 slug: /
 pagination_next: null
 hide_table_of_contents: true
 custom_edit_url: null
 ---
 
-Welcome to the Doura documentation!
+Doura brings the reactivity to React. It's intuitive and simple. It has a powerful type system which all types can be inferred. Doura also splits the `model` from `store`, which means you can write your `models` and share it arcoss projects easily.
 
-## Getting Started
+## React Example
 
-```sh
-npm init doura@latest
+```tsx
+import { defineModel } from 'doura'
+import { useModel } from 'doura-react'
+
+const todoModel = defineModel({
+  name: 'todo',
+  state: {
+    todos: [
+      {
+        id: 0,
+        text: 'read books',
+        isFinished: true,
+      },
+      {
+        id: 1,
+        text: 'play games',
+        isFinished: false,
+      },
+    ],
+    /** @type {'all' | 'unfinished'} */
+    filter: 'all',
+  },
+  views: {
+    unfinishedTodos() {
+      // autocompletion! ✨
+      return this.todos.filter((todo) => !todo.isFinished)
+    },
+    filteredTodos(state) {
+      if (this.filter === 'unfinished') {
+        return this.unfinishedTodos
+      }
+      return this.todos
+    },
+  },
+  actions: {
+    // any amount of arguments, return a promise or not
+    setFilter(filter) {
+      // you can directly mutate the state
+      this.filter = filter
+    },
+  },
+})
+
+export function TodoApp() {
+  const [state, actions] = useModel(todoModel)
+
+  return (
+    <div>
+      <div>
+        <input
+          type="checkbox"
+          id="filter"
+          onClick={(event) =>
+            actions.setFilter(event.target.checked ? 'unfinished' : 'all')
+          }
+        />
+        <label htmlFor="filter">Only show unfinished</label>
+      </div>
+      <ul>
+        // type of `filteredTodos` are inferred
+        {state.filteredTodos.map((todo) => (
+          <li key={todo.id}>
+            <input type="checkbox" checked={todo.isFinished} />
+            {todo.text}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 ```
-
-import { SimpleDocCardList } from "@site/src/components/SimpleDocCardList";
-
-<SimpleDocCardList
-  items={[
-    {
-      title: "📄️ Quick Start",
-      url: "/docs/tutorials",
-      description:
-        "Spend your first few minutes with doura here and let us introduce some of the core features as quickly as possible. After this you can go explore the docs or dive deeper with the other tutorials. We'll build a little markdown blog with data loading, actions, form validation, redirects, and more.",
-    },
-    {
-      title: "📄️ Guides",
-      url: "/docs/guides",
-      description:
-        "Guides take you through the steps required to solve a specific problem. You'll learn how to solve most problems by a step-by-step guide.",
-    },
-    {
-      title: "📄️ Reference",
-      url: "/docs/reference",
-      description:
-        "Doura has a handful of conventions to make web application development a breeze. You'll spend some time in this document when you're first learning Doura, but probably won't need it much after you get your feet wet.",
-    },
-    {
-      title: "📄️ API",
-      url: "/docs/api",
-      description:
-        "This is probably the doc page you'll visit the most. It's got all of the API that you'll use day-to-day in your app.",
-    },
-  ]}
-/>

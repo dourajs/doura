@@ -1,10 +1,10 @@
-import { AnyModel, Selector, ModelPublicInstance, ModelSnapshot } from 'doura'
+import { AnyModel, Selector, ModelPublicInstance, ModelData } from 'doura'
 
 type IActions<IModel extends AnyModel> = ModelPublicInstance<IModel>['$actions']
 
 export interface IUseModel {
   <IModel extends AnyModel>(model: IModel): [
-    ModelSnapshot<IModel>,
+    ModelData<IModel>,
     IActions<IModel>
   ]
 
@@ -17,7 +17,7 @@ export interface IUseModel {
 
 export interface IUseStaticModel {
   <IModel extends AnyModel>(model: IModel): [
-    { current: ModelSnapshot<IModel> },
+    { current: ModelData<IModel> },
     IActions<IModel>
   ]
 }

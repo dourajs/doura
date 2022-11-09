@@ -1,4 +1,4 @@
-import { defineModel, ISelectorParams, Action } from 'doura'
+import { defineModel, ModelData } from 'doura'
 import { expectType, useModel, useRootModel } from './'
 
 type customType = 'custom' | 'custom0'
@@ -9,21 +9,13 @@ const count = defineModel({
     value: 1,
     s: '',
   },
-  reducers: {
-    addValue(state, payload: number = 1) {
-      return {
-        ...state,
-        value: state.value + payload,
-      }
-    },
-    setString(state, payload: customType) {
-      return {
-        ...state,
-        s: payload,
-      }
-    },
-  },
   actions: {
+    addValue(payload: number = 1) {
+      this.value += payload
+    },
+    setString(payload: customType) {
+      this.s = payload
+    },
     async asyncAdd(arg0: number) {
       this.addValue(arg0)
     },
@@ -43,7 +35,7 @@ const count = defineModel({
   },
 })
 
-type countSelectorParameters = ISelectorParams<typeof count>
+type countSelectorParameters = ModelData<typeof count>
 const countSelector = function (stateAndViews: countSelectorParameters) {
   return {
     v: stateAndViews.value,
@@ -63,8 +55,8 @@ function Test() {
   expectType<number>(state.v)
   expectType<string>(state.s)
   expectType<string>(state.custom)
-  expectType<Action<number | undefined>>(action.addValue())
-  expectType<Action<customType>>(action.setString('custom'))
+  expectType<void>(action.addValue())
+  expectType<void>(action.setString('custom'))
   expectType<Promise<void>>(action.asyncAdd(0))
 
   const [rootState, rootAction] = useRootModel(count, countSelector)
@@ -72,8 +64,8 @@ function Test() {
   expectType<number>(rootState.v)
   expectType<string>(rootState.s)
   expectType<string>(rootState.custom)
-  expectType<Action<number | undefined>>(rootAction.addValue())
-  expectType<Action<customType>>(rootAction.setString('custom'))
+  expectType<void>(rootAction.addValue())
+  expectType<void>(rootAction.setString('custom'))
   expectType<Promise<void>>(rootAction.asyncAdd(0))
 }
 
