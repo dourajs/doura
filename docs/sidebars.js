@@ -37,12 +37,19 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'React integration',
+      items: [
+        'react/component-state',
+        'react/shared-store',
+        'react/global-store',
+      ],
+      collapsed: false,
+      collapsible: false,
+    },
+    {
+      type: 'category',
       label: 'Guides',
-      items: [],
-      link: {
-        type: 'doc',
-        id: 'guides/index',
-      },
+      items: ['guides/compose-model', 'guides/hmr', 'guides/optimize-views'],
       collapsed: false,
       collapsible: false,
     },
