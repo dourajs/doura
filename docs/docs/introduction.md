@@ -7,7 +7,13 @@ hide_table_of_contents: true
 custom_edit_url: null
 ---
 
-Doura brings the reactivity to React. It's intuitive and simple. It has a powerful type system which all types can be inferred. Doura also splits the `model` from `store`, which means you can write your `models` and share it arcoss projects easily.
+Doura brings the reactivity to React. It's provided an intuitive and simple way to manage state. It has a powerful type system which all types can be inferred. Doura also splits the `model` from `store`, which means you can write your `models` and share it arcoss projects easily. Doura can be used as a global store(redux), shared stores(React Context) or local store(useReducer).
+
+:::info
+
+Doura is greatly inspired by [immer](https://github.com/immerjs/immer) and [Pinia](https://github.com/vuejs/pinia). Thanks for their excellent work.
+
+:::
 
 ## React Example
 

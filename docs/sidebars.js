@@ -37,7 +37,7 @@ const sidebars = {
     },
     {
       type: 'category',
-      label: 'Guide',
+      label: 'Guides',
       items: [],
       link: {
         type: 'doc',

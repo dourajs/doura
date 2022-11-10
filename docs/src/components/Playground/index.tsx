@@ -15,8 +15,8 @@ import Link from '@docusaurus/Link'
 const Playgrounds = [
   {
     name: '📦 CodeSandbox',
-    image: require('@site/static/img/playgrounds/codesandbox.png'),
-    url: 'https://codesandbox.io/s/github/shuvijs/shuvi/tree/main/examples/basic',
+    image: require('@site/static/img/playgrounds/codesandbox.png').default,
+    url: 'https://codesandbox.io/s/doura-todo-example-u4klh5?file=/src/models/todo.ts',
     description: (
       <Translate id="playground.codesandbox.description">
         CodeSandbox is a popular playground solution. Runs Docusaurus in a
