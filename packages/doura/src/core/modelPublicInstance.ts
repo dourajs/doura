@@ -1,8 +1,13 @@
 import { hasOwn, extend, isPlainObject } from '../utils'
 import { warn } from '../warning'
 import { PublicPropertiesMap, ProxyContext, AccessContext } from './model'
-import { AnyModel, GetActions, GetState } from './defineModel'
-import { State, Views } from './modelOptions'
+import {
+  State,
+  AnyModel,
+  GetModelActions,
+  GetModelState,
+  Views,
+} from './modelOptions'
 import { createView, Selector, ModelView, ModelData } from './view'
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
@@ -10,15 +15,15 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $state: IModel['state']
   $patch(newState: State): void
   $replace(newState: State): void
-  $actions: GetActions<IModel>
+  $actions: GetModelActions<IModel>
   $views: Views<IModel['views']>
   $getSnapshot(): ModelData<IModel>
   $createSelector: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
-} & GetState<IModel> &
+} & GetModelState<IModel> &
   Views<IModel['views']> &
-  GetActions<IModel>
+  GetModelActions<IModel>
 
 const enum AccessTypes {
   STATE,

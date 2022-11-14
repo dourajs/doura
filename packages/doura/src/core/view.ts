@@ -1,5 +1,4 @@
-import { AnyModel } from './defineModel'
-import { Views } from './modelOptions'
+import { AnyModel, Views } from './modelOptions'
 import { ModelInternal } from './model'
 import { EmptyObject } from '../types'
 

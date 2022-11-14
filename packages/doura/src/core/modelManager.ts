@@ -1,5 +1,4 @@
-import { State, Action } from './modelOptions'
-import { AnyModel } from './defineModel'
+import { State, Action, AnyModel, ModelOptions } from './modelOptions'
 import { createModelInstnace, ModelInternal, Store, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { emptyObject } from '../utils'
@@ -23,7 +22,9 @@ export type ProxyMethods = typeof proxyMethods[number]
 type InternalModelProxy = Pick<ModelInternal<AnyModel>, ProxyMethods>
 
 export interface ModelManager extends Omit<Store, 'subscribe'> {
-  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  getModel<IModel extends ModelOptions<any, any, any, any, any>>(
+    model: IModel
+  ): ModelPublicInstance<IModel>
   subscribe(model: AnyModel, fn: () => any): UnSubscribe
 }
 

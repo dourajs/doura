@@ -1,4 +1,4 @@
-import { AnyModel } from '../defineModel'
+import { AnyModel } from '../modelOptions'
 import { ModelInternal } from '../model'
 import { nextTick } from '../scheduler'
 

@@ -9,8 +9,14 @@ import {
   watch,
   snapshot,
 } from '../reactivity/index'
-import { AnyModel, GetActions } from './defineModel'
-import { Views, Action, State, StateObject } from './modelOptions'
+import {
+  Views,
+  Action,
+  State,
+  StateObject,
+  AnyModel,
+  GetModelActions,
+} from './modelOptions'
 import {
   ModelPublicInstance,
   PublicInstanceProxyHandlers,
@@ -88,7 +94,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   proxy: ModelPublicInstance<IModel> | null = null
 
   // props
-  actions: GetActions<IModel>
+  actions: GetModelActions<IModel>
   views: Views<IModel['views']>
   viewInstances: View[] = []
   accessContext: AccessContext

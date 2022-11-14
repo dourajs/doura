@@ -1,10 +1,14 @@
-import { Deps, AnyModel, DefineModel } from './defineModel'
+import { DefineModel } from './defineModel'
 import { warn } from '../warning'
+import { EmptyObject } from '../types'
 import { invariant, isPlainObject } from '../utils'
 
-export type ActionOptions = Record<string, Function>
-
-export type ViewOptions = Record<string, Function>
+export interface Action<T = any> {
+  type: string
+  payload?: T
+  // Allows any extra properties to be defined in an action.
+  [extraProps: string]: any
+}
 
 export type StateObject = {
   [x: string]: any
@@ -20,14 +24,13 @@ export type StatePrimitive =
 
 export type State = StateObject | StatePrimitive
 
-export interface Action<T = any> {
-  type: string
-  payload?: T
-  // Allows any extra properties to be defined in an action.
-  [extraProps: string]: any
-}
+export type ActionOptions = Record<string, Function>
 
-type FilterIndex<T> = {
+export type ViewOptions = Record<string, Function>
+
+export type Deps = Record<string, AnyModel>
+
+type FilterActionIndex<T> = {
   [P in keyof T as string extends P
     ? never
     : number extends P
@@ -36,7 +39,7 @@ type FilterIndex<T> = {
 }
 
 export type Actions<A> = A extends ActionOptions
-  ? FilterIndex<A> extends infer FilterA
+  ? FilterActionIndex<A> extends infer FilterA
     ? {
         [K in keyof FilterA]: FilterA[K]
       }
@@ -88,15 +91,69 @@ export type ViewThis<
         infer DDeps
       >
         ? ViewThis<DS, DV, DDeps>
-        : ActionThis
+        : ViewThis
     }
   }
 
 /**
- * If the first item is true, it means there is an error described by
- * the second item.
+ * @template S State
+ * @template MC dependency models
  */
-export type Validation = [boolean | undefined, string]
+export type ModelOptions<
+  N extends string,
+  S extends State,
+  A extends ActionOptions,
+  V extends ViewOptions,
+  D extends Deps
+> = {
+  name?: N
+  state: S
+  actions?: A & ThisType<ActionThis<S, A, V, D>>
+  views?: V & ThisType<ViewThis<S, V, D>>
+  _depends?: Deps
+}
+
+export type AnyModel = ModelOptions<any, any, any, any, any>
+
+export type GetModelName<T> = T extends ModelOptions<
+  infer Name,
+  any,
+  any,
+  any,
+  any
+>
+  ? Name
+  : never
+
+export type GetModelState<Model> = Model extends ModelOptions<
+  any,
+  infer S,
+  any,
+  any,
+  any
+>
+  ? { [K in keyof S]: S[K] }
+  : never
+
+export type GetModelActions<Model> = Model extends ModelOptions<
+  any,
+  any,
+  infer A,
+  any,
+  any
+>
+  ? Actions<A> & EmptyObject
+  : never
+
+export type GetModelDeps<T> = T extends ModelOptions<
+  any,
+  any,
+  any,
+  any,
+  infer Deps
+>
+  ? Deps
+  : never
 
 /**
  * Checks if a parameter is a valid function but only when it's defined.

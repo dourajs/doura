@@ -1,16 +1,14 @@
 import {
   State,
-  Actions,
   ActionOptions,
   ViewOptions,
-  ActionThis,
-  ViewThis,
   validateModelOptions,
+  ModelOptions,
+  GetModelName,
+  GetModelDeps,
 } from './modelOptions'
 import { invariant } from '../utils'
-import { Math, Tuple, EmptyObject } from '../types'
-
-export type Deps = Record<string, AnyModel>
+import { Math, Tuple } from '../types'
 
 type MakeDeps<
   T extends any[],
@@ -53,68 +51,20 @@ export type DefineModel<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
-  D extends Deps
-> = {
-  name?: N
-  state: S
-  actions?: A & ThisType<ActionThis<S, A, V, D>>
-  views?: V & ThisType<ViewThis<S, V, D>>
-  _depends?: Deps
-}
-
-export type AnyModel = DefineModel<any, any, any, any, any>
-
-export type GetModelName<T> = T extends DefineModel<
-  infer Name,
-  any,
-  any,
-  any,
-  any
->
-  ? Name
-  : never
-
-export type GetState<Model> = Model extends DefineModel<
-  any,
-  infer S,
-  any,
-  any,
-  any
->
-  ? { [K in keyof S]: S[K] }
-  : never
-
-export type GetActions<Model> = Model extends DefineModel<
-  any,
-  any,
-  infer A,
-  any,
-  any
->
-  ? Actions<A> & EmptyObject
-  : never
-
-export type GetModelDeps<T> = T extends DefineModel<
-  any,
-  any,
-  any,
-  any,
-  infer Deps
->
-  ? Deps
-  : never
+  DM extends {}
+> = ModelOptions<N, S, A, V, DM> & {} // BUG: {} is required
 
 export const defineModel = <
   N extends string,
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
-  Deps extends MakeDeps<D>,
-  D extends any[] = []
+  DM extends MakeDeps<DA>,
+  DA extends any[] = []
 >(
-  modelOptions: Omit<DefineModel<N, S, A, V, Deps>, '_depends'>,
-  depends?: Tuple<D>
-) => {
+  modelOptions: Omit<ModelOptions<N, S, A, V, DM>, '_depends'>,
+  depends?: Tuple<DA>
+): DefineModel<N, S, A, V, DM> => {
   if (process.env.NODE_ENV === 'development') {
     invariant(
       !depends || Array.isArray(depends),
@@ -123,11 +73,11 @@ export const defineModel = <
     validateModelOptions(modelOptions)
   }
 
-  const model = modelOptions as DefineModel<N, S, A, V, Deps>
+  const model = modelOptions as ModelOptions<N, S, A, V, DM>
   if (depends) {
     model._depends = {}
     for (let index = 0; index < depends.length; index++) {
-      const dep = depends[index] as AnyModel
+      const dep = depends[index] as any
       const name: string = dep.name || `${index}`
       model._depends[name] = dep
     }

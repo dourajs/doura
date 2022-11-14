@@ -33,9 +33,9 @@ const model = defineModel(
     state: {
       text: 'initial',
     },
-    reducers: {
-      reset(state) {
-        state.text = 'initial'
+    actions: {
+      reset() {
+        this.text = 'initial'
       },
     },
     views: {
