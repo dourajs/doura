@@ -24,6 +24,9 @@ const depModel = defineModel({
       expectType<number>(this.double)
       expectType<{}>(this.$dep)
     },
+    viewParams(state) {
+      expectType<{ count: number }>(state)
+    },
   },
 })
 

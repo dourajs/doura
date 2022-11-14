@@ -1,4 +1,4 @@
-import { isPlainObject, hasOwn, isObject } from '../utils'
+import { isPlainObject, hasOwn, isObject, def } from '../utils'
 import { warn } from '../warning'
 import {
   view as reactiveView,
@@ -147,9 +147,9 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
 
     this._isDispatching = false
 
-    this.ctx = {
-      _: this,
-    }
+    this.ctx = {}
+    def(this.ctx, '_', this)
+
     this.accessCache = Object.create(null)
     this.proxy = new Proxy(
       this.ctx,
@@ -292,14 +292,14 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     }
   }
 
-  createView(viewFn: () => any) {
+  createView(viewFn: (s: IModel['state']) => any) {
     let view: View
     this.effectScope.run(() => {
       view = reactiveView(() => {
         const oldCtx = this.accessContext
         this.accessContext = AccessContext.VIEW
         try {
-          let value = viewFn.call(this.proxy)
+          let value = viewFn.call(this.proxy, this.proxy)
           if (process.env.NODE_ENV === 'development') {
             if (isObject(value)) {
               if (value === this.proxy) {

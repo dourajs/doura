@@ -16,6 +16,23 @@ afterAll(() => {
 })
 
 describe('defineModel/views', () => {
+  it('should receive state as first params', () => {
+    const sample = defineModel({
+      name: 'sample',
+      state: {
+        count: 1,
+      },
+      views: {
+        double(s) {
+          return s.count * 2
+        },
+      },
+    })
+    const store = modelMgr.getModel(sample)
+
+    expect(store.double).toBe(2)
+  })
+
   it('should throw if changed state in a view', () => {
     let initState = {
       a: 0,
@@ -315,6 +332,7 @@ describe('defineModel/views', () => {
     store.changeC('zoo')
     void store.viewC
 
+    // a.viewA
     expect(store.viewC).not.toBe(originC)
     expect(store.viewC.foo).toBe('zoo')
     expect(store.viewC.foo).toBe('zoo')
@@ -428,6 +446,37 @@ describe('defineModel/views', () => {
 
     expect(store.getLevel2).toBe(level2)
     expect(numberOfCalls).toBe(4)
+  })
+
+  it('should return new reference when target is modified', async () => {
+    const model = defineModel({
+      name: 'model',
+      state: {
+        numbers: [1, 2],
+      },
+      actions: {
+        add(n: number) {
+          this.numbers.push(n)
+        },
+      },
+      views: {
+        nums() {
+          return this.numbers
+        },
+      },
+    })
+
+    const store = modelMgr.getModel(model)
+
+    let value = store.nums
+    expect(value).toEqual([1, 2])
+    store.add(3)
+    await nextTick()
+    // expect(store.nums).not.toBe(value)
+    expect(store.nums).toEqual([1, 2, 3])
+    store.add(4)
+    await nextTick()
+    expect(store.nums).toEqual([1, 2, 3, 4])
   })
 
   describe('view with depends', () => {
@@ -562,37 +611,6 @@ describe('defineModel/views', () => {
       expect(numberStore.double).toBe(2)
       expect(numberOfCalls).toBe(2)
     })
-  })
-
-  it('should return new reference when target is modified', async () => {
-    const model = defineModel({
-      name: 'model',
-      state: {
-        numbers: [1, 2],
-      },
-      actions: {
-        add(n: number) {
-          this.numbers.push(n)
-        },
-      },
-      views: {
-        nums() {
-          return this.numbers
-        },
-      },
-    })
-
-    const store = modelMgr.getModel(model)
-
-    let value = store.nums
-    expect(value).toEqual([1, 2])
-    store.add(3)
-    await nextTick()
-    // expect(store.nums).not.toBe(value)
-    expect(store.nums).toEqual([1, 2, 3])
-    store.add(4)
-    await nextTick()
-    expect(store.nums).toEqual([1, 2, 3, 4])
   })
 
   describe('array', () => {

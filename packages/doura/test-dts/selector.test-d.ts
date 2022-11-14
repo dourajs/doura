@@ -1,4 +1,4 @@
-import { defineModel, ISelectorParams } from './'
+import { defineModel, Selector } from './'
 
 type customType = 'custom' | 'custom0'
 
@@ -8,21 +8,13 @@ const count = defineModel({
     value: 1,
     s: '',
   },
-  reducers: {
-    addValue(state, payload: number = 1) {
-      return {
-        ...state,
-        value: state.value + payload,
-      }
-    },
-    setString(state, payload: customType) {
-      return {
-        ...state,
-        s: payload,
-      }
-    },
-  },
   actions: {
+    addValue(payload: number = 1) {
+      this.value += payload
+    },
+    setString(payload: customType) {
+      this.s = payload
+    },
     async asyncAdd(arg0: number) {
       this.addValue(arg0)
     },
@@ -42,8 +34,8 @@ const count = defineModel({
   },
 })
 
-type countSelectorParameters = ISelectorParams<typeof count>
-const countSelector = function (stateAndViews: countSelectorParameters) {
+type CountSelector = Selector<typeof count>
+const countSelector: CountSelector = function (stateAndViews) {
   return {
     v: stateAndViews.value,
     n: stateAndViews.viewNumber,
@@ -52,6 +44,6 @@ const countSelector = function (stateAndViews: countSelectorParameters) {
   }
 }
 
-const count$State = function (stateAndViews: countSelectorParameters) {
+const count$State: CountSelector = function (stateAndViews) {
   return stateAndViews.$state
 }

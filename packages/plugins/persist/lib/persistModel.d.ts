@@ -9,6 +9,9 @@ export declare const persistModel: import('doura/esm/core/modelOptions').ModelOp
     flush(): Promise<any>
     togglePause(): void
   },
-  import('doura/esm/core/modelOptions').ViewOptions,
+  import('doura/esm/core/modelOptions').ViewOptions<{
+    rehydrated: boolean
+    version: number
+  }>,
   {}
 >

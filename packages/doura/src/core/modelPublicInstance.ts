@@ -4,9 +4,9 @@ import { PublicPropertiesMap, ProxyContext, AccessContext } from './model'
 import {
   State,
   AnyModel,
-  GetModelActions,
   GetModelState,
-  Views,
+  GetModelActions,
+  GetModelViews,
 } from './modelOptions'
 import { createView, Selector, ModelView, ModelData } from './view'
 
@@ -16,13 +16,14 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $patch(newState: State): void
   $replace(newState: State): void
   $actions: GetModelActions<IModel>
-  $views: Views<IModel['views']>
+  v: IModel['views']
+  $views: GetModelViews<IModel>
   $getSnapshot(): ModelData<IModel>
   $createSelector: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
 } & GetModelState<IModel> &
-  Views<IModel['views']> &
+  GetModelViews<IModel> &
   GetModelActions<IModel>
 
 const enum AccessTypes {
@@ -106,12 +107,15 @@ export const PublicInstanceProxyHandlers = {
       accessCache[key] = AccessTypes.CONTEXT
       return ctx[key]
     }
+    // CAUTION: pinia requires state exist at first, we should consider carefully
+    // whether to support this
     // fallback to state, the key may not exist at first
     else if (isPlainObject(state)) {
       // @ts-ignore
       return state[key]
     }
   },
+
   set({ _: instance }: ProxyContext, key: string, value: any): boolean {
     const {
       ctx,
@@ -173,5 +177,26 @@ export const PublicInstanceProxyHandlers = {
     }
 
     return true
+  },
+
+  has({ _: instance }: ProxyContext, key: string) {
+    const {
+      actions,
+      views,
+      accessCache,
+      accessContext,
+      ctx,
+      stateValue: state,
+    } = instance
+
+    return (
+      !!accessCache[key] ||
+      hasOwn(state, key) ||
+      hasOwn(views, key) ||
+      (accessContext !== AccessContext.VIEW && hasOwn(actions, key)) ||
+      key === '$dep' ||
+      hasOwn(ctx, key) ||
+      hasOwn(publicPropertiesMap, key)
+    )
   },
 }

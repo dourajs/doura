@@ -6,6 +6,7 @@ export type {
   ModelPublicInstance,
   ModelManagerOptions,
   AnyModel,
+  State,
   Action,
   Selector,
   ModelData,

@@ -26,7 +26,10 @@ export type State = StateObject | StatePrimitive
 
 export type ActionOptions = Record<string, Function>
 
-export type ViewOptions = Record<string, Function>
+export type ViewOptions<State = any> = Record<
+  string,
+  ((s: State) => any) | (() => any)
+>
 
 export type Deps = Record<string, AnyModel>
 
@@ -47,7 +50,7 @@ export type Actions<A> = A extends ActionOptions
   : {}
 
 export type Views<ViewOptions> = {
-  [K in keyof ViewOptions]: ViewOptions[K] extends () => any
+  [K in keyof ViewOptions]: ViewOptions[K] extends (...args: any) => any
     ? ReturnType<ViewOptions[K]>
     : never
 }
@@ -143,6 +146,16 @@ export type GetModelActions<Model> = Model extends ModelOptions<
   any
 >
   ? Actions<A> & EmptyObject
+  : never
+
+export type GetModelViews<Model> = Model extends ModelOptions<
+  any,
+  any,
+  any,
+  infer V,
+  any
+>
+  ? Views<V> & EmptyObject & { ttt: number }
   : never
 
 export type GetModelDeps<T> = T extends ModelOptions<

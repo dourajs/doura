@@ -58,7 +58,7 @@ export const defineModel = <
   N extends string,
   S extends State,
   A extends ActionOptions,
-  V extends ViewOptions,
+  V extends ViewOptions<S>,
   DM extends MakeDeps<DA>,
   DA extends any[] = []
 >(
