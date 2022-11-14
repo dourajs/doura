@@ -89,7 +89,7 @@ function useModelWithSelector<
       preMv.destory()
     }
 
-    mv = selectorRef.current = modelInstance.$createSelector(selector)
+    mv = selectorRef.current = modelInstance.$createView(selector)
 
     return mv
   }, [modelInstance, ...(depends ? depends : [selector])])

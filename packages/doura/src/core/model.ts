@@ -51,6 +51,10 @@ export interface ActionListener {
   (action: Action): any
 }
 
+export interface SubscriptionCallback {
+  (): any
+}
+
 const DepsPublicInstanceProxyHandlers = {
   get: (deps: Map<string, ModelInternal>, key: string) => {
     const model = deps.get(key)
@@ -115,9 +119,9 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   private _snapshot: State | null = null
   private _initState: IModel['state']
   private _currentState!: IModel['state']
-  private _listeners: Set<() => void> = new Set()
-  private _viewListeners: Set<() => void> = new Set()
   private _actionListeners: Set<ActionListener> = new Set()
+  private _viewListeners: Set<() => void> = new Set()
+  private _subscribers: Set<SubscriptionCallback> = new Set()
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
@@ -270,7 +274,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       this._currentState = nextState
       this.isPrimitiveState = !isObject(nextState)
       this.stateValue = this.stateRef.value
-      // trigger self _listeners
+      // trigger self _subscribers
       this._triggerListener()
     }
 
@@ -286,10 +290,10 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   }
 
   subscribe(listener: () => void) {
-    this._listeners.add(listener)
+    this._subscribers.add(listener)
 
     return () => {
-      this._listeners.delete(listener)
+      this._subscribers.delete(listener)
     }
   }
 
@@ -298,7 +302,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this.stateRef = {
       value: null,
     }
-    this._listeners.clear()
+    this._subscribers.clear()
     this.effectScope.stop()
     this._draftListenerHandler()
   }
@@ -316,7 +320,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     for (const listener of this._viewListeners) {
       listener()
     }
-    for (const listener of this._listeners) {
+    for (const listener of this._subscribers) {
       listener()
     }
   }
