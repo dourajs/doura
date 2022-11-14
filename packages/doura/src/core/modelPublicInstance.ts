@@ -46,12 +46,12 @@ export const publicPropertiesMap: PublicPropertiesMap =
     {
       $rawState: (i) => i.getState(),
       $state: (i) => (i.isPrimitiveState ? i.stateRef.value : i.stateValue),
-      $patch: (i) => i.patch,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
+      $patch: (i) => i.patch,
+      $onAction: (i) => i.onAction,
       $getSnapshot: (i) => i.getSnapshot,
       $createSelector: (i) => createView.bind(null, i),
-      $onAction: (i) => i.onAction,
     } as PublicPropertiesMap)
   )
 

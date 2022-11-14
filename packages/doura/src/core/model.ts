@@ -127,7 +127,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this.getSnapshot = this.getSnapshot.bind(this)
     this.subscribe = this.subscribe.bind(this)
     this.onAction = this.onAction.bind(this)
-    this.reducer = this.reducer.bind(this)
     this._subscribeFromView = this._subscribeFromView.bind(this)
 
     this.options = model
