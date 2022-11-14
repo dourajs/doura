@@ -1,6 +1,13 @@
 import { State, Action, AnyModel, ModelOptions } from './modelOptions'
-import { createModelInstnace, ModelInternal, Store, UnSubscribe } from './model'
+import {
+  createModelInstnace,
+  ModelInternal,
+  Store,
+  SubscriptionCallback,
+  UnSubscribe,
+} from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
+import { queueJob, SchedulerJob } from './scheduler'
 import { emptyObject } from '../utils'
 
 export type ModelManagerOptions = {
@@ -25,7 +32,8 @@ export interface ModelManager extends Omit<Store, 'subscribe'> {
   getModel<IModel extends ModelOptions<any, any, any, any, any>>(
     model: IModel
   ): ModelPublicInstance<IModel>
-  subscribe(model: AnyModel, fn: () => any): UnSubscribe
+  subscribe(fn: SubscriptionCallback): UnSubscribe
+  subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
 }
 
 export type PluginHook<IModel extends AnyModel = AnyModel> = {
@@ -74,10 +82,20 @@ class ModelManagerImpl implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models: MapHelper
+  private _subscribers: Set<SubscriptionCallback> = new Set()
+  private _onModelChange: SubscriptionCallback
 
   constructor(initialState = emptyObject, plugins: [Plugin, any?][] = []) {
     this._initialState = initialState
     this._models = createMapHelper()
+    const emitChange: SchedulerJob = () => {
+      for (const listener of this._subscribers) {
+        listener()
+      }
+    }
+    this._onModelChange = () => {
+      queueJob(emitChange)
+    }
     this._hooks = plugins.map(([plugin, option]) => plugin(option))
     this._hooks.map((hook) => hook.onInit?.(this, initialState))
   }
@@ -112,15 +130,26 @@ class ModelManagerImpl implements ModelManager {
     return action
   }
 
-  // fixme: listen all models
-  subscribe(model: AnyModel, fn: () => any) {
-    const instance = this._getModelInstance(model)
-    return instance.subscribe(fn)
+  subscribe(fn: SubscriptionCallback): UnSubscribe
+  subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
+  subscribe(modelOrFn: any, fn?: any): any {
+    if (typeof modelOrFn === 'function') {
+      const listener: SubscriptionCallback = modelOrFn
+      this._subscribers.add(listener)
+      return () => {
+        this._subscribers.delete(listener)
+      }
+    } else if (typeof fn === 'function') {
+      const model: AnyModel = modelOrFn
+      const instance = this._getModelInstance(model)
+      return instance.subscribe(fn)
+    }
   }
 
   destroy() {
     this._hooks.map((hook) => hook.onDestroy?.())
     this._models.clear()
+    this._subscribers.clear()
     this._initialState = emptyObject
   }
 
@@ -140,6 +169,7 @@ class ModelManagerImpl implements ModelManager {
       model,
       this._getInitialState(model.name)
     )
+    modelInstance.subscribe(this._onModelChange)
 
     const depends = model._depends
     if (depends) {

@@ -37,7 +37,7 @@ export type UnSubscribe = () => void
 export interface Store {
   getState(): Record<string, State>
   dispatch(action: Action): Action
-  subscribe(fn: () => any): UnSubscribe
+  subscribe(fn: SubscriptionCallback): UnSubscribe
   destroy(): void
 }
 

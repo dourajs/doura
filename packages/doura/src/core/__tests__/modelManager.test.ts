@@ -188,55 +188,93 @@ describe('modelManager', () => {
     expect(newStore.$state.value).toBe(0)
   })
 
-  it('subscribes and unsubscribes should work', async () => {
-    const modelMgr = modelManager()
-    let firstCount = 0
-    const first = defineModel({
-      name: 'first',
-      state: { value: 0 },
-      actions: {
-        addOne() {
-          this.value += 1
+  describe('subscribe', () => {
+    it('should subscribe to all models', async () => {
+      const fn = jest.fn()
+      const modelMgr = modelManager()
+      const a = defineModel({
+        name: 'a',
+        state: { value: 0 },
+        actions: {
+          increment(n: number) {
+            this.value += n
+          },
         },
-      },
-    })
-    const firstStore = modelMgr.getModel(first)
-    modelMgr.subscribe(first, () => {
-      firstCount++
-    })
-    let secondCount = 0
-    const second = defineModel({
-      name: 'second',
-      state: { value: 0 },
-      actions: {
-        add(n: number) {
-          this.value += n
+      })
+      const b = defineModel(
+        {
+          name: 'b',
+          state: { value: 0 },
+          actions: {
+            increment(n: number) {
+              this.$dep.a.increment(n)
+              this.value += n
+            },
+          },
         },
-      },
+        [a]
+      )
+
+      modelMgr.subscribe(fn)
+      const store = modelMgr.getModel(b)
+
+      expect(fn).toHaveBeenCalledTimes(0)
+      store.increment(1)
+      expect(fn).toHaveBeenCalledTimes(0)
+      await nextTick()
+      expect(fn).toHaveBeenCalledTimes(1)
     })
-    const secondStore = modelMgr.getModel(second)
-    const unSubscribeSecond = modelMgr.subscribe(second, () => {
-      secondCount++
+
+    it('should subscribe to model', async () => {
+      const modelMgr = modelManager()
+      let firstCount = 0
+      const first = defineModel({
+        name: 'first',
+        state: { value: 0 },
+        actions: {
+          addOne() {
+            this.value += 1
+          },
+        },
+      })
+      const firstStore = modelMgr.getModel(first)
+      modelMgr.subscribe(first, () => {
+        firstCount++
+      })
+      let secondCount = 0
+      const second = defineModel({
+        name: 'second',
+        state: { value: 0 },
+        actions: {
+          add(n: number) {
+            this.value += n
+          },
+        },
+      })
+      const secondStore = modelMgr.getModel(second)
+      const unSubscribeSecond = modelMgr.subscribe(second, () => {
+        secondCount++
+      })
+
+      firstStore.addOne()
+      await nextTick()
+      expect(firstCount).toBe(1)
+      firstStore.addOne()
+      await nextTick()
+      expect(firstCount).toBe(2)
+      expect(firstStore.$state).toStrictEqual({ value: 2 })
+      expect(secondStore.$state).toStrictEqual({ value: 0 })
+
+      secondStore.add(5)
+      await nextTick()
+      expect(secondCount).toBe(1)
+      expect(secondStore.$state).toStrictEqual({ value: 5 })
+
+      unSubscribeSecond()
+      secondStore.add(5)
+      await nextTick()
+      expect(secondCount).toBe(1)
     })
-
-    firstStore.addOne()
-    await nextTick()
-    expect(firstCount).toBe(1)
-    firstStore.addOne()
-    await nextTick()
-    expect(firstCount).toBe(2)
-    expect(firstStore.$state).toStrictEqual({ value: 2 })
-    expect(secondStore.$state).toStrictEqual({ value: 0 })
-
-    secondStore.add(5)
-    await nextTick()
-    expect(secondCount).toBe(1)
-    expect(secondStore.$state).toStrictEqual({ value: 5 })
-
-    unSubscribeSecond()
-    secondStore.add(5)
-    await nextTick()
-    expect(secondCount).toBe(1)
   })
 
   it('should trigger change when dependencies have changed', async () => {
