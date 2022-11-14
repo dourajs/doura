@@ -1,6 +1,11 @@
 import { hasOwn, extend, isPlainObject } from '../utils'
 import { warn } from '../warning'
-import { PublicPropertiesMap, ProxyContext, AccessContext } from './model'
+import {
+  PublicPropertiesMap,
+  ProxyContext,
+  AccessContext,
+  ActionListener,
+} from './model'
 import {
   State,
   AnyModel,
@@ -16,12 +21,12 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $patch(newState: State): void
   $replace(newState: State): void
   $actions: GetModelActions<IModel>
-  v: IModel['views']
   $views: GetModelViews<IModel>
   $getSnapshot(): ModelData<IModel>
   $createSelector: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
+  $onAction: (listener: ActionListener) => void
 } & GetModelState<IModel> &
   GetModelViews<IModel> &
   GetModelActions<IModel>
@@ -46,6 +51,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
       $views: (i) => i.views,
       $getSnapshot: (i) => i.getSnapshot,
       $createSelector: (i) => createView.bind(null, i),
+      $onAction: (i) => i.onAction,
     } as PublicPropertiesMap)
   )
 

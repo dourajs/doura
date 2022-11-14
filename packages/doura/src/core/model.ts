@@ -26,9 +26,10 @@ import { queueJob, SchedulerJob } from './scheduler'
 const randomString = () =>
   Math.random().toString(36).substring(7).split('').join('.')
 
-const ActionTypes = {
+export const ActionTypes = {
   INIT: `@@doura/INIT${/* #__PURE__ */ randomString()}`,
-  ACTION: '@@doura/ACTION',
+  MODIFY: '@@doura/MODIFY',
+  PATCH: '@@doura/PATCH',
 }
 
 export type UnSubscribe = () => void
@@ -44,6 +45,10 @@ export type PublicPropertiesMap = Record<string, (i: ModelInternal) => any>
 
 export interface ProxyContext {
   _: ModelInternal<any>
+}
+
+export interface ActionListener {
+  (action: Action): any
 }
 
 const DepsPublicInstanceProxyHandlers = {
@@ -112,13 +117,16 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   private _currentState!: IModel['state']
   private _listeners: Set<() => void> = new Set()
   private _viewListeners: Set<() => void> = new Set()
+  private _actionListeners: Set<ActionListener> = new Set()
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
+  private _watchStateChange: boolean = true
 
   constructor(model: IModel, initState: State) {
     this.patch = this.patch.bind(this)
     this.getSnapshot = this.getSnapshot.bind(this)
     this.subscribe = this.subscribe.bind(this)
+    this.onAction = this.onAction.bind(this)
     this.reducer = this.reducer.bind(this)
     this._subscribeFromView = this._subscribeFromView.bind(this)
 
@@ -132,12 +140,14 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     })
     const update: SchedulerJob = () => {
       this.dispatch({
-        type: ActionTypes.ACTION,
+        type: ActionTypes.MODIFY,
         payload: snapshot(this.stateRef.value, this.stateRef.value),
       })
     }
     this._draftListenerHandler = watch(this.stateRef, () => {
-      queueJob(update)
+      if (this._watchStateChange) {
+        queueJob(update)
+      }
     })
 
     this.actions = Object.create(null)
@@ -180,7 +190,14 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       return
     }
 
+    this._watchStateChange = false
     patchObj(this.proxy!.$state, obj)
+    this._watchStateChange = true
+
+    this.dispatch({
+      type: ActionTypes.PATCH,
+      payload: snapshot(this.stateRef.value, this.stateRef.value),
+    })
   }
 
   replace(newState: StateObject) {
@@ -212,7 +229,8 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     switch (action.type) {
       case ActionTypes.INIT:
         return this._initState
-      case ActionTypes.ACTION:
+      case ActionTypes.MODIFY:
+      case ActionTypes.PATCH:
         return action.payload
       default:
         return state
@@ -236,6 +254,10 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       return action
     }
 
+    for (const listener of this._actionListeners) {
+      listener(action)
+    }
+
     let nextState
 
     try {
@@ -254,6 +276,14 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     }
 
     return action
+  }
+
+  onAction(listener: (action: Action) => any) {
+    this._actionListeners.add(listener)
+
+    return () => {
+      this._actionListeners.delete(listener)
+    }
   }
 
   subscribe(listener: () => void) {
