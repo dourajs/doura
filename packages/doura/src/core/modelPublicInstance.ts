@@ -6,6 +6,7 @@ import {
   AccessContext,
   ActionListener,
   SubscriptionCallback,
+  UnSubscribe,
 } from './model'
 import {
   State,
@@ -17,13 +18,14 @@ import {
 import { createView, Selector, ModelView, ModelData } from './view'
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
+  $name: string
   $rawState: IModel['state']
   $state: IModel['state']
   $actions: GetModelActions<IModel>
   $views: GetModelViews<IModel>
   $patch(newState: State): void
-  $onAction: (listener: ActionListener) => void
-  $subscribe: (listener: SubscriptionCallback) => void
+  $onAction: (listener: ActionListener) => UnSubscribe
+  $subscribe: (listener: SubscriptionCallback) => UnSubscribe
   $getSnapshot(): ModelData<IModel>
   $createView: <R>(
     selector: Selector<IModel, R>
@@ -45,6 +47,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
   /*#__PURE__*/ extend(
     (Object.create(null),
     {
+      $name: (i) => i.name,
       $rawState: (i) => i.getState(),
       $state: (i) => (i.isPrimitiveState ? i.stateRef.value : i.stateValue),
       $actions: (i) => i.actions,

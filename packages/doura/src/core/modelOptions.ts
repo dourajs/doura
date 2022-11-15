@@ -113,7 +113,7 @@ export type ModelOptions<
   state: S
   actions?: A & ThisType<ActionThis<S, A, V, D>>
   views?: V & ThisType<ViewThis<S, V, D>>
-  _depends?: Deps
+  models?: Deps
 }
 
 export type AnyModel = ModelOptions<any, any, any, any, any>

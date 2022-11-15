@@ -8,25 +8,13 @@ import {
 } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
+import { Plugin, PluginHook } from './plugins'
 import { emptyObject } from '../utils'
 
 export type ModelManagerOptions = {
   initialState?: Record<string, any>
   plugins?: [Plugin, any?][]
 }
-
-export const proxyMethods = [
-  'name',
-  'getState',
-  'dispatch',
-  'subscribe',
-  'reducer',
-  'replace',
-] as const
-
-export type ProxyMethods = typeof proxyMethods[number]
-
-type InternalModelProxy = Pick<ModelInternal<AnyModel>, ProxyMethods>
 
 export interface ModelManager extends Omit<Store, 'subscribe'> {
   getModel<IModel extends ModelOptions<any, any, any, any, any>>(
@@ -35,17 +23,6 @@ export interface ModelManager extends Omit<Store, 'subscribe'> {
   subscribe(fn: SubscriptionCallback): UnSubscribe
   subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
 }
-
-export type PluginHook<IModel extends AnyModel = AnyModel> = {
-  onInit?(store: ModelManager, initialState: Record<string, State>): void
-  onModel?(model: IModel): void
-  onModelInstance?(instance: InternalModelProxy): void
-  onDestroy?(): void
-}
-
-export type Plugin<IModel extends AnyModel = AnyModel, Option = any> = (
-  option: Option
-) => PluginHook<IModel>
 
 interface MapHelper {
   get(key: AnyModel): ModelInternal | undefined
@@ -97,7 +74,7 @@ class ModelManagerImpl implements ModelManager {
       queueJob(emitChange)
     }
     this._hooks = plugins.map(([plugin, option]) => plugin(option))
-    this._hooks.map((hook) => hook.onInit?.(this, initialState))
+    this._hooks.map((hook) => hook.onInit?.({ initialState }, { doura: this }))
   }
 
   getModel<IModel extends AnyModel>(model: IModel) {
@@ -163,7 +140,7 @@ class ModelManagerImpl implements ModelManager {
   }
 
   private _initModel(model: AnyModel): ModelInternal {
-    this._hooks.map((hook) => hook.onModel?.(model))
+    this._hooks.map((hook) => hook.onModel?.(model, { doura: this }))
 
     const modelInstance = createModelInstnace(
       model,
@@ -171,7 +148,7 @@ class ModelManagerImpl implements ModelManager {
     )
     modelInstance.subscribe(this._onModelChange)
 
-    const depends = model._depends
+    const depends = model.models
     if (depends) {
       for (const [name, dep] of Object.entries(depends)) {
         // todo: lazy init
@@ -180,25 +157,11 @@ class ModelManagerImpl implements ModelManager {
       }
     }
 
-    const modelInstanceProxy = new Proxy(modelInstance, {
-      get(target, prop: ProxyMethods, receiver: object) {
-        if (proxyMethods.includes(prop)) {
-          const value = Reflect.get(target, prop, receiver)
-          if (typeof value === 'function') {
-            return value.bind(target)
-          } else {
-            return value
-          }
-        }
-
-        return undefined
-      },
-    })
-    this._hooks.map((hook) => {
-      hook.onModelInstance?.(modelInstanceProxy)
-    })
-
     this._models.set(model, modelInstance)
+    this._hooks.map((hook) => {
+      hook.onModelInstance?.(modelInstance.proxy!, { doura: this })
+    })
+
     return modelInstance
   }
 

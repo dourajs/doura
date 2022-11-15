@@ -347,15 +347,19 @@ describe('modelManager', () => {
         plugins: [[plugin, {}]],
       })
 
-      expect(onInit).toHaveBeenCalledWith(modelMgr, initialState)
+      expect(onInit).toHaveBeenCalledWith({ initialState }, { doura: modelMgr })
 
       const model = defineModel({
         name: 'model',
         state: { value: '' },
       })
       modelMgr.getModel(model)
-      expect(onModel).toHaveBeenCalledWith(model)
-      expect(typeof onModelInstance.mock.calls[0][0].dispatch).toBe('function')
+      expect(onModel).toHaveBeenCalledWith(model, { doura: modelMgr })
+      expect(typeof onModelInstance.mock.calls[0][0].$name).toBe('string')
+      expect(typeof onModelInstance.mock.calls[0][0].$state).toBe('object')
+      expect(typeof onModelInstance.mock.calls[0][0].$subscribe).toBe(
+        'function'
+      )
 
       modelMgr.destroy()
       expect(onDestroy).toHaveBeenCalledWith()

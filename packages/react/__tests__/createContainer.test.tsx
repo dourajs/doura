@@ -33,17 +33,11 @@ describe('createContainer', () => {
     expect(_useStaticModel).toBeTruthy()
   })
 
-  test('createContainer should accept doura argument', () => {
+  test('createContainer should accept options of doura', () => {
     const onInit = jest.fn()
-    const onModel = jest.fn()
-    const onModelInstance = jest.fn()
-    const onDestroy = jest.fn()
     const plugin: Plugin = () => {
       return {
         onInit,
-        onModel,
-        onModelInstance,
-        onDestroy,
       }
     }
 
@@ -67,8 +61,6 @@ describe('createContainer', () => {
     )
 
     expect(onInit).toHaveBeenCalled()
-    expect(onModel).toHaveBeenCalled()
-    expect(typeof onModelInstance.mock.calls[0][0].dispatch).toBe('function')
   })
 
   test('Local DouraRoot and useSharedModel should work', async () => {

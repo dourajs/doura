@@ -5,8 +5,6 @@ import { createWebStorage } from './storage'
 import { persistModel } from './persistModel'
 import { IStorageState, PersistOptions } from './types'
 
-const ACTIONTYPE = '_PERSISTSET'
-
 type StoreProxy = Parameters<
   ReturnType<typeof douraPersist>['onModelInstance'] & Function
 > extends infer P
@@ -15,25 +13,23 @@ type StoreProxy = Parameters<
     : undefined
   : undefined
 
-function _rehydrated(storageState: IStorageState, store: StoreProxy) {
-  if (storageState && store.name && storageState[store.name]) {
-    store.replace(storageState[store.name])
+function rehydrated(storageState: IStorageState, store: StoreProxy) {
+  if (storageState && store.$name && storageState[store.$name]) {
+    store.$patch(storageState[store.$name])
   }
 }
 
-const douraPersist: Plugin<AnyModel, PersistOptions> = function (options) {
+const douraPersist: Plugin = function (options: PersistOptions) {
   const persist = createPersist(options)
   let persistStore: ModelPublicInstance<typeof persistModel>
-  let _douraStore: ReturnType<typeof doura>
   const unSubscribes = new Set<() => void>()
   const collectLoadingStore = new Set<StoreProxy>()
   let _storageState: IStorageState
   let _isPause = false
   let _isInit = false
   return {
-    onInit(douraStore) {
-      _douraStore = douraStore
-      persistStore = douraStore.getModel(persistModel)
+    onInit(_options, { doura }) {
+      persistStore = doura.getModel(persistModel)
       Object.assign(persistStore, {
         purge() {
           return persist.purge()
@@ -44,7 +40,7 @@ const douraPersist: Plugin<AnyModel, PersistOptions> = function (options) {
         togglePause() {
           _isPause = !_isPause
           if (!_isPause && _isInit) {
-            persist.update(_douraStore.getState())
+            persist.update(doura.getState())
           }
         },
       })
@@ -60,8 +56,9 @@ const douraPersist: Plugin<AnyModel, PersistOptions> = function (options) {
           )
             .then((migrateState) => {
               _storageState = migrateState
+              // fixme: collectLoadingStore may not ready
               for (const model of collectLoadingStore) {
-                _rehydrated(_storageState, model)
+                rehydrated(_storageState, model)
               }
               persistStore.$patch({
                 rehydrated: true,
@@ -77,22 +74,15 @@ const douraPersist: Plugin<AnyModel, PersistOptions> = function (options) {
           console.error(`getStoredState inner error:`, err)
         })
     },
-    onModelInstance(instance) {
-      const originReducer = instance.reducer
-      instance.reducer = function (state, action) {
-        if (action.type === ACTIONTYPE) {
-          return action.payload
-        }
-        return originReducer(state, action)
-      }
+    onModelInstance(instance, { doura }) {
       if (_isInit) {
-        _rehydrated(_storageState, instance)
+        rehydrated(_storageState, instance)
       } else {
         collectLoadingStore.add(instance)
       }
-      const unSubscribe = instance.subscribe(function () {
+      const unSubscribe = instance.$subscribe(function () {
         if (!_isPause && _isInit) {
-          persist.update(_douraStore.getState())
+          persist.update(doura.getState())
         }
       })
       unSubscribes.add(unSubscribe)

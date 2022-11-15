@@ -75,11 +75,11 @@ export const defineModel = <
 
   const model = modelOptions as ModelOptions<N, S, A, V, DM>
   if (depends) {
-    model._depends = {}
+    model.models = {}
     for (let index = 0; index < depends.length; index++) {
       const dep = depends[index] as any
       const name: string = dep.name || `${index}`
-      model._depends[name] = dep
+      model.models[name] = dep
     }
   }
 
