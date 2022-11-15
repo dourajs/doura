@@ -17,6 +17,8 @@ import {
 } from './modelOptions'
 import { createView, Selector, ModelView, ModelData } from './view'
 
+export const isReservedPrefix = (key: string) => key === '_' || key === '$'
+
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $name: string
   $rawState: IModel['state']
@@ -118,12 +120,14 @@ export const PublicInstanceProxyHandlers = {
       accessCache[key] = AccessTypes.CONTEXT
       return ctx[key]
     }
-    // CAUTION: pinia requires state exist at first, we should consider carefully
-    // whether to support this
-    // fallback to state, the key may not exist at first
-    else if (isPlainObject(state)) {
-      // @ts-ignore
-      return state[key]
+
+    if (isReservedPrefix(key[0]) && hasOwn(state, key)) {
+      warn(
+        `Property ${JSON.stringify(
+          key
+        )} must be accessed via $state because it starts with a reserved ` +
+          `character ("$" or "_") and is not proxied on the render context.`
+      )
     }
   },
 

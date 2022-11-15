@@ -364,7 +364,7 @@ describe('defineModel/views', () => {
     expect(store.view).toStrictEqual(newState.a)
   })
 
-  it('should return last value (non-existed property)', () => {
+  it('should not reactive to properties not existing in the initial state', () => {
     const fn = jest.fn()
     let initState = {}
     const model = defineModel({
@@ -384,11 +384,9 @@ describe('defineModel/views', () => {
     expect(fn).toHaveBeenCalledTimes(1)
 
     store.$patch({ a: 1 })
-    // re-run view
-    expect(store.view).toStrictEqual(1)
-    // cache view
-    expect(store.view).toStrictEqual(1)
-    expect(fn).toHaveBeenCalledTimes(2)
+    // should not re-run view
+    expect(store.view).toBeUndefined()
+    expect(fn).toHaveBeenCalledTimes(1)
   })
 
   it('should return last value (using this.$state in view)', () => {

@@ -203,6 +203,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     })
   }
 
+  // fixme: use a dedicated replace action for this
   replace(newState: StateObject) {
     this.stateRef.value = newState
     this.stateValue = this.stateRef.value
