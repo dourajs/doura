@@ -12,9 +12,7 @@ export const counterModel = defineModel('counter', {
     count: 0,
   },
   views: {
-    doubleCount() {
-      return this.count * 2,
-    }
+    doubleCount: (state) => state.count * 2,
   },
 })
 ```
@@ -26,13 +24,12 @@ export const counterModel = defineModel('counter', {
   state: {
     count: 0,
   },
-  getters: {
+  views: {
     // automatically infers the return type as a number
-    doubleCount() {
-      return this.count * 2
-    },
+     doubleCount: (state) => state.count * 2,
     // automatically infers the return type as a number
     doublePlusOne() {
+      // use this to access other views 
       return this.doubleCount + 1
     },
   },
