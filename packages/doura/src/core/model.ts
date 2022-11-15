@@ -28,6 +28,7 @@ const randomString = () =>
 
 export const ActionTypes = {
   INIT: `@@doura/INIT${/* #__PURE__ */ randomString()}`,
+  REPLACE: '@@doura/REPLACE',
   MODIFY: '@@doura/MODIFY',
   PATCH: '@@doura/PATCH',
 }
@@ -203,14 +204,20 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     })
   }
 
-  // fixme: use a dedicated replace action for this
   replace(newState: StateObject) {
+    this._watchStateChange = false
     this.stateRef.value = newState
-    this.stateValue = this.stateRef.value
+    this._watchStateChange = true
+
     // invalid all views;
     for (const view of this.viewInstances) {
       view.effect.scheduler!()
     }
+
+    this.dispatch({
+      type: ActionTypes.PATCH,
+      payload: newState,
+    })
   }
 
   getState() {
@@ -233,6 +240,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     switch (action.type) {
       case ActionTypes.INIT:
         return this._initState
+      case ActionTypes.REPLACE:
       case ActionTypes.MODIFY:
       case ActionTypes.PATCH:
         return action.payload
