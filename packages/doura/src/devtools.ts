@@ -1,8 +1,6 @@
 import { invariant } from './utils'
 import type { Plugin } from './core/index'
 
-const SET_FROM_DEVTOOLS = '@@doura/SET_FROM_DEVTOOLS'
-
 const reduxDevTools: Plugin = function () {
   let id = 0
   const unsubscribeSet = new Set<() => void>()
@@ -16,11 +14,11 @@ const reduxDevTools: Plugin = function () {
           name: instance.name || `model_${id++}`,
         })
 
-        const initialState = instance.getState()
+        const initialState = instance.$rawState
         devTools.init(initialState)
 
         let isLatestState = true
-        let latestState: any = instance.getState()
+        let latestState: any = instance.$rawState
         const fn = (message: any) => {
           switch (message.type) {
             case 'ACTION':
@@ -28,34 +26,23 @@ const reduxDevTools: Plugin = function () {
                 typeof message.payload === 'string',
                 'Unsupported action format'
               )
-              try {
-                const action = JSON.parse(message.payload)
-                return instance.dispatch(action)
-              } catch (e) {
-                throw new Error(
-                  `[Doura Devtool] Could not parse the received json.`
-                )
-              }
-
+              // todo
+              return
             case 'DISPATCH':
               switch (message.payload.type) {
                 case 'RESET':
-                  return devTools.init(instance.getState())
+                  return devTools.init(instance.$rawState)
 
                 case 'COMMIT':
                   isLatestState = true
-                  return devTools.init(instance.getState())
+                  return devTools.init(instance.$rawState)
 
                 case 'ROLLBACK':
                   isLatestState = true
                   try {
                     const parsedState = JSON.parse(message.state)
-                    const action = {
-                      type: SET_FROM_DEVTOOLS,
-                      payload: parsedState,
-                    }
-                    instance.dispatch(action)
-                    return devTools.init(instance.getState())
+                    instance.$state = parsedState
+                    return devTools.init(instance.$rawState)
                   } catch (e) {
                     throw new Error(
                       `[Doura Devtool] Could not parse the received json.`
@@ -73,40 +60,29 @@ const reduxDevTools: Plugin = function () {
                       isLatestState = true
                     } else if (isLatestState) {
                       isLatestState = false
-                      latestState = instance.getState()
+                      latestState = instance.$rawState
                     }
-                    const action = {
-                      type: SET_FROM_DEVTOOLS,
-                      payload: parsedState,
-                    }
-                    return instance.dispatch(action)
+                    instance.$state = parsedState
                   } catch (e) {
                     throw new Error(
                       `[Doura Devtool] Could not parse the received json.`
                     )
                   }
+                  return
               }
-              return
           }
         }
         const unsubscribe = devTools.subscribe(fn)
         unsubscribeSet.add(unsubscribe)
 
-        const originReducer = instance.reducer
-        instance.reducer = function (state, action) {
-          if (action.type === SET_FROM_DEVTOOLS) {
-            return action.payload
-          }
+        instance.$onAction(() => {
           if (!isLatestState) {
-            const newState = originReducer(latestState, action)
-            latestState = newState
-            devTools.send(action, newState)
-            return state
+            latestState = instance.$rawState
+            devTools.send({} /* action */, latestState)
           }
-          const newState = originReducer(state, action)
-          devTools.send(action, newState)
-          return newState
-        }
+
+          devTools.send({} /* action */, latestState)
+        })
       }
     },
     onDestroy() {

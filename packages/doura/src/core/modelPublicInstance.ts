@@ -1,4 +1,4 @@
-import { hasOwn, extend, isPlainObject } from '../utils'
+import { hasOwn, extend } from '../utils'
 import { warn } from '../warning'
 import {
   PublicPropertiesMap,

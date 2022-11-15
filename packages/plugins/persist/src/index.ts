@@ -1,4 +1,4 @@
-import { Plugin, doura, AnyModel, ModelPublicInstance } from 'doura'
+import { Plugin, ModelPublicInstance } from 'doura'
 import createPersist from './createPersist'
 import getStoredState from './getStoredState'
 import { createWebStorage } from './storage'
