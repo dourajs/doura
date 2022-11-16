@@ -1,10 +1,11 @@
 /.git
 CHANGELOG.md
 package.json
-lerna.json
+packages/*/lib
 packages/*/dist
+packages/*/esm
 packages/*/node_modules
-website/*/node_modules
-website/*/build
-website/*/.docusaurus
 packages/*/CHANGELOG.md
+docs/*/node_modules
+docs/*/build
+docs/*/.docusaurus

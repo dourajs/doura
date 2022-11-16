@@ -8,6 +8,21 @@
   "umd:main": "dist/doura.umd.production.min.js",
   "unpkg": "dist/doura.umd.production.min.js",
   "types": "esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./esm/index.d.ts",
+      "import": "./esm/index.js",
+      "require": "./lib/index.js",
+      "default": "./lib/index.js"
+    },
+    "./devtool": {
+      "types": "./esm/devtool.d.ts",
+      "import": "./esm/devtool.js",
+      "require": "./lib/devtool.js",
+      "default": "./lib/devtool.js"
+    },
+    "./*": "./*"
+  },
   "sideEffects": false,
   "scripts": {
     "dev": "run-p watch:*",

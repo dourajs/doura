@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react'
 import { doura } from 'doura'
+import devtool from 'doura/devtool'
 import type { Doura, AnyModel, DouraOptions, Selector } from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
 import { createBatchManager } from './batchManager'
@@ -105,7 +106,9 @@ const {
   Provider: DouraRoot,
   useSharedModel: useRootModel,
   useStaticModel: useRootStaticModel,
-} = createContainer()
+} = createContainer({
+  plugins: process.env.NODE_ENV === 'development' ? [[devtool]] : [],
+})
 
 export { DouraRoot, useRootModel, useRootStaticModel }
 

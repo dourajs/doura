@@ -1,0 +1,23 @@
+.App {
+  font-family: sans-serif;
+}
+
+input,
+button {
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  max-width: 100%;
+  margin-bottom: 0;
+  margin-right: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .logo {
+    color: white;
+  }
+}
