@@ -1,4 +1,4 @@
-import { ActionTypes, defineModel, modelManager } from '../index'
+import { ActionType, defineModel, modelManager } from '../index'
 import { nextTick } from '../scheduler'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -373,88 +373,6 @@ describe('defineModel/actions', () => {
       expect(
         "[Doura warn] 'BigInt' and 'Symbol' are not assignable to the State"
       ).toHaveBeenWarnedTimes(2)
-    })
-  })
-
-  describe('$patch()', () => {
-    it('should warn primitive value', () => {
-      const count = defineModel({
-        name: 'count',
-        state: 1,
-      })
-
-      const store = modelMgr.getModel(count)
-
-      store.$patch(2)
-      expect('$patch argument should be an object').toHaveBeenWarned()
-    })
-
-    it('should patch the state', () => {
-      type IState = {
-        a: number
-        b: number
-      }
-      const count = defineModel({
-        name: 'count',
-        state: { a: 1 } as IState,
-      })
-
-      const store = modelMgr.getModel(count)
-      const onAction = jest.fn()
-      store.$onAction(onAction)
-      store.$patch({ a: 2 })
-      expect(store.$state).toEqual({ a: 2 })
-      expect(onAction).toHaveBeenCalledTimes(1)
-      expect(onAction.mock.calls[0][0]).toMatchObject({
-        type: ActionTypes.PATCH,
-      })
-
-      store.$patch({ b: 2 })
-      expect(store.$state).toEqual({ a: 2, b: 2 })
-      expect(onAction).toHaveBeenCalledTimes(2)
-      expect(onAction.mock.calls[1][0]).toMatchObject({
-        type: ActionTypes.PATCH,
-      })
-    })
-
-    it('should patch deep state', () => {
-      const count = defineModel({
-        name: 'count',
-        state: {
-          a: {
-            b: 'b',
-            c: 'c',
-            d: {
-              f: 'f',
-            },
-          },
-        },
-      })
-
-      const store = modelMgr.getModel(count)
-
-      store.$patch({
-        a: {
-          m: 'n',
-          c: 'c1',
-          d: {
-            f: 'f1',
-            o: 'o',
-          },
-        },
-      })
-
-      expect(store.$state).toEqual({
-        a: {
-          b: 'b',
-          c: 'c1',
-          d: {
-            f: 'f1',
-            o: 'o',
-          },
-          m: 'n',
-        },
-      })
     })
   })
 })

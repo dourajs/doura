@@ -3,13 +3,6 @@ import { warn } from '../warning'
 import { EmptyObject } from '../types'
 import { invariant, isPlainObject } from '../utils'
 
-export interface Action<T = any> {
-  type: string
-  payload?: T
-  // Allows any extra properties to be defined in an action.
-  [extraProps: string]: any
-}
-
 export type StateObject = {
   [x: string]: any
 }

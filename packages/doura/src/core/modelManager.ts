@@ -1,8 +1,7 @@
-import { State, Action, AnyModel, ModelOptions } from './modelOptions'
+import { State, AnyModel, ModelOptions } from './modelOptions'
 import {
   createModelInstnace,
   ModelInternal,
-  Store,
   SubscriptionCallback,
   UnSubscribe,
 } from './model'
@@ -16,12 +15,18 @@ export type ModelManagerOptions = {
   plugins?: [Plugin, any?][]
 }
 
-export interface ModelManager extends Omit<Store, 'subscribe'> {
+export interface ModelManager {
+  getState(): Record<string, State>
   getModel<IModel extends ModelOptions<any, any, any, any, any>>(
     model: IModel
   ): ModelPublicInstance<IModel>
-  subscribe(fn: SubscriptionCallback): UnSubscribe
+  subscribe(fn: DouraSubscriptionCallback): UnSubscribe
   subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
+  destroy(): void
+}
+
+export interface DouraSubscriptionCallback {
+  (): any
 }
 
 interface MapHelper {
@@ -59,8 +64,8 @@ class ModelManagerImpl implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models: MapHelper
-  private _subscribers: Set<SubscriptionCallback> = new Set()
-  private _onModelChange: SubscriptionCallback
+  private _subscribers: Set<DouraSubscriptionCallback> = new Set()
+  private _onModelChange: DouraSubscriptionCallback
 
   constructor(initialState = emptyObject, plugins: [Plugin, any?][] = []) {
     this._initialState = initialState
@@ -100,18 +105,11 @@ class ModelManagerImpl implements ModelManager {
     return allState
   }
 
-  dispatch(action: Action) {
-    this._models.each((m) => {
-      m.dispatch(action)
-    })
-    return action
-  }
-
-  subscribe(fn: SubscriptionCallback): UnSubscribe
+  subscribe(fn: DouraSubscriptionCallback): UnSubscribe
   subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
   subscribe(modelOrFn: any, fn?: any): any {
     if (typeof modelOrFn === 'function') {
-      const listener: SubscriptionCallback = modelOrFn
+      const listener: DouraSubscriptionCallback = modelOrFn
       this._subscribers.add(listener)
       return () => {
         this._subscribers.delete(listener)

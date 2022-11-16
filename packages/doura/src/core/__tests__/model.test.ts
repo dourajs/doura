@@ -1,6 +1,15 @@
 import { AnyModel } from '../modelOptions'
-import { ModelInternal } from '../model'
+import { ModelInternal, ActionType } from '../model'
 import { nextTick } from '../scheduler'
+
+let oldEnv: any
+beforeAll(() => {
+  oldEnv = process.env.NODE_ENV
+  process.env.NODE_ENV = 'development'
+})
+afterAll(() => {
+  process.env.NODE_ENV = oldEnv
+})
 
 const createModel = (options: AnyModel, initState?: any) =>
   new ModelInternal(options, initState)
@@ -63,6 +72,121 @@ describe('model', () => {
       a: 2,
       arr: [1, 2],
       firstOfArr: 1,
+    })
+  })
+
+  describe('subscribe()', () => {
+    it('should work', async () => {
+      type IState = {
+        a: number
+        b: number
+      }
+      const count = createModel({
+        name: 'count',
+        state: { a: 1, b: 1 } as IState,
+      })
+
+      const onChange = jest.fn()
+      count.subscribe(onChange)
+      count.patch({ a: 2 })
+      expect(count.stateRef.value).toEqual({ a: 2, b: 1 })
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(onChange.mock.calls[0][0]).toMatchObject({
+        type: ActionType.PATCH,
+        patch: { a: 2 },
+      })
+
+      count.replace({ a: 3, b: 3 })
+      expect(count.stateRef.value).toEqual({ a: 3, b: 3 })
+      expect(onChange).toHaveBeenCalledTimes(2)
+      expect(onChange.mock.calls[1][0]).toMatchObject({
+        type: ActionType.REPLACE,
+      })
+
+      count.stateRef.value.a = 4
+      await nextTick()
+      expect(onChange).toHaveBeenCalledTimes(3)
+      expect(onChange.mock.calls[2][0]).toMatchObject({
+        type: ActionType.MODIFY,
+      })
+    })
+  })
+
+  describe('patch()', () => {
+    it('should warn primitive value', () => {
+      const count = createModel({
+        name: 'count',
+        state: 1,
+      })
+
+      // @ts-expect-error
+      count.patch(2)
+      expect('patch argument should be an object').toHaveBeenWarned()
+    })
+
+    it('should patch the state', () => {
+      type IState = {
+        a: number
+        b: number
+      }
+      const count = createModel({
+        name: 'count',
+        state: { a: 1, b: 1 } as IState,
+      })
+
+      const onChange = jest.fn()
+      count.subscribe(onChange)
+      count.patch({ a: 2 })
+      expect(count.stateRef.value).toEqual({ a: 2, b: 1 })
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(onChange.mock.calls[0][0]).toMatchObject({
+        type: ActionType.PATCH,
+      })
+
+      count.patch({ b: 2 })
+      expect(count.stateRef.value).toEqual({ a: 2, b: 2 })
+      expect(onChange).toHaveBeenCalledTimes(2)
+      expect(onChange.mock.calls[1][0]).toMatchObject({
+        type: ActionType.PATCH,
+      })
+    })
+
+    it('should patch deep state', () => {
+      const count = createModel({
+        name: 'count',
+        state: {
+          a: {
+            b: 'b',
+            c: 'c',
+            d: {
+              f: 'f',
+            },
+          },
+        },
+      })
+
+      count.patch({
+        a: {
+          m: 'n',
+          c: 'c1',
+          d: {
+            f: 'f1',
+            o: 'o',
+          },
+        },
+      })
+
+      expect(count.stateRef.value).toEqual({
+        a: {
+          b: 'b',
+          c: 'c1',
+          d: {
+            f: 'f1',
+            o: 'o',
+          },
+          m: 'n',
+        },
+      })
     })
   })
 

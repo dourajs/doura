@@ -11,7 +11,6 @@ import {
 } from '../reactivity/index'
 import {
   Views,
-  Action,
   State,
   StateObject,
   AnyModel,
@@ -23,24 +22,16 @@ import {
 } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 
-const randomString = () =>
-  Math.random().toString(36).substring(7).split('').join('.')
+// const randomString = () =>
+//   Math.random().toString(36).substring(7).split('').join('.')
 
-export const ActionTypes = {
-  INIT: `@@doura/INIT${/* #__PURE__ */ randomString()}`,
-  REPLACE: '@@doura/REPLACE',
-  MODIFY: '@@doura/MODIFY',
-  PATCH: '@@doura/PATCH',
+export enum ActionType {
+  REPLACE = 'replace',
+  MODIFY = 'modify',
+  PATCH = 'patch',
 }
 
 export type UnSubscribe = () => void
-
-export interface Store {
-  getState(): Record<string, State>
-  dispatch(action: Action): Action
-  subscribe(fn: SubscriptionCallback): UnSubscribe
-  destroy(): void
-}
 
 export type PublicPropertiesMap = Record<string, (i: ModelInternal) => any>
 
@@ -48,13 +39,69 @@ export interface ProxyContext {
   _: ModelInternal<any>
 }
 
+export interface ModelAction {
+  name: string
+  args: any[]
+}
+
 export interface ActionListener {
-  (action: Action): any
+  (action: ModelAction): any
 }
 
 export interface SubscriptionCallback {
-  (): any
+  (event: ModelChangeEvent): any
 }
+
+export interface ActionBase<T = any> {
+  type: string
+  payload?: T
+  // Allows any extra properties to be defined in an action.
+  [extraProps: string]: any
+}
+
+export interface ModifyAction extends ActionBase {
+  type: ActionType.MODIFY
+}
+
+export type PatchArgs = {
+  patch: any
+}
+
+export interface PatchAction extends ActionBase {
+  type: ActionType.PATCH
+  args: PatchArgs
+}
+
+export interface ReplaceAction extends ActionBase {
+  type: ActionType.REPLACE
+}
+
+export type Action = ModifyAction | PatchAction | ReplaceAction
+
+export interface ModelChangeEventBase {
+  type: ActionType
+  // the model to which the event is attached.
+  model: ModelPublicInstance<AnyModel>
+  // the model that triggered the event.
+  target: ModelPublicInstance<AnyModel>
+}
+
+export interface ModelModifyEvent extends ModelChangeEventBase {
+  type: ActionType.MODIFY
+}
+
+export interface ModelPatchEvent extends ModelChangeEventBase, PatchArgs {
+  type: ActionType.PATCH
+}
+
+export interface ModelReplaceEvent extends ModelChangeEventBase {
+  type: ActionType.REPLACE
+}
+
+export type ModelChangeEvent =
+  | ModelModifyEvent
+  | ModelPatchEvent
+  | ModelReplaceEvent
 
 const DepsPublicInstanceProxyHandlers = {
   get: (deps: Map<string, ModelInternal>, key: string) => {
@@ -142,9 +189,10 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this.stateRef = draft({
       value: this._initState,
     })
+
     const update: SchedulerJob = () => {
       this.dispatch({
-        type: ActionTypes.MODIFY,
+        type: ActionType.MODIFY,
         payload: snapshot(this.stateRef.value, this.stateRef.value),
       })
     }
@@ -175,14 +223,14 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this._initActions()
     this._initViews()
 
-    this.dispatch({ type: ActionTypes.INIT })
+    this._setState(this._initState)
   }
 
   patch(obj: StateObject) {
     if (!isPlainObject(obj)) {
       if (process.env.NODE_ENV === 'development') {
         warn(
-          `$patch argument should be an object, but receive a ${Object.prototype.toString.call(
+          `patch argument should be an object, but receive a ${Object.prototype.toString.call(
             obj
           )}`
         )
@@ -199,8 +247,11 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this._watchStateChange = true
 
     this.dispatch({
-      type: ActionTypes.PATCH,
+      type: ActionType.PATCH,
       payload: snapshot(this.stateRef.value, this.stateRef.value),
+      args: {
+        patch: obj,
+      },
     })
   }
 
@@ -215,7 +266,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     }
 
     this.dispatch({
-      type: ActionTypes.PATCH,
+      type: ActionType.REPLACE,
       payload: newState,
     })
   }
@@ -238,11 +289,9 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
 
   reducer(state: IModel['state'], action: Action) {
     switch (action.type) {
-      case ActionTypes.INIT:
-        return this._initState
-      case ActionTypes.REPLACE:
-      case ActionTypes.MODIFY:
-      case ActionTypes.PATCH:
+      case ActionType.REPLACE:
+      case ActionType.MODIFY:
+      case ActionType.PATCH:
         return action.payload
       default:
         return state
@@ -266,10 +315,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       return action
     }
 
-    for (const listener of this._actionListeners) {
-      listener(action)
-    }
-
     let nextState
 
     try {
@@ -279,18 +324,19 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       this._isDispatching = false
     }
     if (nextState !== this._currentState) {
-      this._snapshot = null
-      this._currentState = nextState
-      this.isPrimitiveState = !isObject(nextState)
-      this.stateValue = this.stateRef.value
-      // trigger self _subscribers
-      this._triggerListener()
+      this._setState(nextState)
+      this._triggerListener({
+        type: action.type,
+        model: this.proxy!,
+        target: this.proxy!,
+        ...action.args,
+      })
     }
 
     return action
   }
 
-  onAction(listener: (action: Action) => any) {
+  onAction(listener: (action: ModelAction) => any) {
     this._actionListeners.add(listener)
 
     return () => {
@@ -298,7 +344,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     }
   }
 
-  subscribe(listener: () => void) {
+  subscribe(listener: SubscriptionCallback) {
     this._subscribers.add(listener)
 
     return () => {
@@ -319,18 +365,28 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   depend(name: string, dep: ModelInternal<any>) {
     this.deps.set(name, dep)
     // collection beDepends, a depends b, when b update, call a need trigger listener
-    dep.subscribe(() => {
-      this._triggerListener()
+    dep.subscribe((event) => {
+      this._triggerListener({
+        ...event,
+        model: this.proxy!,
+      })
     })
   }
 
-  private _triggerListener() {
+  private _setState(newState: IModel['state']) {
+    this._snapshot = null
+    this._currentState = newState
+    this.isPrimitiveState = !isObject(newState)
+    this.stateValue = this.stateRef.value
+  }
+
+  private _triggerListener(event: ModelChangeEvent) {
     // view's listeners should be triggered first
     for (const listener of this._viewListeners) {
       listener()
     }
     for (const listener of this._subscribers) {
-      listener()
+      listener(event)
     }
   }
 
@@ -376,6 +432,13 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
 
         // @ts-ignore
         this.actions[actionsName as string] = (...args: any[]) => {
+          for (const listener of this._actionListeners) {
+            listener({
+              name: actionsName,
+              args,
+            })
+          }
+
           return action.call(this.proxy, ...args)
         }
       })
