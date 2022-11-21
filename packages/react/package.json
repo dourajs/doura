@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "module": "esm/index.js",
   "browser": "esm/index.js",
-  "unpkg": "dist/dourareact.umd.production.min.js",
+  "unpkg": "dist/doura-react.umd.production.min.js",
   "types": "esm/index.d.ts",
   "sideEffects": false,
   "scripts": {
@@ -23,9 +23,11 @@
   ],
   "keywords": [
     "doura",
-    "doura",
-    "react",
-    "redux"
+    "reactive",
+    "state management",
+    "javascript",
+    "typescript",
+    "react"
   ],
   "homepage": "https://dourajs.github.io/doura",
   "license": "MIT",
@@ -41,9 +43,9 @@
     "access": "public"
   },
   "files": [
+    "dist",
     "esm",
-    "lib",
-    "dist"
+    "lib"
   ],
   "dependencies": {
     "use-sync-external-store": "1.2.0"

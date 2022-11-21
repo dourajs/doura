@@ -62,7 +62,7 @@ describe('useModel', () => {
   describe('should always be isolation', () => {
     test('should isolation with useRootModel', async () => {
       const App = () => {
-        const [state, actions] = useRootModel(countModel)
+        const [state, actions] = useRootModel('count', countModel)
         const [state1, actions1] = useModel(countModel)
 
         return (

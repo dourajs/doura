@@ -39,6 +39,7 @@
   ],
   "keywords": [
     "doura",
+    "reactive",
     "state management",
     "javascript",
     "typescript"
@@ -57,9 +58,10 @@
     "access": "public"
   },
   "files": [
+    "dist",
     "esm",
     "lib",
-    "dist"
+    "./devtool.js"
   ],
   "devDependencies": {
     "lodash": "^4.17.4"

@@ -26,7 +26,7 @@ describe('batchedUpdates', () => {
       const [index, setIndex] = useState(0)
 
       useEffect(() => {
-        batchManager.addSubscribe(countModel, douraStore, function () {
+        batchManager.addSubscribe(douraStore.getModel(countModel), function () {
           setIndex(1)
         })
       })
@@ -53,7 +53,7 @@ describe('batchedUpdates', () => {
       const [index, setIndex] = useState(0)
 
       useEffect(() => {
-        batchManager.addSubscribe(countModel, douraStore, function () {
+        batchManager.addSubscribe(douraStore.getModel(countModel), function () {
           setIndex(1)
         })
       })
@@ -68,7 +68,7 @@ describe('batchedUpdates', () => {
 
     expect(container.querySelector('#value')?.innerHTML).toEqual('0')
     act(() => {
-      batchManager.triggerSubscribe(countModel)
+      batchManager.triggerSubscribe(douraStore.getModel(countModel))
     })
     expect(container.querySelector('#value')?.innerHTML).toEqual('1')
   })
@@ -80,8 +80,7 @@ describe('batchedUpdates', () => {
 
       useEffect(() => {
         unsubscribe = batchManager.addSubscribe(
-          countModel,
-          douraStore,
+          douraStore.getModel(countModel),
           function () {
             setIndex(1)
           }
@@ -113,10 +112,10 @@ describe('batchedUpdates', () => {
       const [index1, setIndex1] = useState(0)
 
       useEffect(() => {
-        batchManager.addSubscribe(countModel, douraStore, function () {
+        batchManager.addSubscribe(douraStore.getModel(countModel), function () {
           setIndex(1)
         })
-        batchManager.addSubscribe(countModel, douraStore, function () {
+        batchManager.addSubscribe(douraStore.getModel(countModel), function () {
           setIndex1(1)
         })
       })

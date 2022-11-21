@@ -10,6 +10,8 @@ import {
 import { useSyncExternalStore } from 'use-sync-external-store/shim'
 import { createBatchManager } from './batchManager'
 
+type SubscribeFn = (onStoreChange: () => void) => () => void
+
 function readonlyModel(model: ModelPublicInstance<AnyModel>) {
   return new Proxy(model, {
     get(target: ModelPublicInstance<AnyModel>, key: string | symbol): any {
@@ -31,55 +33,27 @@ function readonlyModel(model: ModelPublicInstance<AnyModel>) {
 }
 
 function useModel<IModel extends AnyModel, S extends Selector<IModel>>(
-  doura: Doura,
-  batchManager: ReturnType<typeof createBatchManager>,
-  model: IModel
+  model: ModelPublicInstance<IModel>,
+  subscribe: SubscribeFn
 ) {
-  const { modelInstance, subscribe } = useMemo(
-    () => {
-      return {
-        modelInstance: doura.getModel(model),
-        subscribe: (onModelChange: () => void) =>
-          batchManager.addSubscribe(model, doura, onModelChange),
-      }
-    },
-    // ignore model's change
-    [doura]
-  )
-
-  const view = useMemo(
-    () => () => modelInstance.$getSnapshot(),
-    [modelInstance]
-  )
+  const view = useMemo(() => () => model.$getSnapshot(), [model])
 
   const state = useSyncExternalStore<ReturnType<S>>(subscribe, view, view)
 
   useDebugValue(state)
 
-  return [state, modelInstance.$actions] as [any, any]
+  return [state, model.$actions] as [any, any]
 }
 
 function useModelWithSelector<
   IModel extends AnyModel,
   S extends Selector<IModel>
 >(
-  doura: Doura,
-  batchManager: ReturnType<typeof createBatchManager>,
-  model: IModel,
+  model: ModelPublicInstance<IModel>,
+  subscribe: SubscribeFn,
   selector: S,
   depends?: any[]
 ) {
-  const { modelInstance, subscribe } = useMemo(
-    () => {
-      return {
-        modelInstance: doura.getModel(model),
-        subscribe: (onModelChange: () => void) =>
-          batchManager.addSubscribe(model, doura, onModelChange),
-      }
-    },
-    // ignore model's change
-    [doura]
-  )
   const selectorRef = useRef<undefined | ModelView>(undefined)
 
   const view = useMemo(() => {
@@ -89,17 +63,66 @@ function useModelWithSelector<
       preMv.destory()
     }
 
-    mv = selectorRef.current = modelInstance.$createView(selector)
+    mv = selectorRef.current = model.$createView(selector)
 
     return mv
-  }, [modelInstance, ...(depends ? depends : [selector])])
+  }, [model, ...(depends ? depends : [selector])])
 
   const state = useSyncExternalStore<ReturnType<S>>(subscribe, view, view)
 
   useDebugValue(state)
 
-  return [state, modelInstance.$actions] as [any, any]
+  return [state, model.$actions] as [any, any]
 }
+
+function useModelInstance<IModel extends AnyModel>(
+  name: string,
+  model: IModel,
+  doura: Doura,
+  batchManager: ReturnType<typeof createBatchManager>
+) {
+  const { modelInstance, subscribe } = useMemo(
+    () => {
+      const modelInstance = doura.getModel(name, model)
+      return {
+        modelInstance,
+        subscribe: (onModelChange: () => void) =>
+          batchManager.addSubscribe(modelInstance, onModelChange),
+      }
+    },
+    // ignore model's change
+    [name, doura]
+  )
+
+  return {
+    modelInstance,
+    subscribe,
+  }
+}
+
+export const createUseSharedModel =
+  (doura: Doura, batchManager: ReturnType<typeof createBatchManager>) =>
+  <IModel extends AnyModel, S extends Selector<IModel>>(
+    name: string,
+    model: IModel,
+    selector?: S,
+    depends?: any[]
+  ) => {
+    const hasSelector = useRef(selector)
+    const { modelInstance, subscribe } = useModelInstance(
+      name,
+      model,
+      doura,
+      batchManager
+    )
+
+    // todo: warn when hasSelector changes
+    if (hasSelector.current) {
+      return useModelWithSelector(modelInstance, subscribe, selector!, depends)
+    } else {
+      return useModel(modelInstance, subscribe)
+    }
+  }
 
 export const createUseModel =
   (doura: Doura, batchManager: ReturnType<typeof createBatchManager>) =>
@@ -109,18 +132,18 @@ export const createUseModel =
     depends?: any[]
   ) => {
     const hasSelector = useRef(selector)
+    const { modelInstance, subscribe } = useModelInstance(
+      model.name || '',
+      model,
+      doura,
+      batchManager
+    )
 
     // todo: warn when hasSelector changes
     if (hasSelector.current) {
-      return useModelWithSelector(
-        doura,
-        batchManager,
-        model,
-        selector!,
-        depends
-      )
+      return useModelWithSelector(modelInstance, subscribe, selector!, depends)
     } else {
-      return useModel(doura, batchManager, model)
+      return useModel(modelInstance, subscribe)
     }
   }
 

@@ -7,8 +7,20 @@ export interface IUseModel {
     ModelData<IModel>,
     IActions<IModel>
   ]
-
   <IModel extends AnyModel, S extends Selector<IModel>>(
+    model: IModel,
+    selectors: S,
+    depends?: any[]
+  ): [ReturnType<S>, IActions<IModel>]
+}
+
+export interface IUseSharedModel {
+  <IModel extends AnyModel>(name: string, model: IModel): [
+    ModelData<IModel>,
+    IActions<IModel>
+  ]
+  <IModel extends AnyModel, S extends Selector<IModel>>(
+    name: string,
     model: IModel,
     selectors: S,
     depends?: any[]

@@ -1,4 +1,4 @@
-import { ActionType, defineModel, modelManager } from '../index'
+import { defineModel, modelManager } from '../index'
 import { nextTick } from '../scheduler'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -109,7 +109,7 @@ describe('defineModel/actions', () => {
     })
 
     const store = modelMgr.getModel(count)
-    modelMgr.subscribe(count, fn)
+    store.$subscribe(fn)
     store.add()
     expect(fn).toHaveBeenCalledTimes(0)
     await nextTick()
@@ -134,7 +134,7 @@ describe('defineModel/actions', () => {
     })
 
     const store = modelMgr.getModel(count)
-    modelMgr.subscribe(count, fn)
+    store.$subscribe(fn)
     store.add()
     expect(fn).toHaveBeenCalledTimes(0)
     await nextTick()
@@ -162,7 +162,7 @@ describe('defineModel/actions', () => {
     })
 
     const store = modelMgr.getModel(count)
-    modelMgr.subscribe(count, fn)
+    store.$subscribe(fn)
     store.add()
     expect(fn).toHaveBeenCalledTimes(0)
     await nextTick()

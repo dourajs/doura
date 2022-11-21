@@ -91,10 +91,6 @@ export type ViewThis<
     }
   }
 
-/**
- * @template S State
- * @template MC dependency models
- */
 export type ModelOptions<
   N extends string,
   S extends State,
@@ -107,6 +103,16 @@ export type ModelOptions<
   actions?: A & ThisType<ActionThis<S, A, V, D>>
   views?: V & ThisType<ViewThis<S, V, D>>
   models?: Deps
+}
+
+export interface NamedModelOptions<
+  N extends string,
+  S extends State,
+  A extends ActionOptions,
+  V extends ViewOptions,
+  D extends Deps
+> extends ModelOptions<N, S, A, V, D> {
+  name: N
 }
 
 export type AnyModel = ModelOptions<any, any, any, any, any>

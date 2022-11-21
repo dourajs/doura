@@ -1,14 +1,9 @@
-import { State, AnyModel, ModelOptions } from './modelOptions'
-import {
-  createModelInstnace,
-  ModelInternal,
-  SubscriptionCallback,
-  UnSubscribe,
-} from './model'
+import { State, AnyModel } from './modelOptions'
+import { createModelInstnace, ModelInternal, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
-import { emptyObject } from '../utils'
+import { emptyObject, invariant } from '../utils'
 
 export type ModelManagerOptions = {
   initialState?: Record<string, any>
@@ -17,11 +12,12 @@ export type ModelManagerOptions = {
 
 export interface ModelManager {
   getState(): Record<string, State>
-  getModel<IModel extends ModelOptions<any, any, any, any, any>>(
+  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  getModel<IModel extends AnyModel>(
+    name: string,
     model: IModel
   ): ModelPublicInstance<IModel>
   subscribe(fn: DouraSubscriptionCallback): UnSubscribe
-  subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
   destroy(): void
 }
 
@@ -30,8 +26,8 @@ export interface DouraSubscriptionCallback {
 }
 
 interface MapHelper {
-  get(key: AnyModel): ModelInternal | undefined
-  set(key: AnyModel, model: ModelInternal): void
+  get(key: string): ModelInternal | undefined
+  set(key: string, model: ModelInternal): void
   each(fn: (item: ModelInternal) => void): void
   clear(): void
 }
@@ -40,11 +36,11 @@ const createMapHelper = (): MapHelper => {
   const models = new Map<string, ModelInternal>()
 
   const self: MapHelper = {
-    get(modelOptions: AnyModel) {
-      return models.get(modelOptions.name || modelOptions)
+    get(key: string) {
+      return models.get(key)
     },
-    set(modelOptions: AnyModel, model: ModelInternal) {
-      models.set(modelOptions.name || modelOptions, model)
+    set(key: string, model: ModelInternal) {
+      models.set(key, model)
     },
     each(fn) {
       for (const model of models.values()) {
@@ -82,9 +78,22 @@ class ModelManagerImpl implements ModelManager {
     this._hooks.map((hook) => hook.onInit?.({ initialState }, { doura: this }))
   }
 
-  getModel<IModel extends AnyModel>(model: IModel) {
-    let instance = this._getModelInstance(model)
-    return instance.proxy as ModelPublicInstance<IModel>
+  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  getModel<IModel extends AnyModel>(
+    name: string,
+    model: IModel
+  ): ModelPublicInstance<IModel>
+  getModel(nameOrModel: any, model?: any): any {
+    let name: string
+    if (typeof nameOrModel === 'string') {
+      name = nameOrModel
+    } else {
+      model = nameOrModel
+      name = model.name
+      invariant(typeof name !== 'undefined', 'name is required')
+    }
+    let instance = this._getModelInstance(name, model)
+    return instance.proxy as ModelPublicInstance<AnyModel>
   }
 
   getState() {
@@ -105,19 +114,10 @@ class ModelManagerImpl implements ModelManager {
     return allState
   }
 
-  subscribe(fn: DouraSubscriptionCallback): UnSubscribe
-  subscribe(model: AnyModel, fn: SubscriptionCallback): UnSubscribe
-  subscribe(modelOrFn: any, fn?: any): any {
-    if (typeof modelOrFn === 'function') {
-      const listener: DouraSubscriptionCallback = modelOrFn
-      this._subscribers.add(listener)
-      return () => {
-        this._subscribers.delete(listener)
-      }
-    } else if (typeof fn === 'function') {
-      const model: AnyModel = modelOrFn
-      const instance = this._getModelInstance(model)
-      return instance.subscribe(fn)
+  subscribe(listener: DouraSubscriptionCallback): UnSubscribe {
+    this._subscribers.add(listener)
+    return () => {
+      this._subscribers.delete(listener)
     }
   }
 
@@ -128,34 +128,33 @@ class ModelManagerImpl implements ModelManager {
     this._initialState = emptyObject
   }
 
-  private _getModelInstance(model: AnyModel) {
-    let cacheStore = this._models.get(model)
+  private _getModelInstance(name: string, model: AnyModel) {
+    let cacheStore = this._models.get(name)
     if (cacheStore) {
       return cacheStore
     }
 
-    return this._initModel(model)
+    return this._initModel(name, model)
   }
 
-  private _initModel(model: AnyModel): ModelInternal {
-    this._hooks.map((hook) => hook.onModel?.(model, { doura: this }))
+  private _initModel(name: string, model: AnyModel): ModelInternal {
+    this._hooks.map((hook) => hook.onModel?.(name, model, { doura: this }))
 
     const modelInstance = createModelInstnace(
       model,
-      this._getInitialState(model.name)
+      this._getInitialState(name)
     )
     modelInstance.subscribe(this._onModelChange)
 
     const depends = model.models
     if (depends) {
       for (const [name, dep] of Object.entries(depends)) {
-        // todo: lazy init
-        const depInstance = this._getModelInstance(dep)
+        const depInstance = this._getModelInstance(name, dep)
         modelInstance.depend(name, depInstance)
       }
     }
 
-    this._models.set(model, modelInstance)
+    this._models.set(name, modelInstance)
     this._hooks.map((hook) => {
       hook.onModelInstance?.(modelInstance.proxy!, { doura: this })
     })

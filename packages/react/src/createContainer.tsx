@@ -9,9 +9,9 @@ import React, {
 import { doura } from 'doura'
 import devtool from 'doura/devtool'
 import type { Doura, AnyModel, DouraOptions, Selector } from 'doura'
-import { createUseModel, createUseStaticModel } from './createUseModel'
+import { createUseSharedModel, createUseStaticModel } from './createUseModel'
 import { createBatchManager } from './batchManager'
-import { IUseModel, IUseStaticModel } from './types'
+import { IUseSharedModel, IUseStaticModel } from './types'
 import { invariant } from './utils'
 
 const createContainer = function (options?: DouraOptions) {
@@ -52,10 +52,11 @@ const createContainer = function (options?: DouraOptions) {
     return <Context.Provider value={contextValue}>{children}</Context.Provider>
   }
 
-  const useSharedModel: IUseModel = <
+  const useSharedModel: IUseSharedModel = <
     IModel extends AnyModel,
     S extends Selector<IModel>
   >(
+    name: string,
     model: IModel,
     selector?: S,
     depends?: any[]
@@ -71,9 +72,9 @@ const createContainer = function (options?: DouraOptions) {
     const { store, batchManager } = context
 
     return useMemo(
-      () => createUseModel(store, batchManager),
+      () => createUseSharedModel(store, batchManager),
       [store, batchManager]
-    )(model, selector, depends)
+    )(name, model, selector, depends)
   }
 
   const useStaticModel: IUseStaticModel = <IModel extends AnyModel>(

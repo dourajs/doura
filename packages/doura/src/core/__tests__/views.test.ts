@@ -614,6 +614,7 @@ describe('defineModel/views', () => {
   describe('array', () => {
     it('should return new reference when an existing element is modified', async () => {
       const model = defineModel({
+        name: 'todo',
         state: {
           todos: [{ id: 0, finished: false }],
           nextId: 0,
@@ -646,6 +647,7 @@ describe('defineModel/views', () => {
 
     it('should return new reference when a new element is modified', async () => {
       const model = defineModel({
+        name: 'todo',
         state: {
           todos: [] as { id: number; finished: boolean }[],
           nextId: 0,

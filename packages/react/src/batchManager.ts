@@ -1,22 +1,24 @@
 import { unstable_batchedUpdates } from 'react-dom'
-import type { AnyModel, Doura } from 'doura'
+import type { AnyModel, ModelPublicInstance } from 'doura'
 
 const createBatchManager = () => {
   // store models which is using now
-  const modelBindRender = new WeakMap<AnyModel, Set<() => void>>()
-  const douraUnSub = new WeakMap<AnyModel, () => void>()
+  const modelBindRender = new WeakMap<
+    ModelPublicInstance<AnyModel>,
+    Set<() => void>
+  >()
+  const douraUnSub = new WeakMap<ModelPublicInstance<AnyModel>, () => void>()
 
   // add models to listen
   const addSubscribe = function (
-    model: AnyModel,
-    store: Doura,
+    model: ModelPublicInstance<AnyModel>,
     fn: () => void
   ) {
     let modelsFnSet = modelBindRender.get(model)
     if (!modelsFnSet) {
       modelsFnSet = new Set()
       modelsFnSet.add(fn)
-      const unSubscribe = store.subscribe(model, function () {
+      const unSubscribe = model.$subscribe(function () {
         triggerSubscribe(model) // render self;
       })
       modelBindRender.set(model, modelsFnSet)
@@ -30,7 +32,10 @@ const createBatchManager = () => {
   }
 
   // remove models to listen
-  const removeSubscribe = function (model: AnyModel, fn: () => void) {
+  const removeSubscribe = function (
+    model: ModelPublicInstance<AnyModel>,
+    fn: () => void
+  ) {
     let modelsFnSet = modelBindRender.get(model)
     if (modelsFnSet) {
       modelsFnSet.delete(fn)
@@ -46,7 +51,7 @@ const createBatchManager = () => {
   }
 
   // listen to models in using
-  const triggerSubscribe = function (model: AnyModel) {
+  const triggerSubscribe = function (model: ModelPublicInstance<AnyModel>) {
     const updateList: (() => void)[] = Array.from(
       modelBindRender.get(model) || []
     )

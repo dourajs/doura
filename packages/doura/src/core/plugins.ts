@@ -11,7 +11,7 @@ export type PluginHook = {
     options: { initialState: Record<string, State> },
     context: PluginContext
   ): void
-  onModel?(model: AnyModel, context: PluginContext): void
+  onModel?(name: string, model: AnyModel, context: PluginContext): void
   onModelInstance?(
     instance: ModelPublicInstance<AnyModel>,
     context: PluginContext

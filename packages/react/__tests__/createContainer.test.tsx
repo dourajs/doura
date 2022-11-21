@@ -49,7 +49,7 @@ describe('createContainer', () => {
     })
 
     const SubApp = () => {
-      const [_state] = useSharedModel(countModel)
+      const [_state] = useSharedModel('count', countModel)
 
       return null
     }
@@ -67,7 +67,7 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const [state, actions] = useSharedModel(countModel)
+      const [state, actions] = useSharedModel('count', countModel)
 
       return (
         <>
@@ -102,8 +102,8 @@ describe('createContainer', () => {
       createContainer()
 
     const C = () => {
-      const [stateA, _actionsA] = useSharedModelA(countModel)
-      const [stateB, _actionsB] = useSharedModelB(countModel)
+      const [stateA, _actionsA] = useSharedModelA('count', countModel)
+      const [stateB, _actionsB] = useSharedModelB('count', countModel)
 
       return (
         <>
@@ -114,7 +114,7 @@ describe('createContainer', () => {
     }
 
     const A = () => {
-      const [state, actions] = useSharedModelA(countModel)
+      const [state, actions] = useSharedModelA('count', countModel)
 
       return (
         <>
@@ -128,7 +128,7 @@ describe('createContainer', () => {
     }
 
     const B = () => {
-      const [state, actions] = useSharedModelB(countModel)
+      const [state, actions] = useSharedModelB('count', countModel)
 
       return (
         <>
@@ -171,7 +171,7 @@ describe('createContainer', () => {
       createContainer()
 
     const A = (props: { id: number }) => {
-      const [state, actions] = useSharedModelA(countModel)
+      const [state, actions] = useSharedModelA('count', countModel)
 
       return (
         <>
@@ -222,8 +222,8 @@ describe('createContainer', () => {
       createContainer()
 
     const C = () => {
-      const [stateA, _actionsA] = useSharedModelA(countModel)
-      const [stateB, _actionsB] = useSharedModelB(countModel)
+      const [stateA, _actionsA] = useSharedModelA('count', countModel)
+      const [stateB, _actionsB] = useSharedModelB('count', countModel)
 
       return (
         <>
@@ -234,7 +234,7 @@ describe('createContainer', () => {
     }
 
     const A = () => {
-      const [state, actions] = useSharedModelA(countModel)
+      const [state, actions] = useSharedModelA('count', countModel)
 
       return (
         <>
@@ -248,7 +248,7 @@ describe('createContainer', () => {
     }
 
     const B = () => {
-      const [state, actions] = useSharedModelB(countModel)
+      const [state, actions] = useSharedModelB('count', countModel)
 
       return (
         <>
@@ -290,7 +290,7 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const [state, actions] = useSharedModel(countModel)
+      const [state, actions] = useSharedModel('count', countModel)
 
       return (
         <>
@@ -343,7 +343,7 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const [state, actions] = useSharedModel(countModel)
+      const [state, actions] = useSharedModel('count', countModel)
 
       return (
         <>
@@ -402,7 +402,7 @@ describe('createContainer', () => {
 describe('createContainer/DouraRoot', () => {
   test('DouraRoot should worked without props douraStore', async () => {
     const App = () => {
-      const [state, actions] = useRootModel(countModel)
+      const [state, actions] = useRootModel('count', countModel)
       return (
         <>
           <div id="value">{state.value}</div>
@@ -431,7 +431,7 @@ describe('createContainer/DouraRoot', () => {
 
   test('DouraRoot props douraStore could overwrite default douraStore', () => {
     const App = () => {
-      const [state] = useRootModel(countModel)
+      const [state] = useRootModel('count', countModel)
       return (
         <>
           <div id="value">{state.value}</div>
@@ -441,7 +441,7 @@ describe('createContainer/DouraRoot', () => {
 
     const douraStore = doura({
       initialState: {
-        countModel: {
+        count: {
           value: 2,
         },
       },
@@ -472,7 +472,7 @@ describe('createContainer/useRootModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootModel(tempModel)
+        const [state, actions] = useRootModel('count', tempModel)
 
         return (
           <>
@@ -507,7 +507,7 @@ describe('createContainer/useRootModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootModel(tempModel)
+        const [state, actions] = useRootModel('count', tempModel)
 
         return (
           <>
@@ -542,7 +542,7 @@ describe('createContainer/useRootModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootModel(tempModel)
+        const [state, actions] = useRootModel('count', tempModel)
 
         return (
           <>
@@ -564,8 +564,8 @@ describe('createContainer/useRootModel', () => {
     let AppState: any = null
     let AppState1: any = null
     const App = () => {
-      const [state, actions] = useRootModel(countModel)
-      const [state1, _actions1] = useRootModel(countModel)
+      const [state, actions] = useRootModel('count', countModel)
+      const [state1, _actions1] = useRootModel('count', countModel)
       AppState = state
       AppState1 = state1
       return (
@@ -580,7 +580,7 @@ describe('createContainer/useRootModel', () => {
     }
     let SubAppState: any = null
     function SubApp() {
-      const [state, _actions] = useRootModel(countModel)
+      const [state, _actions] = useRootModel('count', countModel)
       SubAppState = state
       return <></>
     }
@@ -612,8 +612,8 @@ describe('createContainer/useRootModel', () => {
     let AppActions: any = null
     let AppActions1: any = null
     const App = () => {
-      const [state, actions] = useRootModel(countModel)
-      const [_state1, actions1] = useRootModel(countModel)
+      const [state, actions] = useRootModel('count', countModel)
+      const [_state1, actions1] = useRootModel('count', countModel)
       AppActions = actions
       AppActions1 = actions1
       return (
@@ -628,7 +628,7 @@ describe('createContainer/useRootModel', () => {
     }
     let SubAppActions: any = null
     function SubApp() {
-      const [_state, actions] = useRootModel(countModel)
+      const [_state, actions] = useRootModel('count', countModel)
       SubAppActions = actions
       return <></>
     }
@@ -658,7 +658,7 @@ describe('createContainer/useRootModel', () => {
 
   test("should keep data's state with component unmount or not", async () => {
     const SubApp = () => {
-      const [state, actions] = useRootModel(countModel)
+      const [state, actions] = useRootModel('count', countModel)
 
       return (
         <>

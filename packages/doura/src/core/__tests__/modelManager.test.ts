@@ -224,63 +224,17 @@ describe('modelManager', () => {
       await nextTick()
       expect(fn).toHaveBeenCalledTimes(1)
     })
-
-    it('should subscribe to model', async () => {
-      const modelMgr = modelManager()
-      let firstCount = 0
-      const first = defineModel({
-        name: 'first',
-        state: { value: 0 },
-        actions: {
-          addOne() {
-            this.value += 1
-          },
-        },
-      })
-      const firstStore = modelMgr.getModel(first)
-      modelMgr.subscribe(first, () => {
-        firstCount++
-      })
-      let secondCount = 0
-      const second = defineModel({
-        name: 'second',
-        state: { value: 0 },
-        actions: {
-          add(n: number) {
-            this.value += n
-          },
-        },
-      })
-      const secondStore = modelMgr.getModel(second)
-      const unSubscribeSecond = modelMgr.subscribe(second, () => {
-        secondCount++
-      })
-
-      firstStore.addOne()
-      await nextTick()
-      expect(firstCount).toBe(1)
-      firstStore.addOne()
-      await nextTick()
-      expect(firstCount).toBe(2)
-      expect(firstStore.$state).toStrictEqual({ value: 2 })
-      expect(secondStore.$state).toStrictEqual({ value: 0 })
-
-      secondStore.add(5)
-      await nextTick()
-      expect(secondCount).toBe(1)
-      expect(secondStore.$state).toStrictEqual({ value: 5 })
-
-      unSubscribeSecond()
-      secondStore.add(5)
-      await nextTick()
-      expect(secondCount).toBe(1)
-    })
   })
 
   it('should trigger change when dependencies have changed', async () => {
-    const modelMgr = modelManager()
-    let dependCount = 0
     let storeCount = 0
+    let modelCount = 0
+    let dependCount = 0
+    const modelMgr = modelManager()
+    modelMgr.subscribe(() => {
+      storeCount++
+    })
+
     const first = defineModel({
       name: 'first',
       state: { value: 0 },
@@ -291,7 +245,8 @@ describe('modelManager', () => {
       },
     })
     const depend = modelMgr.getModel(first)
-    modelMgr.subscribe(first, () => {
+
+    depend.$subscribe(() => {
       dependCount++
     })
     const second = defineModel(
@@ -308,21 +263,24 @@ describe('modelManager', () => {
     )
 
     const store = modelMgr.getModel(second)
-    modelMgr.subscribe(second, () => {
-      storeCount++
+    store.$subscribe(() => {
+      modelCount++
     })
 
     depend.addOne()
     await nextTick()
     expect(dependCount).toBe(1)
+    expect(modelCount).toBe(1)
     expect(storeCount).toBe(1)
     depend.addOne()
     await nextTick()
     expect(dependCount).toBe(2)
+    expect(modelCount).toBe(2)
     expect(storeCount).toBe(2)
     store.add(1)
     await nextTick()
     expect(dependCount).toBe(2)
+    expect(modelCount).toBe(3)
     expect(storeCount).toBe(3)
   })
 
@@ -350,11 +308,11 @@ describe('modelManager', () => {
       expect(onInit).toHaveBeenCalledWith({ initialState }, { doura: modelMgr })
 
       const model = defineModel({
-        name: 'model',
+        name: 'test',
         state: { value: '' },
       })
       modelMgr.getModel(model)
-      expect(onModel).toHaveBeenCalledWith(model, { doura: modelMgr })
+      expect(onModel).toHaveBeenCalledWith('test', model, { doura: modelMgr })
       expect(typeof onModelInstance.mock.calls[0][0].$name).toBe('string')
       expect(typeof onModelInstance.mock.calls[0][0].$state).toBe('object')
       expect(typeof onModelInstance.mock.calls[0][0].$subscribe).toBe(
