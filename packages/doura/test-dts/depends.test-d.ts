@@ -1,17 +1,12 @@
-import { defineModel, expectType, Action } from './'
+import { defineModel, expectType } from './'
 
 const depend0 = defineModel({
   state: {
     d0: 0,
   },
-  reducers: {
-    reducerD0(state) {
-      state.d0 += 1
-    },
-  },
   actions: {
     actionD0() {
-      return this.$state.d0
+      this.$state.d0 += 1
     },
   },
   views: {
@@ -25,14 +20,9 @@ const depend1 = defineModel({
   state: {
     d1: '0',
   },
-  reducers: {
-    reducerD1(state) {
-      state.d1 += 1
-    },
-  },
   actions: {
     actionD1() {
-      return this.$state.d1
+      this.$state.d1 += 1
     },
   },
   views: {
@@ -42,46 +32,44 @@ const depend1 = defineModel({
   },
 })
 
-const modelHasDep = defineModel(
-  {
-    state: {
-      count: 0,
-    },
-    actions: {
-      accessDepend() {
-        expectType<number>(this.$dep[0].$state.d0)
-        expectType<Action<void>>(this.$dep[0].reducerD0())
-        expectType<number>(this.$dep[0].actionD0())
-        expectType<number>(this.$dep[0].viewD0)
+const modelHasDep = defineModel({
+  state: {
+    count: 0,
+  },
+  models: {
+    depend0,
+    depend1,
+  },
+  actions: {
+    accessDepend() {
+      expectType<number>(this.$models.depend0.$state.d0)
+      expectType<void>(this.$models.depend0.actionD0())
+      expectType<number>(this.$models.depend0.viewD0)
 
-        expectType<string>(this.$dep[1].$state.d1)
-        expectType<Action<void>>(this.$dep[1].reducerD1())
-        expectType<string>(this.$dep[1].actionD1())
-        expectType<string>(this.$dep[1].viewD1)
-      },
+      expectType<string>(this.$models.depend1.$state.d1)
+      expectType<void>(this.$models.depend1.actionD1())
+      expectType<string>(this.$models.depend1.viewD1)
     },
   },
-  [depend0, depend1]
-)
+})
 
 const foo = defineModel({
-  name: 'foo',
   state: {
     count: 0,
   },
 })
 
-const bar = defineModel(
-  {
-    name: 'bar',
-    state: {
-      count: 0,
-    },
-    actions: {
-      accessDepend() {
-        expectType<number>(this.$dep.foo.$state.count)
-      },
+const bar = defineModel({
+  name: 'bar',
+  models: {
+    foo,
+  },
+  state: {
+    count: 0,
+  },
+  actions: {
+    accessDepend() {
+      expectType<number>(this.$models.foo.$state.count)
     },
   },
-  [foo]
-)
+})

@@ -149,7 +149,7 @@ class ModelManagerImpl implements ModelManager {
     const depends = model.models
     if (depends) {
       for (const [name, dep] of Object.entries(depends)) {
-        const depInstance = this._getModelInstance(name, dep)
+        const depInstance = this._getModelInstance(name, dep as AnyModel)
         modelInstance.depend(name, depInstance)
       }
     }

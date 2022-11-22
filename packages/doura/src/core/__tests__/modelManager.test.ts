@@ -59,77 +59,6 @@ describe('modelManager', () => {
     expect(storeTwo.$state.value).toBe('two')
   })
 
-  it('should access dependencies by name', async () => {
-    const modelMgr = modelManager()
-    const depend = defineModel({
-      name: 'depend',
-      state: { depend: 0 },
-      actions: {
-        increment(v: number) {
-          this.depend += v
-        },
-      },
-    })
-    const count = defineModel(
-      {
-        name: 'count',
-        state: { value: 0 },
-        actions: {
-          increment(v: number) {
-            this.value += v
-          },
-          dependAdd() {
-            this.$dep.depend.increment(1)
-          },
-        },
-      },
-      [depend]
-    )
-
-    const store = modelMgr.getModel(count)
-    store.dependAdd()
-    await nextTick()
-    expect(modelMgr.getState()).toEqual({
-      count: { value: 0 },
-      depend: { depend: 1 },
-    })
-  })
-
-  it('should access dependencies by index', async () => {
-    const modelMgr = modelManager()
-    const depend = defineModel({
-      state: { depend: 0 },
-      actions: {
-        increment(v: number) {
-          this.depend += v
-        },
-      },
-    })
-    const count = defineModel(
-      {
-        name: 'count',
-        state: { value: 0 },
-        actions: {
-          increment(v: number) {
-            this.value += v
-          },
-          dependAdd() {
-            this.$dep[0].increment(1)
-          },
-        },
-      },
-      [depend]
-    )
-
-    const store = modelMgr.getModel(count)
-    store.dependAdd()
-    await nextTick()
-    expect(modelMgr.getState()).toEqual({
-      count: { value: 0 },
-      _: [{ depend: 1 }],
-    })
-  })
-
   it('getState should return the newest state', async () => {
     const modelMgr = modelManager()
     const count0 = defineModel({
@@ -201,19 +130,19 @@ describe('modelManager', () => {
           },
         },
       })
-      const b = defineModel(
-        {
-          name: 'b',
-          state: { value: 0 },
-          actions: {
-            increment(n: number) {
-              this.$dep.a.increment(n)
-              this.value += n
-            },
+      const b = defineModel({
+        name: 'b',
+        models: {
+          a,
+        },
+        state: { value: 0 },
+        actions: {
+          increment(n: number) {
+            this.$models.a.increment(n)
+            this.value += n
           },
         },
-        [a]
-      )
+      })
 
       modelMgr.subscribe(fn)
       const store = modelMgr.getModel(b)
@@ -249,18 +178,18 @@ describe('modelManager', () => {
     depend.$subscribe(() => {
       dependCount++
     })
-    const second = defineModel(
-      {
-        name: 'second',
-        state: { value: 0 },
-        actions: {
-          add(n: number) {
-            this.value += n
-          },
+    const second = defineModel({
+      name: 'second',
+      models: {
+        first,
+      },
+      state: { value: 0 },
+      actions: {
+        add(n: number) {
+          this.value += n
         },
       },
-      [first]
-    )
+    })
 
     const store = modelMgr.getModel(second)
     store.$subscribe(() => {

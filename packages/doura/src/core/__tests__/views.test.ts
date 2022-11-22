@@ -492,19 +492,19 @@ describe('defineModel/views', () => {
         },
       })
       let calltime = 0
-      const sample = defineModel(
-        {
-          name: 'sample',
-          state: {},
-          views: {
-            viewA() {
-              calltime++
-              return this.$dep.modelA.a
-            },
+      const sample = defineModel({
+        name: 'sample',
+        models: {
+          modelA,
+        },
+        state: {},
+        views: {
+          viewA() {
+            calltime++
+            return this.$models.modelA.a
           },
         },
-        [modelA]
-      )
+      })
       const store = modelMgr.getModel(sample)
 
       expect(calltime).toBe(0)
@@ -532,18 +532,18 @@ describe('defineModel/views', () => {
           },
         },
       })
-      const sample = defineModel(
-        {
-          name: 'sample',
-          state: {},
-          views: {
-            viewA() {
-              return this.$dep.modelA.doubleA
-            },
+      const sample = defineModel({
+        name: 'sample',
+        models: {
+          modelA,
+        },
+        state: {},
+        views: {
+          viewA() {
+            return this.$models.modelA.doubleA
           },
         },
-        [modelA]
-      )
+      })
       const store = modelMgr.getModel(sample)
       const storeA = modelMgr.getModel(modelA)
       expect(store.viewA).toBe(0)

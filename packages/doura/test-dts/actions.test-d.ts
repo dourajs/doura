@@ -1,4 +1,4 @@
-import { defineModel, doura, expectType, Action } from './'
+import { defineModel, doura, expectType } from './'
 
 const douraStore = doura()
 

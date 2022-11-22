@@ -52,6 +52,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
       $name: (i) => i.name,
       $rawState: (i) => i.getState(),
       $state: (i) => (i.isPrimitiveState ? i.stateRef.value : i.stateValue),
+      $models: (i) => i.modelsProxy,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
       $patch: (i) => i.patch,
@@ -69,7 +70,6 @@ export const PublicInstanceProxyHandlers = {
       views,
       accessCache,
       accessContext,
-      depsProxy,
       ctx,
       stateValue: state,
     } = instance
@@ -107,10 +107,6 @@ export const PublicInstanceProxyHandlers = {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
       }
-    }
-
-    if (key === '$dep') {
-      return depsProxy
     }
 
     const publicGetter = publicPropertiesMap[key]
@@ -209,7 +205,6 @@ export const PublicInstanceProxyHandlers = {
       hasOwn(state, key) ||
       hasOwn(views, key) ||
       (accessContext !== AccessContext.VIEW && hasOwn(actions, key)) ||
-      key === '$dep' ||
       hasOwn(ctx, key) ||
       hasOwn(publicPropertiesMap, key)
     )

@@ -104,8 +104,8 @@ export type ModelChangeEvent =
   | ModelReplaceEvent
 
 const DepsPublicInstanceProxyHandlers = {
-  get: (deps: Map<string, ModelInternal>, key: string) => {
-    const model = deps.get(key)
+  get: (models: Map<string, ModelInternal>, key: string) => {
+    const model = models.get(key)
     if (model) {
       return model.proxy
     }
@@ -138,9 +138,9 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   name: string
   options: IModel
 
-  // deps
-  deps: Map<string, ModelInternal>
-  depsProxy: object
+  // models
+  models: Map<string, ModelInternal>
+  modelsProxy: object
 
   ctx: Record<string, any>
   accessCache: Record<string, any>
@@ -204,7 +204,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
 
     this.actions = Object.create(null)
     this.views = Object.create(null)
-    this.deps = new Map()
+    this.models = new Map()
     this.accessContext = AccessContext.DEFAULT
 
     this._isDispatching = false
@@ -218,7 +218,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       PublicInstanceProxyHandlers
     ) as ModelPublicInstance<IModel>
 
-    this.depsProxy = new Proxy(this.deps, DepsPublicInstanceProxyHandlers)
+    this.modelsProxy = new Proxy(this.models, DepsPublicInstanceProxyHandlers)
 
     this._initActions()
     this._initViews()
@@ -363,7 +363,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   }
 
   depend(name: string, dep: ModelInternal<any>) {
-    this.deps.set(name, dep)
+    this.models.set(name, dep)
     // collection beDepends, a depends b, when b update, call a need trigger listener
     dep.subscribe((event) => {
       this._triggerListener({

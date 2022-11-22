@@ -138,27 +138,27 @@ describe('createUseModel', () => {
     })
 
     test('should rerender when depends state changed', async () => {
-      const newModel = defineModel(
-        {
-          name: 'newModel',
-          state: { value: 0 },
-          actions: {
-            add(payload: number = 1) {
-              this.value += payload
-            },
-            async asyncAdd() {
-              await this.$dep.countModel.asyncAdd(1)
-              this.add(this.$dep.countModel.$state.value)
-            },
+      const newModel = defineModel({
+        name: 'newModel',
+        models: {
+          countModel,
+        },
+        state: { value: 0 },
+        actions: {
+          add(payload: number = 1) {
+            this.value += payload
           },
-          views: {
-            test() {
-              return this.$dep.countModel.value * 2
-            },
+          async asyncAdd() {
+            await this.$models.countModel.asyncAdd(1)
+            this.add(this.$models.countModel.$state.value)
           },
         },
-        [countModel]
-      )
+        views: {
+          test() {
+            return this.$models.countModel.value * 2
+          },
+        },
+      })
 
       const App = () => {
         const [state, actions] = useTestModel(

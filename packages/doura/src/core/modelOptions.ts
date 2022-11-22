@@ -24,7 +24,7 @@ export type ViewOptions<State = any> = Record<
   ((s: State) => any) | (() => any)
 >
 
-export type Deps = Record<string, AnyModel>
+export type Models = Record<string, AnyModel>
 
 type FilterActionIndex<T> = {
   [P in keyof T as string extends P
@@ -52,21 +52,21 @@ export type ActionThis<
   S extends State = {},
   A extends ActionOptions = {},
   V extends ViewOptions = {},
-  D extends Deps = {}
+  M extends Models = {}
 > = {
   $state: S
   $patch: (s: StateObject) => void
 } & S &
   Views<V> & {
-    $dep: {
-      [K in keyof D]: D[K] extends DefineModel<
+    $models: {
+      [K in keyof M]: M[K] extends DefineModel<
         any,
         infer DS,
         infer DA,
         infer DV,
-        infer DDeps
+        infer DM
       >
-        ? ActionThis<DS, DA, DV, DDeps>
+        ? ActionThis<DS, DA, DV, DM>
         : ActionThis
     }
   } & Actions<A>
@@ -74,12 +74,12 @@ export type ActionThis<
 export type ViewThis<
   S extends State = {},
   V extends ViewOptions = {},
-  D extends Deps = {}
+  M extends Models = {}
 > = S & {
   $state: S
 } & Views<V> & {
-    $dep: {
-      [K in keyof D]: D[K] extends DefineModel<
+    $models: {
+      [K in keyof M]: M[K] extends DefineModel<
         any,
         infer DS,
         any,
@@ -96,13 +96,13 @@ export type ModelOptions<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
-  D extends Deps
+  M extends Models
 > = {
   name?: N
   state: S
-  actions?: A & ThisType<ActionThis<S, A, V, D>>
-  views?: V & ThisType<ViewThis<S, V, D>>
-  models?: Deps
+  actions?: A & ThisType<ActionThis<S, A, V, M>>
+  views?: V & ThisType<ViewThis<S, V, M>>
+  models?: M
 }
 
 export interface NamedModelOptions<
@@ -110,8 +110,8 @@ export interface NamedModelOptions<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
-  D extends Deps
-> extends ModelOptions<N, S, A, V, D> {
+  M extends Models
+> extends ModelOptions<N, S, A, V, M> {
   name: N
 }
 
@@ -162,9 +162,9 @@ export type GetModelDeps<T> = T extends ModelOptions<
   any,
   any,
   any,
-  infer Deps
+  infer ModelOptions
 >
-  ? Deps
+  ? ModelOptions
   : never
 
 /**

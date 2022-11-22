@@ -155,33 +155,6 @@ describe('defineModel', () => {
         `key "a" in "views" is conflicted with the key in "state"`
       ).toHaveBeenWarned()
     })
-
-    test('depends should be array or undefined', () => {
-      expect(() => {
-        defineModel(
-          {
-            name: 'a',
-            state: {},
-          },
-          // @ts-ignore
-          {}
-        )
-      }).toThrow()
-
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: {},
-        })
-        defineModel(
-          {
-            name: 'a',
-            state: {},
-          },
-          []
-        )
-      }).not.toThrow()
-    })
   })
 
   it('should return the model', () => {
@@ -197,9 +170,8 @@ describe('defineModel', () => {
   })
 
   describe('dependencies', () => {
-    it('should access dependent models by this.$dep', () => {
+    it('should access dependent models by this.$models', () => {
       const depOne = defineModel({
-        name: 'one',
         state: { count: 0 },
         actions: {
           add(p: number) {
@@ -209,7 +181,6 @@ describe('defineModel', () => {
       })
 
       const depTwo = defineModel({
-        name: 'two',
         state: { count: 0 },
         actions: {
           add(p: number) {
@@ -218,25 +189,26 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel(
-        {
-          name: 'model',
-          state: { value: 0 },
-          actions: {
-            add(p: number) {
-              this.value += p
-            },
-            addDep(_: void) {
-              this.$dep.one.add(1)
-              this.$dep.two.add(1)
-            },
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        models: {
+          one: depOne,
+          two: depTwo,
+        },
+        actions: {
+          add(p: number) {
+            this.value += p
+          },
+          addDep(_: void) {
+            this.$models.one.add(1)
+            this.$models.two.add(1)
           },
         },
-        [depOne, depTwo]
-      )
+      })
 
-      const depOneStore = modelMgr.getModel(depOne)
-      const depTwoStore = modelMgr.getModel(depTwo)
+      const depOneStore = modelMgr.getModel('one', depOne)
+      const depTwoStore = modelMgr.getModel('two', depTwo)
       const store = modelMgr.getModel(model)
 
       store.addDep()
@@ -264,26 +236,26 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel(
-        {
-          name: 'model',
-          state: { value: 0 },
-          actions: {
-            add(p: number) {
-              this.value += p
-            },
-          },
-          views: {
-            all() {
-              return {
-                value: this.value,
-                depDouble: this.$dep.dep.double,
-              }
-            },
+      const model = defineModel({
+        name: 'model',
+        models: {
+          dep,
+        },
+        state: { value: 0 },
+        actions: {
+          add(p: number) {
+            this.value += p
           },
         },
-        [dep]
-      )
+        views: {
+          all() {
+            return {
+              value: this.value,
+              depDouble: this.$models.dep.double,
+            }
+          },
+        },
+      })
 
       const store = modelMgr.getModel(model)
       const depStore = modelMgr.getModel(dep)

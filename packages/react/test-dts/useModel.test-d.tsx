@@ -59,7 +59,7 @@ function Test() {
   expectType<void>(action.setString('custom'))
   expectType<Promise<void>>(action.asyncAdd(0))
 
-  const [rootState, rootAction] = useRootModel(count, countSelector)
+  const [rootState, rootAction] = useRootModel('count', count, countSelector)
   expectType<number>(rootState.n)
   expectType<number>(rootState.v)
   expectType<string>(rootState.s)
@@ -74,7 +74,7 @@ function Test$State() {
   expectType<number>(state.value)
   expectType<string>(state.s)
 
-  const [rootState] = useRootModel(count, count$State)
+  const [rootState] = useRootModel('count', count, count$State)
   expectType<number>(rootState.value)
   expectType<string>(rootState.s)
 }
