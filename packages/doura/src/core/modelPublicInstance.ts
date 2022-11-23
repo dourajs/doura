@@ -21,14 +21,14 @@ export const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $name: string
-  $rawState: IModel['state']
-  $state: IModel['state']
+  $rawState: GetModelState<IModel>
+  $state: GetModelState<IModel>
   $actions: GetModelActions<IModel>
   $views: GetModelViews<IModel>
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
-  $isolate: <T>(fn: (s: IModel['state']) => T) => T
+  $isolate: <T>(fn: (s: GetModelState<IModel>) => T) => T
   $getSnapshot(): ModelData<IModel>
   $createView: <R>(
     selector: Selector<IModel, R>
@@ -53,7 +53,6 @@ export const publicPropertiesMap: PublicPropertiesMap =
       $name: (i) => i.name,
       $rawState: (i) => i.getState(),
       $state: (i) => (i.isPrimitiveState ? i.stateRef.value : i.stateValue),
-      $models: (i) => i.modelsProxy,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
       $patch: (i) => i.patch,

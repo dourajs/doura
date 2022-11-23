@@ -32,13 +32,13 @@ function readonlyModel(model: ModelPublicInstance<AnyModel>) {
   })
 }
 
-function useModel<IModel extends AnyModel, S extends Selector<IModel>>(
+function useModel<IModel extends AnyModel>(
   model: ModelPublicInstance<IModel>,
   subscribe: SubscribeFn
 ) {
   const view = useMemo(() => () => model.$getSnapshot(), [model])
 
-  const state = useSyncExternalStore<ReturnType<S>>(subscribe, view, view)
+  const state = useSyncExternalStore(subscribe, view, view)
 
   useDebugValue(state)
 
@@ -100,7 +100,7 @@ function useModelInstance<IModel extends AnyModel>(
   }
 }
 
-export const createUseSharedModel =
+export const createUseNamedModel =
   (doura: Doura, batchManager: ReturnType<typeof createBatchManager>) =>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
@@ -133,7 +133,7 @@ export const createUseModel =
   ) => {
     const hasSelector = useRef(selector)
     const { modelInstance, subscribe } = useModelInstance(
-      model.name || '',
+      'useModel', // name donen't matter here, use "@" for simplicity
       model,
       doura,
       batchManager
@@ -147,11 +147,11 @@ export const createUseModel =
     }
   }
 
-export const createUseStaticModel =
+export const createUseNamedStaticModel =
   (doura: Doura, _batchManager: ReturnType<typeof createBatchManager>) =>
-  <IModel extends AnyModel>(model: IModel) => {
+  <IModel extends AnyModel>(name: string, model: IModel) => {
     const modelInstance = useMemo(
-      () => doura.getModel(model),
+      () => doura.getModel(name, model),
       // ignore model's change
       [doura]
     )

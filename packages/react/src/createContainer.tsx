@@ -9,9 +9,12 @@ import React, {
 import { doura } from 'doura'
 import devtool from 'doura/devtool'
 import type { Doura, AnyModel, DouraOptions, Selector } from 'doura'
-import { createUseSharedModel, createUseStaticModel } from './createUseModel'
+import {
+  createUseNamedModel,
+  createUseNamedStaticModel,
+} from './createUseModel'
 import { createBatchManager } from './batchManager'
-import { IUseSharedModel, IUseStaticModel } from './types'
+import { IUseNamedModel, IUseNamedStaticModel } from './types'
 import { invariant } from './utils'
 
 const createContainer = function (options?: DouraOptions) {
@@ -52,7 +55,7 @@ const createContainer = function (options?: DouraOptions) {
     return <Context.Provider value={contextValue}>{children}</Context.Provider>
   }
 
-  const useSharedModel: IUseSharedModel = <
+  const useSharedModel: IUseNamedModel = <
     IModel extends AnyModel,
     S extends Selector<IModel>
   >(
@@ -63,7 +66,7 @@ const createContainer = function (options?: DouraOptions) {
   ) => {
     const context = useContext(Context)
 
-    invariant(model.name, 'name is required.')
+    invariant(name, 'name is required.')
     invariant(
       context,
       'You should wrap your Component in createContainer().Provider.'
@@ -72,17 +75,18 @@ const createContainer = function (options?: DouraOptions) {
     const { store, batchManager } = context
 
     return useMemo(
-      () => createUseSharedModel(store, batchManager),
+      () => createUseNamedModel(store, batchManager),
       [store, batchManager]
     )(name, model, selector, depends)
   }
 
-  const useStaticModel: IUseStaticModel = <IModel extends AnyModel>(
+  const useStaticModel: IUseNamedStaticModel = <IModel extends AnyModel>(
+    name: string,
     model: IModel
   ) => {
     const context = useContext(Context)
 
-    invariant(model.name, 'name is required.')
+    invariant(name, 'name is required.')
     invariant(
       context,
       'You should wrap your Component in createContainer().Provider.'
@@ -91,9 +95,9 @@ const createContainer = function (options?: DouraOptions) {
     const { store, batchManager } = context
 
     return useMemo(
-      () => createUseStaticModel(store, batchManager),
+      () => createUseNamedStaticModel(store, batchManager),
       [store, batchManager]
-    )(model)
+    )(name, model)
   }
 
   return {

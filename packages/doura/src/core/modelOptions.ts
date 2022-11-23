@@ -1,4 +1,4 @@
-import { DefineModel } from './defineModel'
+import { ModelPublicInstance } from './modelPublicInstance'
 import { warn } from '../warning'
 import { EmptyObject } from '../types'
 import { invariant, isPlainObject } from '../utils'
@@ -19,27 +19,17 @@ export type State = StateObject | StatePrimitive
 
 export type ActionOptions = Record<string, Function>
 
+export type Params = any
+
 export type ViewOptions<State = any> = Record<
   string,
   ((s: State) => any) | (() => any)
 >
 
-export type Models = Record<string, AnyModel>
-
-type FilterActionIndex<T> = {
-  [P in keyof T as string extends P
-    ? never
-    : number extends P
-    ? never
-    : P]: T[P]
-}
-
 export type Actions<A> = A extends ActionOptions
-  ? FilterActionIndex<A> extends infer FilterA
-    ? {
-        [K in keyof FilterA]: FilterA[K]
-      }
-    : {}
+  ? {
+      [K in keyof A]: A[K]
+    }
   : {}
 
 export type Views<ViewOptions> = {
@@ -48,88 +38,62 @@ export type Views<ViewOptions> = {
     : never
 }
 
-export type ActionThis<
+export type ModelThis<
   S extends State = {},
   A extends ActionOptions = {},
-  V extends ViewOptions = {},
-  M extends Models = {}
+  V extends ViewOptions = {}
 > = {
   $state: S
   $patch: (s: StateObject) => void
 } & S &
-  Views<V> & {
-    $models: {
-      [K in keyof M]: M[K] extends DefineModel<
-        any,
-        infer DS,
-        infer DA,
-        infer DV,
-        infer DM
-      >
-        ? ActionThis<DS, DA, DV, DM>
-        : ActionThis
-    }
-  } & Actions<A>
+  Views<V> &
+  Actions<A>
 
-export type ViewThis<
-  S extends State = {},
-  V extends ViewOptions = {},
-  M extends Models = {}
-> = S & {
+export type ViewThis<S extends State = {}, V extends ViewOptions = {}> = S & {
   $state: S
   $isolate: <T>(fn: (s: S) => T) => T
-} & Views<V> & {
-    $models: {
-      [K in keyof M]: M[K] extends DefineModel<
-        any,
-        infer DS,
-        any,
-        infer DV,
-        infer DDeps
-      >
-        ? ViewThis<DS, DV, DDeps>
-        : ViewThis
-    }
-  }
+} & Views<V>
+
+export type ObjectModel<
+  S extends State,
+  A extends ActionOptions,
+  V extends ViewOptions
+> = {
+  state: S
+  actions?: A
+  views?: V & ThisType<ViewThis<S, V>>
+} & ThisType<ModelThis<S, A, V>>
+
+export interface ModelOptionContext {
+  use<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  use<IModel extends AnyModel>(
+    name: string,
+    model: IModel
+  ): ModelPublicInstance<IModel>
+}
+
+export interface FunctionModel<
+  S extends State,
+  A extends ActionOptions,
+  V extends ViewOptions
+> {
+  (context: ModelOptionContext): ObjectModel<S, A, V>
+}
 
 export type ModelOptions<
-  N extends string,
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
-  M extends Models
-> = {
-  name?: N
-  state: S
-  actions?: A & ThisType<ActionThis<S, A, V, M>>
-  views?: V & ThisType<ViewThis<S, V, M>>
-  models?: M
-}
+  P extends Params
+> = ObjectModel<S, A, V> | FunctionModel<S, A, V>
 
-export interface NamedModelOptions<
-  N extends string,
-  S extends State,
-  A extends ActionOptions,
-  V extends ViewOptions,
-  M extends Models
-> extends ModelOptions<N, S, A, V, M> {
-  name: N
-}
+export type AnyObjectModel = ObjectModel<any, any, any>
 
-export type AnyModel = ModelOptions<any, any, any, any, any>
+export type AnyFunctionModel = FunctionModel<any, any, any>
 
-export type GetModelName<T> = T extends ModelOptions<
-  infer Name,
-  any,
-  any,
-  any,
-  any
->
-  ? Name
-  : never
+export type AnyModel = AnyObjectModel | AnyFunctionModel
 
 export type GetModelState<Model> = Model extends ModelOptions<
-  any,
   infer S,
   any,
   any,
@@ -139,7 +103,6 @@ export type GetModelState<Model> = Model extends ModelOptions<
   : never
 
 export type GetModelActions<Model> = Model extends ModelOptions<
-  any,
   any,
   infer A,
   any,
@@ -151,21 +114,10 @@ export type GetModelActions<Model> = Model extends ModelOptions<
 export type GetModelViews<Model> = Model extends ModelOptions<
   any,
   any,
-  any,
   infer V,
   any
 >
-  ? Views<V> & EmptyObject & { ttt: number }
-  : never
-
-export type GetModelDeps<T> = T extends ModelOptions<
-  any,
-  any,
-  any,
-  any,
-  infer ModelOptions
->
-  ? ModelOptions
+  ? Views<V> & EmptyObject
   : never
 
 /**
@@ -175,7 +127,11 @@ export type GetModelDeps<T> = T extends ModelOptions<
 export const ifDefinedIsFunction = <T>(func: T): boolean =>
   !func || typeof func === 'function'
 
-function validateProperty(model: AnyModel, prop: keyof AnyModel, type: string) {
+function validateProperty(
+  model: AnyObjectModel,
+  prop: keyof AnyObjectModel,
+  type: string
+) {
   const target = model[prop] as any
   if (target) {
     invariant(isPlainObject(target), `model.${prop} should be object!`)
@@ -183,8 +139,8 @@ function validateProperty(model: AnyModel, prop: keyof AnyModel, type: string) {
 }
 
 function checkConflictedKey(
-  type: keyof AnyModel,
-  obj: AnyModel,
+  type: keyof AnyObjectModel,
+  obj: AnyObjectModel,
   cache: Map<string, string>
 ) {
   if (!obj[type]) {
@@ -203,7 +159,7 @@ function checkConflictedKey(
   }
 }
 
-export const validateModelOptions = (model: AnyModel): void => {
+export const validateModelOptions = (model: AnyObjectModel): void => {
   invariant(model.hasOwnProperty('state'), 'state is required')
   invariant(
     typeof model.state !== 'bigint' && typeof model.state !== 'symbol',

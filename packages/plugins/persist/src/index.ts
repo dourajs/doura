@@ -29,7 +29,7 @@ const douraPersist: Plugin = function (options: PersistOptions) {
   let _isInit = false
   return {
     onInit(_options, { doura }) {
-      persistStore = doura.getModel(persistModel)
+      persistStore = doura.getDetachedModel(persistModel)
       Object.assign(persistStore, {
         purge() {
           return persist.purge()

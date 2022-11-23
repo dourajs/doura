@@ -336,7 +336,7 @@ describe('createContainer', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await nextTick()
     })
-    douraStore.getModel(countModel).add(1)
+    douraStore.getModel('count', countModel).add(1)
   })
 
   test('container state should sync with douraStore', async () => {
@@ -472,7 +472,7 @@ describe('createContainer/useRootModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootModel('count', tempModel)
+        const [state, actions] = useRootModel(undefined as any, tempModel)
 
         return (
           <>
@@ -495,7 +495,6 @@ describe('createContainer/useRootModel', () => {
 
     test('name should not be empty', async () => {
       const tempModel = defineModel({
-        name: '',
         state: {
           value: 1,
         },
@@ -507,7 +506,7 @@ describe('createContainer/useRootModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootModel('count', tempModel)
+        const [state, actions] = useRootModel('', tempModel)
 
         return (
           <>
@@ -530,7 +529,6 @@ describe('createContainer/useRootModel', () => {
 
     test('useRootModel should has parent DouraRoot', async () => {
       const tempModel = defineModel({
-        name: 'tempModel',
         state: {
           value: 1,
         },
@@ -728,7 +726,7 @@ describe('createContainer/useRootStaticModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootStaticModel(tempModel)
+        const [state, actions] = useRootStaticModel(undefined as any, tempModel)
 
         return (
           <>
@@ -751,7 +749,6 @@ describe('createContainer/useRootStaticModel', () => {
 
     test('name should not be empty', async () => {
       const tempModel = defineModel({
-        name: '',
         state: {
           value: 1,
         },
@@ -763,7 +760,7 @@ describe('createContainer/useRootStaticModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootStaticModel(tempModel)
+        const [state, actions] = useRootStaticModel('', tempModel)
 
         return (
           <>
@@ -786,7 +783,6 @@ describe('createContainer/useRootStaticModel', () => {
 
     test('useRootStaticModel should has parent DouraRoot', async () => {
       const tempModel = defineModel({
-        name: 'tempModel',
         state: {
           value: 1,
         },
@@ -798,7 +794,7 @@ describe('createContainer/useRootStaticModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useRootStaticModel(tempModel)
+        const [state, actions] = useRootStaticModel('temp', tempModel)
 
         return (
           <>
@@ -821,7 +817,7 @@ describe('createContainer/useRootStaticModel', () => {
     let stateRef1: any
 
     const StaticApp = () => {
-      const [state, dispatch] = useRootStaticModel(countModel)
+      const [state, dispatch] = useRootStaticModel('count', countModel)
       const [_, setValue] = React.useState(false)
 
       if (!stateRef) {

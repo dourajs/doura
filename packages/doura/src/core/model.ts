@@ -16,16 +16,17 @@ import {
   State,
   StateObject,
   AnyModel,
+  AnyObjectModel,
+  GetModelState,
   GetModelActions,
+  GetModelViews,
+  validateModelOptions,
 } from './modelOptions'
 import {
   ModelPublicInstance,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
-
-// const randomString = () =>
-//   Math.random().toString(36).substring(7).split('').join('.')
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -105,17 +106,6 @@ export type ModelChangeEvent =
   | ModelPatchEvent
   | ModelReplaceEvent
 
-const DepsPublicInstanceProxyHandlers = {
-  get: (models: Map<string, ModelInternal>, key: string) => {
-    const model = models.get(key)
-    if (model) {
-      return model.proxy
-    }
-
-    return undefined
-  },
-}
-
 export const enum AccessContext {
   DEFAULT,
   VIEW,
@@ -136,13 +126,14 @@ function patchObj(base: Record<string, any>, patch: Record<string, any>) {
   })
 }
 
-export class ModelInternal<IModel extends AnyModel = AnyModel> {
+export interface ModelInternalOptions {
+  name?: string
+  initState?: State
+}
+
+export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   name: string
   options: IModel
-
-  // models
-  models: Map<string, ModelInternal>
-  modelsProxy: object
 
   ctx: Record<string, any>
   accessCache: Record<string, any>
@@ -150,32 +141,32 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   /**
    * proxy for public this
    */
-  proxy: ModelPublicInstance<IModel> | null = null
+  proxy: ModelPublicInstance<IModel>
 
   // props
   actions: GetModelActions<IModel>
-  views: Views<IModel['views']>
+  views: Views<GetModelViews<IModel>>
   viewInstances: View[] = []
   accessContext: AccessContext
 
   stateRef: {
-    value: IModel['state']
+    value: any
   }
-  stateValue!: IModel['state']
+  stateValue!: any
   effectScope: EffectScope
 
   isPrimitiveState!: boolean
 
   private _snapshot: State | null = null
-  private _initState: IModel['state']
-  private _currentState!: IModel['state']
+  private _initState: GetModelState<IModel>
+  private _currentState!: any
   private _actionListeners: Set<ActionListener> = new Set()
   private _subscribers: Set<SubscriptionCallback> = new Set()
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
 
-  constructor(model: IModel, initState: State) {
+  constructor(model: IModel, { name, initState }: ModelInternalOptions) {
     this.patch = this.patch.bind(this)
     this.onAction = this.onAction.bind(this)
     this.subscribe = this.subscribe.bind(this)
@@ -183,7 +174,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this.getSnapshot = this.getSnapshot.bind(this)
 
     this.options = model
-    this.name = this.options.name || ''
+    this.name = name || ''
     this._initState = initState || model.state
 
     this.effectScope = effectScope()
@@ -205,7 +196,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
 
     this.actions = Object.create(null)
     this.views = Object.create(null)
-    this.models = new Map()
     this.accessContext = AccessContext.DEFAULT
 
     this._isDispatching = false
@@ -218,8 +208,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       this.ctx,
       PublicInstanceProxyHandlers
     ) as ModelPublicInstance<IModel>
-
-    this.modelsProxy = new Proxy(this.models, DepsPublicInstanceProxyHandlers)
 
     this._initActions()
     this._initViews()
@@ -244,7 +232,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     }
 
     this._watchStateChange = false
-    patchObj(this.proxy!.$state, obj)
+    patchObj(this.proxy.$state, obj)
     this._watchStateChange = true
 
     this.dispatch({
@@ -288,7 +276,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     return this._snapshot
   }
 
-  reducer(state: IModel['state'], action: Action) {
+  reducer(state: GetModelState<AnyModel>, action: Action) {
     switch (action.type) {
       case ActionType.REPLACE:
       case ActionType.MODIFY:
@@ -328,8 +316,8 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
       this._setState(nextState)
       this._triggerListener({
         type: action.type,
-        model: this.proxy!,
-        target: this.proxy!,
+        model: this.proxy,
+        target: this.proxy,
         ...action.args,
       })
     }
@@ -368,25 +356,24 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
    * but they cannot cause the reactive scope of the caller to be re-evaluated
    * when they change
    */
-  isolate<T>(fn: (s: IModel['state']) => T): T {
+  isolate<T>(fn: (s: GetModelState<IModel>) => T): T {
     pauseTracking()
     const res = fn(this.stateValue)
     resetTracking()
     return res
   }
 
-  depend(name: string, dep: ModelInternal<any>) {
-    this.models.set(name, dep)
+  depend(dep: ModelInternal<any>) {
     // collection beDepends, a depends b, when b update, call a need trigger listener
     dep.subscribe((event) => {
       this._triggerListener({
         ...event,
-        model: this.proxy!,
+        model: this.proxy,
       })
     })
   }
 
-  private _setState(newState: IModel['state']) {
+  private _setState(newState: GetModelState<IModel>) {
     this._snapshot = null
     this._currentState = newState
     this.isPrimitiveState = !isObject(newState)
@@ -399,7 +386,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     }
   }
 
-  createView(viewFn: (s: IModel['state']) => any) {
+  createView(viewFn: (s: GetModelState<IModel>) => any) {
     let view: View
     this.effectScope.run(() => {
       view = reactiveView(() => {
@@ -413,7 +400,7 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
                 warn(
                   `detect returning "this" in view, it would cause unpected behavior`
                 )
-              } else if (value === this.proxy!.$state) {
+              } else if (value === this.proxy.$state) {
                 warn(
                   `detect returning "this.$state" in view, it would cause unpected behavior`
                 )
@@ -491,9 +478,13 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   }
 }
 
-export function createModelInstnace<IModel extends AnyModel>(
+export function createModelInstnace<IModel extends AnyObjectModel>(
   modelOptions: IModel,
-  initState: State
+  options: ModelInternalOptions = {}
 ) {
-  return new ModelInternal<IModel>(modelOptions, initState)
+  if (process.env.NODE_ENV === 'development') {
+    validateModelOptions(modelOptions)
+  }
+
+  return new ModelInternal<IModel>(modelOptions, options)
 }

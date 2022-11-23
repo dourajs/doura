@@ -14,7 +14,7 @@ export interface IUseModel {
   ): [ReturnType<S>, IActions<IModel>]
 }
 
-export interface IUseSharedModel {
+export interface IUseNamedModel {
   <IModel extends AnyModel>(name: string, model: IModel): [
     ModelData<IModel>,
     IActions<IModel>
@@ -27,8 +27,8 @@ export interface IUseSharedModel {
   ): [ReturnType<S>, IActions<IModel>]
 }
 
-export interface IUseStaticModel {
-  <IModel extends AnyModel>(model: IModel): [
+export interface IUseNamedStaticModel {
+  <IModel extends AnyModel>(name: string, model: IModel): [
     { current: ModelData<IModel> },
     IActions<IModel>
   ]

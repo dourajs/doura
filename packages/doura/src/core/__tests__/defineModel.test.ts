@@ -15,148 +15,6 @@ afterAll(() => {
 })
 
 describe('defineModel', () => {
-  describe('type checking', () => {
-    test('model is necessary', () => {
-      expect(() => {
-        // @ts-ignore
-        const modelA = defineModel()
-      }).toThrow()
-    })
-
-    test('name is not necessary', () => {
-      expect(() => {
-        defineModel(
-          // @ts-ignore
-          {
-            state: {},
-          }
-        )
-      }).not.toThrow()
-    })
-
-    test('state is necessary', () => {
-      expect(() => {
-        defineModel(
-          // @ts-ignore
-          {
-            name: 'a',
-          }
-        )
-      }).toThrow()
-    })
-
-    test('state could be a number', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: 1,
-        })
-      }).not.toThrow()
-    })
-
-    test('state could be a string', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: 'test',
-        })
-      }).not.toThrow()
-    })
-
-    test('state could be a array', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: [],
-        })
-      }).not.toThrow()
-    })
-
-    test('state could be a boolean', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: false,
-        })
-      }).not.toThrow()
-    })
-
-    test('state could be a undefined', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: undefined,
-        })
-      }).not.toThrow()
-    })
-
-    test('state could be a null', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: null,
-        })
-      }).not.toThrow()
-    })
-
-    test('state could not be a bigint', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          // @ts-ignore
-          state: BigInt(1),
-        })
-      }).toThrow()
-    })
-
-    test('state could not be a symbol', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          // @ts-ignore
-          state: Symbol('1'),
-        })
-      }).toThrow()
-    })
-
-    test('actions should be object', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: {},
-          // @ts-ignore
-          actions: 1,
-        })
-      }).toThrow()
-    })
-
-    test('views should be object', () => {
-      expect(() => {
-        defineModel({
-          name: 'a',
-          state: {},
-          // @ts-ignore
-          views: 1,
-        })
-      }).toThrow()
-    })
-
-    test('warn conflicted keys between state and view', () => {
-      defineModel({
-        name: 'a',
-        state: {
-          a: 0,
-        },
-        views: {
-          a() {},
-        },
-      })
-      expect(
-        `key "a" in "views" is conflicted with the key in "state"`
-      ).toHaveBeenWarned()
-    })
-  })
-
   it('should return the model', () => {
     const model = {
       name: 'a',
@@ -169,8 +27,8 @@ describe('defineModel', () => {
     expect(model).toBe(modelA)
   })
 
-  describe('dependencies', () => {
-    it('should access dependent models by this.$models', () => {
+  describe('composing models', () => {
+    it('should consume other models by "use()"', () => {
       const depOne = defineModel({
         state: { count: 0 },
         actions: {
@@ -189,27 +47,27 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        models: {
-          one: depOne,
-          two: depTwo,
-        },
-        actions: {
-          add(p: number) {
-            this.value += p
+      const model = defineModel(({ use }) => {
+        const one = use('one', depOne)
+        const two = use('two', depTwo)
+
+        return {
+          state: { value: 0 },
+          actions: {
+            add(p: number) {
+              this.value += p
+            },
+            addDep(_: void) {
+              one.add(1)
+              two.add(1)
+            },
           },
-          addDep(_: void) {
-            this.$models.one.add(1)
-            this.$models.two.add(1)
-          },
-        },
+        }
       })
 
       const depOneStore = modelMgr.getModel('one', depOne)
       const depTwoStore = modelMgr.getModel('two', depTwo)
-      const store = modelMgr.getModel(model)
+      const store = modelMgr.getModel('test', model)
 
       store.addDep()
       expect(store.$state).toEqual({ value: 0 })
@@ -221,8 +79,7 @@ describe('defineModel', () => {
     })
 
     it("should reactive to dep's view", () => {
-      const dep = defineModel({
-        name: 'dep',
+      const countModel = defineModel({
         state: { count: 1 },
         actions: {
           add(p: number) {
@@ -236,29 +93,28 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel({
-        name: 'model',
-        models: {
-          dep,
-        },
-        state: { value: 0 },
-        actions: {
-          add(p: number) {
-            this.value += p
+      const model = defineModel(({ use }) => {
+        const count = use('count', countModel)
+        return {
+          state: { value: 0 },
+          actions: {
+            add(p: number) {
+              this.value += p
+            },
           },
-        },
-        views: {
-          all() {
-            return {
-              value: this.value,
-              depDouble: this.$models.dep.double,
-            }
+          views: {
+            all() {
+              return {
+                value: this.value,
+                depDouble: count.double,
+              }
+            },
           },
-        },
+        }
       })
 
-      const store = modelMgr.getModel(model)
-      const depStore = modelMgr.getModel(dep)
+      const store = modelMgr.getModel('test', model)
+      const depStore = modelMgr.getModel('count', countModel)
 
       let v = store.all
       expect(v).toEqual({

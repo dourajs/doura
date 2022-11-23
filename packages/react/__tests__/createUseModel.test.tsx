@@ -13,17 +13,17 @@ import {
   nextTick,
 } from 'doura'
 import { createBatchManager } from '../src/batchManager'
-import { IUseSharedModel, IUseStaticModel } from '../src/types'
+import { IUseNamedModel, IUseNamedStaticModel } from '../src/types'
 import {
-  createUseSharedModel,
-  createUseStaticModel,
+  createUseNamedModel,
+  createUseNamedStaticModel,
 } from '../src/createUseModel'
 import { countModel } from './models/index'
 
 let douraStore: ReturnType<typeof doura>
 let batchManager: ReturnType<typeof createBatchManager>
-let useTestModel: IUseSharedModel
-let useTestStaticModel: IUseStaticModel
+let useTestModel: IUseNamedModel
+let useTestStaticModel: IUseNamedStaticModel
 
 beforeEach(() => {
   process.env.NODE_ENV === 'development'
@@ -37,17 +37,18 @@ beforeEach(() => {
     depends?: any[]
   ) => {
     return useMemo(
-      () => createUseSharedModel(douraStore, batchManager),
+      () => createUseNamedModel(douraStore, batchManager),
       [douraStore, batchManager]
     )(name, model, selector, depends)
   }
   useTestStaticModel = <IModel extends AnyModel, S extends Selector<IModel>>(
+    name: string,
     model: IModel
   ) => {
     return useMemo(
-      () => createUseStaticModel(douraStore, batchManager),
+      () => createUseNamedStaticModel(douraStore, batchManager),
       [douraStore, batchManager]
-    )(model)
+    )(name, model)
   }
 })
 
@@ -138,26 +139,26 @@ describe('createUseModel', () => {
     })
 
     test('should rerender when depends state changed', async () => {
-      const newModel = defineModel({
-        name: 'newModel',
-        models: {
-          countModel,
-        },
-        state: { value: 0 },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
+      const newModel = defineModel(({ use }) => {
+        const count = use(countModel)
+
+        return {
+          state: { value: 0 },
+          actions: {
+            add(payload: number = 1) {
+              this.value += payload
+            },
+            async asyncAdd() {
+              await count.asyncAdd(1)
+              this.add(count.value)
+            },
           },
-          async asyncAdd() {
-            await this.$models.countModel.asyncAdd(1)
-            this.add(this.$models.countModel.$state.value)
+          views: {
+            test() {
+              return count.value * 2
+            },
           },
-        },
-        views: {
-          test() {
-            return this.$models.countModel.value * 2
-          },
-        },
+        }
       })
 
       const App = () => {
@@ -648,7 +649,6 @@ describe('createUseModel', () => {
 describe('createUseStaticModel', () => {
   test('could access state and view', () => {
     const model = defineModel({
-      name: 'model',
       state: { value: 1 },
       views: {
         test() {
@@ -658,7 +658,7 @@ describe('createUseStaticModel', () => {
     })
 
     const App = () => {
-      const [state, _actions] = useTestStaticModel(model)
+      const [state, _actions] = useTestStaticModel('test', model)
 
       return (
         <>
@@ -680,7 +680,7 @@ describe('createUseStaticModel', () => {
     const App = () => {
       renderTime += 1
 
-      const [state, dispatch] = useTestStaticModel(countModel)
+      const [state, dispatch] = useTestStaticModel('test', countModel)
 
       currentCount = state.current.value
 
@@ -729,7 +729,7 @@ describe('createUseStaticModel', () => {
   test('should render with newest state even update state during render', () => {
     let firstRender = true
     const App = () => {
-      const [state, actions] = useTestStaticModel(countModel)
+      const [state, actions] = useTestStaticModel('test', countModel)
 
       if (firstRender) {
         firstRender = false

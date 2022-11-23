@@ -20,7 +20,6 @@ const timeout = (n: number = 0) => new Promise((r) => setTimeout(r, n))
 describe('defineModel/actions', () => {
   it('should change the state', () => {
     const count = defineModel({
-      name: 'count',
       state: { value: 0 },
       actions: {
         add() {
@@ -29,7 +28,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(count)
+    const store = modelMgr.getModel('count', count)
     expect(typeof store.add).toBe('function')
 
     store.add()
@@ -41,7 +40,6 @@ describe('defineModel/actions', () => {
 
   it('should accept params', () => {
     const model = defineModel({
-      name: 'model',
       state: { values: [] } as any,
       actions: {
         push(...values: any[]) {
@@ -50,7 +48,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(model)
+    const store = modelMgr.getModel('test', model)
 
     store.push(1)
     expect(store.$state.values).toEqual([1])
@@ -61,7 +59,6 @@ describe('defineModel/actions', () => {
 
   it('should return value', () => {
     const model = defineModel({
-      name: 'model',
       state: { values: null },
       actions: {
         set() {
@@ -70,13 +67,12 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(model)
+    const store = modelMgr.getModel('test', model)
     expect(store.set()).toBe('result')
   })
 
   it('should support async actions', async () => {
-    const example = defineModel({
-      name: 'example',
+    const model = defineModel({
       state: { value: 0 },
       actions: {
         async asyncAction(): Promise<void> {
@@ -87,7 +83,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(example)
+    const store = modelMgr.getModel('test', model)
 
     store.asyncAction()
     expect(store.$state.value).toBe(1)
@@ -98,7 +94,6 @@ describe('defineModel/actions', () => {
   it('shouldb batch update and only triggered once', async () => {
     const fn = jest.fn()
     const count = defineModel({
-      name: 'count',
       state: { value: 0 },
       actions: {
         add() {
@@ -108,7 +103,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(count)
+    const store = modelMgr.getModel('count', count)
     store.$subscribe(fn)
     store.add()
     expect(fn).toHaveBeenCalledTimes(0)
@@ -120,7 +115,6 @@ describe('defineModel/actions', () => {
   it('shouldb batch update and only triggered once (async action)', async () => {
     const fn = jest.fn()
     const count = defineModel({
-      name: 'count',
       state: { value: 0 },
       actions: {
         async add() {
@@ -133,7 +127,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(count)
+    const store = modelMgr.getModel('count', count)
     store.$subscribe(fn)
     store.add()
     expect(fn).toHaveBeenCalledTimes(0)
@@ -148,7 +142,6 @@ describe('defineModel/actions', () => {
   it('shouldb batch update and only triggered once (async action)', async () => {
     const fn = jest.fn()
     const count = defineModel({
-      name: 'count',
       state: { value: 0 },
       actions: {
         async add() {
@@ -161,7 +154,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(count)
+    const store = modelMgr.getModel('count', count)
     store.$subscribe(fn)
     store.add()
     expect(fn).toHaveBeenCalledTimes(0)
@@ -185,7 +178,6 @@ describe('defineModel/actions', () => {
       c: 0,
     }
     const count = defineModel({
-      name: 'count',
       state: state,
       actions: {
         async change() {
@@ -194,7 +186,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(count)
+    const store = modelMgr.getModel('count', count)
     store.change()
     await nextTick()
     expect(store.$rawState).toEqual({
@@ -223,7 +215,6 @@ describe('defineModel/actions', () => {
       anArr: [1],
     }
     const count = defineModel({
-      name: 'count',
       state: state,
       actions: {
         async change() {
@@ -233,7 +224,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(count)
+    const store = modelMgr.getModel('count', count)
     store.change()
     await nextTick()
     expect(store.$rawState).toEqual({
@@ -251,8 +242,7 @@ describe('defineModel/actions', () => {
   })
 
   it('should access views by `this`', () => {
-    const example = defineModel({
-      name: 'example',
+    const model = defineModel({
       state: { value: 0 },
       actions: {
         set(n: number) {
@@ -266,7 +256,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel(example)
+    const store = modelMgr.getModel('test', model)
 
     store.set(5)
     expect(store.valuePlusN).toBe(6)
@@ -275,7 +265,6 @@ describe('defineModel/actions', () => {
   describe('this.$state', () => {
     it('should change value by $state', () => {
       const model = defineModel({
-        name: 'model',
         state: { value: 1 },
         actions: {
           add(n: number) {
@@ -284,7 +273,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel(model)
+      const store = modelMgr.getModel('test', model)
 
       store.add(9)
       expect(store.$state.value).toBe(10)
@@ -293,7 +282,6 @@ describe('defineModel/actions', () => {
     it('should always return the newest state', () => {
       const state: number[] = []
       const count = defineModel({
-        name: 'count',
         state: { value: 0 },
         actions: {
           plusOne() {
@@ -308,7 +296,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel(count)
+      const store = modelMgr.getModel('count', count)
 
       store.makeCall(2)
       expect(state).toEqual([1, 2])
@@ -317,11 +305,10 @@ describe('defineModel/actions', () => {
     // todo: fixme
     it.skip('should throw error if changed state not by reducer in development', async () => {
       const count = defineModel({
-        name: 'count',
         state: { value: 0 },
       })
 
-      const store = modelMgr.getModel(count)
+      const store = modelMgr.getModel('count', count)
 
       const state = store.$state
       state.value = 1
@@ -333,7 +320,6 @@ describe('defineModel/actions', () => {
 
     it('should replace state by assgining to this.$state', () => {
       const count = defineModel({
-        name: 'count',
         state: { a: 1, b: 1 },
         actions: {
           replace(newState: any): void {
@@ -342,7 +328,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel(count)
+      const store = modelMgr.getModel('count', count)
 
       const newState1 = {
         a: 2,
@@ -355,8 +341,7 @@ describe('defineModel/actions', () => {
     })
 
     it('should error when assign Symbol or BigInt to this.$state', () => {
-      const anyModal = defineModel({
-        name: 'anyModal',
+      const count = defineModel({
         state: { value: 0 },
         actions: {
           replace(value: any): void {
@@ -365,7 +350,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel(anyModal)
+      const store = modelMgr.getModel('test', count)
       expect(store.$state).toEqual({ value: 0 })
 
       expect(() => store.replace(Symbol('foo') as any)).toThrow()

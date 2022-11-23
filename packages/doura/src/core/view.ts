@@ -1,11 +1,17 @@
-import { AnyModel, Views } from './modelOptions'
+import {
+  AnyModel,
+  Views,
+  GetModelState,
+  GetModelViews,
+  AnyObjectModel,
+} from './modelOptions'
 import { ModelInternal } from './model'
 import { EmptyObject } from '../types'
 
 export type ModelData<Model extends AnyModel> = {
-  $state: Model['state']
-} & Model['state'] &
-  Views<Model['views']> &
+  $state: GetModelState<Model>
+} & GetModelState<Model> &
+  Views<GetModelViews<Model>> &
   EmptyObject
 
 export type Selector<Model extends AnyModel, TReturn = any> = (
@@ -17,7 +23,7 @@ export interface ModelView<T extends (...args: any[]) => any = any> {
   destory(): void
 }
 
-export function createView<IModel extends AnyModel, TReturn>(
+export function createView<IModel extends AnyObjectModel, TReturn>(
   instance: ModelInternal<IModel>,
   selector: Selector<IModel, TReturn>
 ): ModelView<Selector<IModel, TReturn>> {

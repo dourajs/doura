@@ -35,14 +35,13 @@ describe('persist plugin worked:', () => {
       ],
     })
     await delay(100)
-    const aStore = douraStore.getModel(a)
+    const aStore = douraStore.getModel('a', a)
     aStore.add()
-    const bStore = douraStore.getModel(b)
+    const bStore = douraStore.getModel('b', b)
     bStore.add()
     await delay(100)
     let StorageState = await getStoredState(config)
     expect(StorageState).toStrictEqual({
-      _persist: { rehydrated: true, version: -1 },
       b: { b: 1 },
     })
   })
@@ -60,14 +59,13 @@ describe('persist plugin worked:', () => {
       ],
     })
     await delay(100)
-    const aStore = douraStore.getModel(a)
+    const aStore = douraStore.getModel('a', a)
     aStore.add()
-    const bStore = douraStore.getModel(b)
+    const bStore = douraStore.getModel('b', b)
     bStore.add()
     await delay(100)
     let StorageState = await getStoredState(config)
     expect(StorageState).toStrictEqual({
-      _persist: { rehydrated: true, version: -1 },
       a: { a: 1 },
     })
   })
@@ -86,7 +84,7 @@ describe('persist plugin worked:', () => {
         ],
       ],
     })
-    const aStore = douraStore.getModel(a)
+    const aStore = douraStore.getModel('a', a)
     await delay(100)
     expect(aStore.$state).toStrictEqual({ a: 1 })
   })
@@ -104,12 +102,11 @@ describe('persist plugin worked:', () => {
       ],
     })
     await delay(100)
-    const aStore = douraStore.getModel(a)
+    const aStore = douraStore.getModel('a', a)
     aStore.add()
     await delay(100)
     let StorageState = await getStoredState(config)
     expect(StorageState).toStrictEqual({
-      _persist: { rehydrated: true, version: 1 },
       a: { a: 1 },
     })
   })

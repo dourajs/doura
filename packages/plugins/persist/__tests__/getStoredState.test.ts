@@ -15,13 +15,12 @@ let config = {
 describe('getStoredState worked:', () => {
   test('get persist state and model state', async () => {
     const douraStore = doura({ plugins: [[douraPersist, config]] })
-    const aStore = douraStore.getModel(a)
+    const aStore = douraStore.getModel('a', a)
     aStore.add()
     await aStore.addAsync()
     await delay(100)
     const StorageState = await getStoredState(config)
     expect(StorageState).toStrictEqual({
-      _persist: { rehydrated: true, version: -1 },
       a: { a: 2 },
     })
   })

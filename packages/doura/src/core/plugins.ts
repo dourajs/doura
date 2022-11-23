@@ -1,4 +1,4 @@
-import { State, AnyModel } from './modelOptions'
+import { State, AnyObjectModel } from './modelOptions'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { ModelManager } from './modelManager'
 
@@ -11,9 +11,9 @@ export type PluginHook = {
     options: { initialState: Record<string, State> },
     context: PluginContext
   ): void
-  onModel?(name: string, model: AnyModel, context: PluginContext): void
+  onModel?(name: string, model: AnyObjectModel, context: PluginContext): void
   onModelInstance?(
-    instance: ModelPublicInstance<AnyModel>,
+    instance: ModelPublicInstance<AnyObjectModel>,
     context: PluginContext
   ): void
   onDestroy?(): void

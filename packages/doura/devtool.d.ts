@@ -1,1 +1,3 @@
-export { default } from './lib/devtool'
+declare const reduxDevTools: any
+
+export default reduxDevTools

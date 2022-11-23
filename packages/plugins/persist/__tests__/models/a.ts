@@ -2,7 +2,6 @@ import { defineModel } from 'doura'
 import { delay } from '../utils/delay'
 
 export const a = defineModel({
-  name: 'a',
   state: { a: 0 },
   actions: {
     add(payload: number = 1) {

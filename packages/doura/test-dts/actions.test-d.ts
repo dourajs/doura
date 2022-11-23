@@ -7,7 +7,6 @@ interface State {
 }
 
 const model = defineModel({
-  name: 'model',
   state: {
     count: 0,
   },
@@ -44,7 +43,7 @@ const model = defineModel({
   },
 })
 
-const store = douraStore.getModel(model)
+const store = douraStore.getModel('test', model)
 
 // props
 expectType<State>(store.$state)

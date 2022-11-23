@@ -1,5 +1,5 @@
-import { AnyModel } from '../modelOptions'
-import { ModelInternal, ActionType } from '../model'
+import { AnyObjectModel } from '../modelOptions'
+import { ModelInternal, ActionType, ModelInternalOptions } from '../model'
 import { nextTick } from '../scheduler'
 
 let oldEnv: any
@@ -11,8 +11,17 @@ afterAll(() => {
   process.env.NODE_ENV = oldEnv
 })
 
-const createModel = (options: AnyModel, initState?: any) =>
-  new ModelInternal(options, initState)
+const createModel = (
+  model: AnyObjectModel,
+  options: ModelInternalOptions = {}
+) => new ModelInternal(model, options)
+
+export const sleep = (time: number) =>
+  new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(null)
+    }, time)
+  })
 
 describe('model', () => {
   test('getState should return raw state', () => {
@@ -122,7 +131,6 @@ describe('model', () => {
         b: number
       }
       const count = createModel({
-        name: 'count',
         state: { a: 1, b: 1 } as IState,
       })
 
@@ -155,7 +163,6 @@ describe('model', () => {
   describe('patch()', () => {
     it('should warn primitive value', () => {
       const count = createModel({
-        name: 'count',
         state: 1,
       })
 
@@ -170,7 +177,6 @@ describe('model', () => {
         b: number
       }
       const count = createModel({
-        name: 'count',
         state: { a: 1, b: 1 } as IState,
       })
 
@@ -193,7 +199,6 @@ describe('model', () => {
 
     it('should patch deep state', () => {
       const count = createModel({
-        name: 'count',
         state: {
           a: {
             b: 'b',
@@ -236,7 +241,6 @@ describe('model', () => {
         return this.a
       })
       const model = createModel({
-        name: 'model',
         state: {
           a: 1,
         },

@@ -4,7 +4,6 @@ import { expectType, useModel, useRootModel } from './'
 type customType = 'custom' | 'custom0'
 
 const count = defineModel({
-  name: 'count',
   state: {
     value: 1,
     s: '',

@@ -5,6 +5,8 @@ export type {
   Plugin,
   ModelPublicInstance,
   ModelManagerOptions,
+  AnyObjectModel,
+  AnyFunctionModel,
   AnyModel,
   State,
   Action,

@@ -17,8 +17,7 @@ afterAll(() => {
 
 describe('defineModel/views', () => {
   it('should receive state as first params', () => {
-    const sample = defineModel({
-      name: 'sample',
+    const count = defineModel({
       state: {
         count: 1,
       },
@@ -28,7 +27,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(sample)
+    const store = modelMgr.getModel('test', count)
 
     expect(store.double).toBe(2)
   })
@@ -38,7 +37,6 @@ describe('defineModel/views', () => {
       a: 0,
     }
     const model = defineModel({
-      name: 'model',
       state: initState,
       views: {
         view() {
@@ -47,14 +45,13 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(model)
+    const store = modelMgr.getModel('test', model)
     expect(() => store.view).toThrow()
     expect('Cannot change state in view function').toHaveBeenWarned()
   })
 
   it('should warn when return "this" or "this.$state"', () => {
     const model = defineModel({
-      name: 'modal',
       state: {
         a: {},
       },
@@ -68,7 +65,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const modelStore = modelMgr.getModel(model)
+    const modelStore = modelMgr.getModel('test', model)
 
     void modelStore.This
     expect(
@@ -81,8 +78,7 @@ describe('defineModel/views', () => {
   })
 
   it('should return same reference if no update', () => {
-    const sample = defineModel({
-      name: 'sample',
+    const model = defineModel({
       state: {
         a: { foo: 'bar' },
         b: 1,
@@ -99,7 +95,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(sample)
+    const store = modelMgr.getModel('test', model)
 
     const value = store.viewA
     store.changeB()
@@ -107,8 +103,7 @@ describe('defineModel/views', () => {
   })
 
   it('should always return same reference if no depends', () => {
-    const sample = defineModel({
-      name: 'sample',
+    const model = defineModel({
       state: {
         a: { foo: 'bar' },
         b: 1,
@@ -127,7 +122,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(sample)
+    const store = modelMgr.getModel('test', model)
 
     const value = store.test
     store.changeB()
@@ -139,8 +134,7 @@ describe('defineModel/views', () => {
 
   it("should not be invoked when deps don't change", () => {
     let calltime = 0
-    const sample = defineModel({
-      name: 'sample',
+    const model = defineModel({
       state: {
         a: 0,
         b: 1,
@@ -157,7 +151,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(sample)
+    const store = modelMgr.getModel('test', model)
 
     expect(calltime).toBe(0)
     store.doubleB
@@ -169,8 +163,7 @@ describe('defineModel/views', () => {
 
   it("should not be invoked when deps don't change (complex)", () => {
     let sampleComputeTimes = 0
-    const sample = defineModel({
-      name: 'sample',
+    const model = defineModel({
       state: {
         value: 0,
         value1: {
@@ -193,7 +186,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(sample)
+    const store = modelMgr.getModel('test', model)
 
     expect(sampleComputeTimes).toBe(0)
     store.sampleView
@@ -205,8 +198,7 @@ describe('defineModel/views', () => {
 
   it("should not be invoked when deps don't change (nested views)", () => {
     let selfViewComputeTimes = 0
-    const selfView = defineModel({
-      name: 'selfView',
+    const model = defineModel({
       state: {
         value: 0,
         value1: {
@@ -231,7 +223,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(selfView)
+    const store = modelMgr.getModel('test', model)
 
     expect(selfViewComputeTimes).toBe(0)
 
@@ -245,7 +237,6 @@ describe('defineModel/views', () => {
   it("should not be invoked when deps don't change (this.$state())", () => {
     let calltime = 0
     const model = defineModel({
-      name: 'model',
       state: {
         foo: 'bar',
       },
@@ -262,7 +253,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const store = modelMgr.getModel(model)
+    const store = modelMgr.getModel('test', model)
     expect(calltime).toBe(0)
     store.getFoo
     store.getFoo
@@ -277,8 +268,7 @@ describe('defineModel/views', () => {
     let calltimeA = 0
     let calltimeB = 0
     let calltimeC = 0
-    const sample = defineModel({
-      name: 'sample',
+    const model = defineModel({
       state: {
         a: 0,
         b: {},
@@ -312,7 +302,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(sample)
+    const store = modelMgr.getModel('test', model)
 
     expect(calltimeC).toBe(0)
     const originC = store.viewC
@@ -344,7 +334,6 @@ describe('defineModel/views', () => {
       a: 0,
     }
     const model = defineModel({
-      name: 'model',
       state: initState,
       actions: {
         replace(newState: any) {
@@ -357,7 +346,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(model)
+    const store = modelMgr.getModel('test', model)
     expect(store.view).toStrictEqual(0)
     const newState = { a: 2 }
     store.replace(newState)
@@ -366,8 +355,7 @@ describe('defineModel/views', () => {
 
   it('should return last value (using this.$state in view)', () => {
     let numberOfCalls = 0
-    const test = defineModel({
-      name: 'test',
+    const model = defineModel({
       state: {
         other: 'other value',
         level1: {
@@ -396,7 +384,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const store = modelMgr.getModel(test)
+    const store = modelMgr.getModel('test', model)
 
     expect(numberOfCalls).toBe(0)
     store.getOther
@@ -425,7 +413,6 @@ describe('defineModel/views', () => {
     const fn = jest.fn()
     let initState = {}
     const model = defineModel({
-      name: 'model',
       state: initState as { a: number },
       views: {
         view() {
@@ -434,7 +421,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel(model)
+    const store = modelMgr.getModel('test', model)
     expect(fn).toHaveBeenCalledTimes(0)
 
     expect(store.view).toBeUndefined()
@@ -449,44 +436,41 @@ describe('defineModel/views', () => {
   describe('view with depends', () => {
     it('should not be invoked if no dep update', () => {
       const modelA = defineModel({
-        name: 'modelA',
         state: {
-          a: 0,
-          b: 1,
+          value: 0,
         },
         actions: {
-          changeB() {
-            this.b += 1
+          inc() {
+            this.value += 1
           },
         },
       })
       let calltime = 0
-      const sample = defineModel({
-        name: 'sample',
-        models: {
-          modelA,
-        },
-        state: {},
-        views: {
-          viewA() {
-            calltime++
-            return this.$models.modelA.a
+      const model = defineModel(({ use }) => {
+        const a = use(modelA)
+
+        return {
+          state: {},
+          views: {
+            viewA() {
+              calltime++
+              return a.value
+            },
           },
-        },
+        }
       })
-      const store = modelMgr.getModel(sample)
+      const store = modelMgr.getModel('test', model)
 
       expect(calltime).toBe(0)
       store.viewA
       expect(calltime).toBe(1)
-      modelMgr.getModel(modelA).changeB()
+      modelMgr.getModel('a', modelA).inc()
       store.viewA
       expect(calltime).toBe(1)
     })
 
     it('should return last state', () => {
       const modelA = defineModel({
-        name: 'modelA',
         state: {
           a: 0,
         },
@@ -501,20 +485,19 @@ describe('defineModel/views', () => {
           },
         },
       })
-      const sample = defineModel({
-        name: 'sample',
-        models: {
-          modelA,
-        },
-        state: {},
-        views: {
-          viewA() {
-            return this.$models.modelA.doubleA
+      const model = defineModel(({ use }) => {
+        const a = use('a', modelA)
+        return {
+          state: {},
+          views: {
+            viewA() {
+              return a.doubleA
+            },
           },
-        },
+        }
       })
-      const store = modelMgr.getModel(sample)
-      const storeA = modelMgr.getModel(modelA)
+      const store = modelMgr.getModel('test', model)
+      const storeA = modelMgr.getModel('a', modelA)
       expect(store.viewA).toBe(0)
       storeA.changeA()
       expect(storeA.doubleA).toBe(2)
@@ -525,7 +508,6 @@ describe('defineModel/views', () => {
   describe('array', () => {
     it('should return a new array when it is modified', async () => {
       const model = defineModel({
-        name: 'model',
         state: {
           numbers: [1, 2],
         },
@@ -541,7 +523,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const store = modelMgr.getModel(model)
+      const store = modelMgr.getModel('test', model)
 
       let value = store.nums
       expect(value).toEqual([1, 2])
@@ -555,8 +537,7 @@ describe('defineModel/views', () => {
     })
 
     it('should return a new array when an existing element is modified', async () => {
-      const model = defineModel({
-        name: 'todo',
+      const todo = defineModel({
         state: {
           todos: [{ id: 0, finished: false }],
           nextId: 0,
@@ -576,7 +557,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const store = modelMgr.getModel(model)
+      const store = modelMgr.getModel('todo', todo)
 
       let value = store.allTodos
       expect(value).toEqual([{ id: 0, finished: false }])
@@ -588,8 +569,7 @@ describe('defineModel/views', () => {
     })
 
     it('should return a new array when a new element is modified', async () => {
-      const model = defineModel({
-        name: 'todo',
+      const todo = defineModel({
         state: {
           todos: [] as { id: number; finished: boolean }[],
           nextId: 0,
@@ -615,7 +595,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const store = modelMgr.getModel(model)
+      const store = modelMgr.getModel('todo', todo)
 
       expect(store.allTodos).toEqual([])
       store.addTodo()
@@ -636,7 +616,6 @@ describe('defineModel/views', () => {
     it("should not be invoked when deps don't change", () => {
       let numberOfCalls = 0
       const numberModel = defineModel({
-        name: 'numberModel',
         state: 0,
         actions: {
           doNothing: () => {},
@@ -649,7 +628,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const numberStore = modelMgr.getModel(numberModel)
+      const numberStore = modelMgr.getModel('number', numberModel)
 
       expect(numberOfCalls).toBe(0)
       expect(numberStore.double).toBe(0)
@@ -663,7 +642,6 @@ describe('defineModel/views', () => {
     it('should return last value', () => {
       let numberOfCalls = 0
       const numberModel = defineModel({
-        name: 'numberModel',
         state: 0,
         actions: {
           increment() {
@@ -678,7 +656,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const numberStore = modelMgr.getModel(numberModel)
+      const numberStore = modelMgr.getModel('number', numberModel)
 
       expect(numberOfCalls).toBe(0)
       expect(numberStore.double).toBe(0)
@@ -695,7 +673,6 @@ describe('defineModel/views', () => {
       let numberOfCalls = 0
 
       const arrayModel = defineModel({
-        name: 'arrayModel',
         state: [0, 1],
         actions: {
           doNothing: () => {},
@@ -708,7 +685,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const arrayStore = modelMgr.getModel(arrayModel)
+      const arrayStore = modelMgr.getModel('array', arrayModel)
 
       expect(numberOfCalls).toBe(0)
       expect(arrayStore.double).toEqual([0, 2])
@@ -723,7 +700,6 @@ describe('defineModel/views', () => {
       let numberOfCalls = 0
 
       const arrayModel = defineModel({
-        name: 'arrayModel',
         state: [0],
         actions: {
           remove(payload: number) {
@@ -741,7 +717,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const arrayStore = modelMgr.getModel(arrayModel)
+      const arrayStore = modelMgr.getModel('array', arrayModel)
 
       expect(numberOfCalls).toBe(0)
       expect(arrayStore.double).toEqual([0])
