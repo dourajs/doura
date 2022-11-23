@@ -28,6 +28,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
+  $isolate: <T>(fn: (s: IModel['state']) => T) => T
   $getSnapshot(): ModelData<IModel>
   $createView: <R>(
     selector: Selector<IModel, R>
@@ -58,6 +59,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
       $patch: (i) => i.patch,
       $onAction: (i) => i.onAction,
       $subscribe: (i) => i.subscribe,
+      $isolate: (i) => i.isolate,
       $getSnapshot: (i) => i.getSnapshot,
       $createView: (i) => createView.bind(null, i),
     } as PublicPropertiesMap)

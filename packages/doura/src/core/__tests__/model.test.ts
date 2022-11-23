@@ -75,6 +75,46 @@ describe('model', () => {
     })
   })
 
+  describe('isolate', () => {
+    it('should not track reactive values in isolate()', () => {
+      const model = createModel({
+        state: { anObj: { a: 0 }, value: 0 },
+        views: {
+          view() {
+            const anObj = this.anObj
+            return {
+              anObj,
+              value: this.value,
+            }
+          },
+          isolatedView() {
+            const anObj = this.$isolate((s: any) => s.anObj)
+            return {
+              anObj,
+              value: this.value,
+            }
+          },
+        },
+        actions: {
+          update() {
+            this.anObj.a++
+          },
+        },
+      }).proxy as any
+      let value = model.view
+      let isolatedValue = model.isolatedView
+      expect(value).toEqual({ anObj: { a: 0 }, value: 0 })
+      expect(isolatedValue).toEqual({ anObj: { a: 0 }, value: 0 })
+      model.update()
+      let nextValue = model.view
+      let nextIsolatedValue = model.isolatedView
+      expect(nextValue).not.toBe(value)
+      expect(nextValue).toEqual({ anObj: { a: 1 }, value: 0 })
+      expect(nextIsolatedValue).toBe(isolatedValue)
+      expect(nextIsolatedValue).toEqual({ anObj: { a: 0 }, value: 0 })
+    })
+  })
+
   describe('subscribe()', () => {
     it('should work', async () => {
       type IState = {

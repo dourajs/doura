@@ -16,6 +16,10 @@ const depModel = defineModel({
     count: 0,
   },
   views: {
+    isolate() {
+      const r = this.$isolate((s) => ({ v: s.count + 1 }))
+      return r
+    },
     double() {
       return this.count * 2
     },

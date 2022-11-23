@@ -364,31 +364,6 @@ describe('defineModel/views', () => {
     expect(store.view).toStrictEqual(newState.a)
   })
 
-  it('should not reactive to properties not existing in the initial state', () => {
-    const fn = jest.fn()
-    let initState = {}
-    const model = defineModel({
-      name: 'model',
-      state: initState as { a: number },
-      views: {
-        view() {
-          fn()
-          return this.a
-        },
-      },
-    })
-    const store = modelMgr.getModel(model)
-    expect(fn).toHaveBeenCalledTimes(0)
-
-    expect(store.view).toBeUndefined()
-    expect(fn).toHaveBeenCalledTimes(1)
-
-    store.$patch({ a: 1 })
-    // should not re-run view
-    expect(store.view).toBeUndefined()
-    expect(fn).toHaveBeenCalledTimes(1)
-  })
-
   it('should return last value (using this.$state in view)', () => {
     let numberOfCalls = 0
     const test = defineModel({
@@ -446,35 +421,29 @@ describe('defineModel/views', () => {
     expect(numberOfCalls).toBe(4)
   })
 
-  it('should return new reference when target is modified', async () => {
+  it('should not reactive to properties not existing in the initial state', () => {
+    const fn = jest.fn()
+    let initState = {}
     const model = defineModel({
       name: 'model',
-      state: {
-        numbers: [1, 2],
-      },
-      actions: {
-        add(n: number) {
-          this.numbers.push(n)
-        },
-      },
+      state: initState as { a: number },
       views: {
-        nums() {
-          return this.numbers
+        view() {
+          fn()
+          return this.a
         },
       },
     })
-
     const store = modelMgr.getModel(model)
+    expect(fn).toHaveBeenCalledTimes(0)
 
-    let value = store.nums
-    expect(value).toEqual([1, 2])
-    store.add(3)
-    await nextTick()
-    // expect(store.nums).not.toBe(value)
-    expect(store.nums).toEqual([1, 2, 3])
-    store.add(4)
-    await nextTick()
-    expect(store.nums).toEqual([1, 2, 3, 4])
+    expect(store.view).toBeUndefined()
+    expect(fn).toHaveBeenCalledTimes(1)
+
+    store.$patch({ a: 1 })
+    // should not re-run view
+    expect(store.view).toBeUndefined()
+    expect(fn).toHaveBeenCalledTimes(1)
   })
 
   describe('view with depends', () => {
@@ -553,6 +522,116 @@ describe('defineModel/views', () => {
     })
   })
 
+  describe('array', () => {
+    it('should return a new array when it is modified', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: {
+          numbers: [1, 2],
+        },
+        actions: {
+          add(n: number) {
+            this.numbers.push(n)
+          },
+        },
+        views: {
+          nums() {
+            return this.numbers
+          },
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+
+      let value = store.nums
+      expect(value).toEqual([1, 2])
+      store.add(3)
+      await nextTick()
+      // expect(store.nums).not.toBe(value)
+      expect(store.nums).toEqual([1, 2, 3])
+      store.add(4)
+      await nextTick()
+      expect(store.nums).toEqual([1, 2, 3, 4])
+    })
+
+    it('should return a new array when an existing element is modified', async () => {
+      const model = defineModel({
+        name: 'todo',
+        state: {
+          todos: [{ id: 0, finished: false }],
+          nextId: 0,
+        },
+        actions: {
+          toggle(id: number) {
+            const todo = this.todos.find((i) => i.id === id)
+            if (todo) {
+              todo.finished = !todo.finished
+            }
+          },
+        },
+        views: {
+          allTodos() {
+            return this.todos
+          },
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+
+      let value = store.allTodos
+      expect(value).toEqual([{ id: 0, finished: false }])
+
+      store.toggle(0)
+      await nextTick()
+      expect(store.allTodos).not.toEqual(value)
+      expect(store.allTodos).toEqual([{ id: 0, finished: true }])
+    })
+
+    it('should return a new array when a new element is modified', async () => {
+      const model = defineModel({
+        name: 'todo',
+        state: {
+          todos: [] as { id: number; finished: boolean }[],
+          nextId: 0,
+        },
+        actions: {
+          addTodo() {
+            this.todos.push({
+              id: this.nextId++,
+              finished: false,
+            })
+          },
+          toggle(id: number) {
+            const todo = this.todos.find((i) => i.id === id)
+            if (todo) {
+              todo.finished = !todo.finished
+            }
+          },
+        },
+        views: {
+          allTodos() {
+            return this.todos
+          },
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+
+      expect(store.allTodos).toEqual([])
+      store.addTodo()
+      await nextTick()
+
+      let value = store.allTodos
+      expect(value).toEqual([{ id: 0, finished: false }])
+      expect(store.allTodos).toEqual([{ id: 0, finished: false }])
+
+      store.toggle(0)
+      await nextTick()
+      expect(store.allTodos).not.toEqual(value)
+      expect(store.allTodos).toEqual([{ id: 0, finished: true }])
+    })
+  })
+
   describe('primitive state/simple value', () => {
     it("should not be invoked when deps don't change", () => {
       let numberOfCalls = 0
@@ -608,85 +687,6 @@ describe('defineModel/views', () => {
       numberStore.increment()
       expect(numberStore.double).toBe(2)
       expect(numberOfCalls).toBe(2)
-    })
-  })
-
-  describe('array', () => {
-    it('should return new reference when an existing element is modified', async () => {
-      const model = defineModel({
-        name: 'todo',
-        state: {
-          todos: [{ id: 0, finished: false }],
-          nextId: 0,
-        },
-        actions: {
-          toggle(id: number) {
-            const todo = this.todos.find((i) => i.id === id)
-            if (todo) {
-              todo.finished = !todo.finished
-            }
-          },
-        },
-        views: {
-          allTodos() {
-            return this.todos
-          },
-        },
-      })
-
-      const store = modelMgr.getModel(model)
-
-      let value = store.allTodos
-      expect(value).toEqual([{ id: 0, finished: false }])
-
-      store.toggle(0)
-      await nextTick()
-      expect(store.allTodos).not.toEqual(value)
-      expect(store.allTodos).toEqual([{ id: 0, finished: true }])
-    })
-
-    it('should return new reference when a new element is modified', async () => {
-      const model = defineModel({
-        name: 'todo',
-        state: {
-          todos: [] as { id: number; finished: boolean }[],
-          nextId: 0,
-        },
-        actions: {
-          addTodo() {
-            this.todos.push({
-              id: this.nextId++,
-              finished: false,
-            })
-          },
-          toggle(id: number) {
-            const todo = this.todos.find((i) => i.id === id)
-            if (todo) {
-              todo.finished = !todo.finished
-            }
-          },
-        },
-        views: {
-          allTodos() {
-            return this.todos
-          },
-        },
-      })
-
-      const store = modelMgr.getModel(model)
-
-      expect(store.allTodos).toEqual([])
-      store.addTodo()
-      await nextTick()
-
-      let value = store.allTodos
-      expect(value).toEqual([{ id: 0, finished: false }])
-      expect(store.allTodos).toEqual([{ id: 0, finished: false }])
-
-      store.toggle(0)
-      await nextTick()
-      expect(store.allTodos).not.toEqual(value)
-      expect(store.allTodos).toEqual([{ id: 0, finished: true }])
     })
   })
 

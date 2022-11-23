@@ -117,44 +117,6 @@ describe('modelManager', () => {
     expect(newStore.$state.value).toBe(0)
   })
 
-  describe('subscribe', () => {
-    it('should subscribe to all models', async () => {
-      const fn = jest.fn()
-      const modelMgr = modelManager()
-      const a = defineModel({
-        name: 'a',
-        state: { value: 0 },
-        actions: {
-          increment(n: number) {
-            this.value += n
-          },
-        },
-      })
-      const b = defineModel({
-        name: 'b',
-        models: {
-          a,
-        },
-        state: { value: 0 },
-        actions: {
-          increment(n: number) {
-            this.$models.a.increment(n)
-            this.value += n
-          },
-        },
-      })
-
-      modelMgr.subscribe(fn)
-      const store = modelMgr.getModel(b)
-
-      expect(fn).toHaveBeenCalledTimes(0)
-      store.increment(1)
-      expect(fn).toHaveBeenCalledTimes(0)
-      await nextTick()
-      expect(fn).toHaveBeenCalledTimes(1)
-    })
-  })
-
   it('should trigger change when dependencies have changed', async () => {
     let storeCount = 0
     let modelCount = 0
@@ -211,6 +173,44 @@ describe('modelManager', () => {
     expect(dependCount).toBe(2)
     expect(modelCount).toBe(3)
     expect(storeCount).toBe(3)
+  })
+
+  describe('subscribe', () => {
+    it('should subscribe to all models', async () => {
+      const fn = jest.fn()
+      const modelMgr = modelManager()
+      const a = defineModel({
+        name: 'a',
+        state: { value: 0 },
+        actions: {
+          increment(n: number) {
+            this.value += n
+          },
+        },
+      })
+      const b = defineModel({
+        name: 'b',
+        models: {
+          a,
+        },
+        state: { value: 0 },
+        actions: {
+          increment(n: number) {
+            this.$models.a.increment(n)
+            this.value += n
+          },
+        },
+      })
+
+      modelMgr.subscribe(fn)
+      const store = modelMgr.getModel(b)
+
+      expect(fn).toHaveBeenCalledTimes(0)
+      store.increment(1)
+      expect(fn).toHaveBeenCalledTimes(0)
+      await nextTick()
+      expect(fn).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('plugin', () => {

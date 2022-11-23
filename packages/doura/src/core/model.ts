@@ -8,7 +8,9 @@ import {
   draft,
   watch,
   snapshot,
-} from '../reactivity/index'
+  pauseTracking,
+  resetTracking,
+} from '../reactivity'
 import {
   Views,
   State,
@@ -168,7 +170,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   private _initState: IModel['state']
   private _currentState!: IModel['state']
   private _actionListeners: Set<ActionListener> = new Set()
-  private _viewListeners: Set<() => void> = new Set()
   private _subscribers: Set<SubscriptionCallback> = new Set()
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
@@ -176,10 +177,10 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
 
   constructor(model: IModel, initState: State) {
     this.patch = this.patch.bind(this)
-    this.getSnapshot = this.getSnapshot.bind(this)
-    this.subscribe = this.subscribe.bind(this)
     this.onAction = this.onAction.bind(this)
-    this._subscribeFromView = this._subscribeFromView.bind(this)
+    this.subscribe = this.subscribe.bind(this)
+    this.isolate = this.isolate.bind(this)
+    this.getSnapshot = this.getSnapshot.bind(this)
 
     this.options = model
     this.name = this.options.name || ''
@@ -362,6 +363,18 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
     this._draftListenerHandler()
   }
 
+  /**
+   * Executes the given function in a scope where reactive values can be read,
+   * but they cannot cause the reactive scope of the caller to be re-evaluated
+   * when they change
+   */
+  isolate<T>(fn: (s: IModel['state']) => T): T {
+    pauseTracking()
+    const res = fn(this.stateValue)
+    resetTracking()
+    return res
+  }
+
   depend(name: string, dep: ModelInternal<any>) {
     this.models.set(name, dep)
     // collection beDepends, a depends b, when b update, call a need trigger listener
@@ -381,10 +394,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
   }
 
   private _triggerListener(event: ModelChangeEvent) {
-    // view's listeners should be triggered first
-    for (const listener of this._viewListeners) {
-      listener()
-    }
     for (const listener of this._subscribers) {
       listener(event)
     }
@@ -478,14 +487,6 @@ export class ModelInternal<IModel extends AnyModel = AnyModel> {
           },
         })
       }
-    }
-  }
-
-  private _subscribeFromView(listener: () => void) {
-    this._viewListeners.add(listener)
-
-    return () => {
-      this._viewListeners.delete(listener)
     }
   }
 }

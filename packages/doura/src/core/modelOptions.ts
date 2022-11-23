@@ -77,6 +77,7 @@ export type ViewThis<
   M extends Models = {}
 > = S & {
   $state: S
+  $isolate: <T>(fn: (s: S) => T) => T
 } & Views<V> & {
     $models: {
       [K in keyof M]: M[K] extends DefineModel<
