@@ -3,4 +3,125 @@ id: compose-model
 title: Composing Models
 ---
 
-Documentation coming soon...
+To use other models when define a model, we need to use **function** to define
+the model.
+
+```ts
+const countModel = defineModel({
+  state: {
+    count: 0,
+  },
+})
+
+const userModel = defineModel(({ use }) => {
+  const counter = use(countModel)
+
+  return {
+    state: {
+      name: 'alice',
+      isLogin: false,
+    },
+    actions: {
+      login() {
+        counter.count++
+        this.isLogin = true
+      },
+    },
+    views: {
+      loginCount() {
+        return counter.count
+      },
+    },
+  }
+})
+```
+
+:::caution
+Note that if you destructure the `counter` object, the destructured variables will lose reactivity. It is therefore recommended to always access props in the form of `counter.xxx`.
+:::
+
+```ts
+const userModel = defineModel(({ use }) => {
+  const counter = use(countModel)
+  const { count } = counter // ❌ don't destructure
+
+  return {
+    state: {},
+    views: {
+      countOne() {
+        return count; // ⚠️ countOne won't update once count is changed
+      }
+      countTwo() {
+        return counter.count // ✅ always access props by `someModel.xx` in a view function
+      },
+    },
+  }
+})
+```
+
+## Local Model
+
+when composing a model by `use(model)`, if we don't provide a name, the model is isolated and can only get accessed in the current model.
+
+```ts
+const countModel = defineModel({
+  state: {
+    count: 0,
+  },
+})
+
+const modelOne = defineModel(({ use }) => {
+  const counter1 = use(countModel)
+  const counter2 = use(countModel)
+
+  return {
+    state: {
+      value: 0,
+    },
+  }
+})
+
+const modelTwo = defineModel(({ use }) => {
+  const counter3 = use(countModel)
+
+  return {
+    state: {
+      value: 0,
+    },
+  }
+})
+```
+
+`counter1`, `counter2` and `counter3` are three different instances. They are independent of each other and do not affect each other.
+
+## Named Model
+
+If you want to share a model's state among other models, you need use **named model**.
+
+```ts
+const countModel = defineModel({
+  state: {
+    count: 0,
+  },
+})
+
+const modelOne = defineModel(({ use }) => {
+  const counter1 = use('counter', countModel)
+
+  return {
+    state: {
+      value: 0,
+    },
+  }
+})
+
+const modelTwo = defineModel(({ use }) => {
+  const counter2 = use('counter', countModel) // counter1 and counter2 point to a same instance as long as they have a same name.
+
+  return {
+    state: {
+      value: 0,
+    },
+  }
+})
+```

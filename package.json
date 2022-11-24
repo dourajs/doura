@@ -18,8 +18,8 @@
     "test": "jest",
     "release": "node scripts/release.js",
     "prepare": "husky install",
-    "docs": "pnpm --filter \"doura-docs\" run start",
-    "docs:build": "pnpm --filter \"doura-docs\" run build"
+    "doc": "pnpm --filter \"doura-docs\" run start",
+    "doc:build": "pnpm --filter \"doura-docs\" run build"
   },
   "devDependencies": {
     "@commitlint/cli": "^13.1.0",

@@ -7,7 +7,6 @@ Actions can be defined with the `actions` property in `defineModel()` and **they
 
 ```js
 export const counterModel = defineModel({
-  name: 'counter',
   state: {
     count: 0,
   },
@@ -27,7 +26,6 @@ Actions get access to the _whole model instance_ through `this` with **full typi
 
 ```js
 export const useUsers = defineModel({
-  name: 'users',
   state: {
     userData: null,
   },
@@ -51,7 +49,7 @@ You are also completely free to set whatever arguments you want and return anyth
 Actions are invoked like methods:
 
 ```js
-const counter = store.getModel(counterModel)
+const counter = store.getModel('counter', counterModel)
 // call the action as a method of the model
 counter.randomizeCounter()
 ```
