@@ -1,6 +1,6 @@
 {
   "name": "doura-react",
-  "version": "0.0.0-rc.4",
+  "version": "0.0.0-rc.5",
   "description": "Doura react integration",
   "main": "lib/index.js",
   "module": "esm/index.js",
@@ -60,7 +60,7 @@
     "react-dom": "18.1.0"
   },
   "peerDependencies": {
-    "doura": "0.0.0-rc.4",
+    "doura": "0.0.0-rc.5",
     "react": ">=16.8",
     "react-dom": ">=16.8"
   }
