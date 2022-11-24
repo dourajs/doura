@@ -11,7 +11,6 @@ interface storeState {
 }
 
 const depModel = defineModel({
-  name: 'depModel',
   state: {
     count: 0,
   },
@@ -26,7 +25,7 @@ const depModel = defineModel({
     increment() {
       expectType<number>(this.count)
       expectType<number>(this.double)
-      expectType<{}>(this.$models)
+      expectType<number>(this.$isolate(() => 1))
     },
     viewParams(state) {
       expectType<{ count: number }>(state)
@@ -35,10 +34,6 @@ const depModel = defineModel({
 })
 
 const model = defineModel({
-  name: 'model',
-  models: {
-    depModel,
-  },
   state: {
     text: 'initial',
   },
@@ -49,10 +44,6 @@ const model = defineModel({
   },
   views: {
     setText() {
-      expectType<{ depModel: { $state: depState } & depState }>(this.$models)
-      expectType<depState>(this.$models.depModel.$state)
-      expectType<number>(this.$models.depModel.double)
-      expectType<number>(this.$models.depModel.count)
       expectType<storeState>(this.$state)
       expectType<string>(this.text)
       expectType<void>(this.setText)
@@ -60,8 +51,8 @@ const model = defineModel({
   },
 })
 
-const store = douraStore.getModel(model)
-const depStore = douraStore.getModel(depModel)
+const store = douraStore.getModel('model', model)
+const depStore = douraStore.getModel('test', depModel)
 
 expectType<void>(store.setText)
 expectType<storeState>(store.$state)
