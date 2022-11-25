@@ -145,7 +145,7 @@ async function main() {
   // build all packages with types
   step('\nBuilding all packages...')
   if (!skipBuild && !isDryRun) {
-    await run('pnpm', ['build'])
+    await run('pnpm', ['run', 'build', '--release'])
   } else {
     console.log(`(skipped)`)
   }

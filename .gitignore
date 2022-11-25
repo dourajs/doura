@@ -15,7 +15,7 @@ node_modules
 .idea/
 
 # build output
+dist/
+temp/
 packages/*/dist/
-packages/*/lib/
-packages/*/esm/
 examples/*/build

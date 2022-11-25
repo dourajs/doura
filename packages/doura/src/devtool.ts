@@ -1,5 +1,5 @@
 import { invariant } from './utils'
-import type { Plugin } from './core/index'
+import type { Plugin } from './core'
 import { Doura } from './doura'
 
 function applyState(newState: any, doura: Doura) {

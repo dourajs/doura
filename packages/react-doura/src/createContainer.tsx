@@ -6,8 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react'
-import { doura } from 'doura'
-import devtool from 'doura/devtool'
+import { doura, devtool } from 'doura'
 import type { Doura, AnyModel, DouraOptions, Selector } from 'doura'
 import {
   createUseNamedModel,

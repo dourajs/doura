@@ -1,4 +1,38 @@
 {
-  "extends": "./tsconfig.build",
-  "include": ["./global.d.ts", "packages/*/src", "packages/*/__tests__"]
+  "compilerOptions": {
+    "target": "es6",
+		"module": "esnext",
+		"moduleResolution": "node",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitAny": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "stripInternal": true,
+    "downlevelIteration": true,
+    "noUnusedLocals": true,
+    "declaration": true,
+    "sourceMap": true,
+    "declarationMap": true,
+    "jsx": "react",
+		"lib": ["dom", "esnext"],
+    "outDir": "dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "doura": ["packages/doura/src"],
+      "react-doura": ["packages/react-doura/src"],
+      "doura-*": ["packages/doura-*/src"],
+    }
+  },
+  "include": [
+    "./global.d.ts",
+    "packages/*/src",
+    "packages/*/__tests__",
+    "test-dts"
+  ]
 }

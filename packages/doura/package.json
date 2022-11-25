@@ -2,38 +2,16 @@
   "name": "doura",
   "version": "0.0.0-rc.6",
   "description": "Reactive and intuitive state management",
-  "main": "lib/index.js",
-  "module": "esm/index.js",
-  "browser": "esm/index.js",
-  "umd:main": "dist/doura.umd.production.min.js",
-  "unpkg": "dist/doura.umd.production.min.js",
-  "types": "esm/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./esm/index.d.ts",
-      "import": "./esm/index.js",
-      "require": "./lib/index.js",
-      "default": "./lib/index.js"
-    },
-    "./devtool": {
-      "types": "./esm/devtool.d.ts",
-      "import": "./esm/devtool.js",
-      "require": "./lib/devtool.js",
-      "default": "./lib/devtool.js"
-    },
-    "./*": "./*"
-  },
+  "main": "index.js",
+  "module": "dist/doura.esm-bundler.js",
+  "types": "dist/doura.d.ts",
+  "unpkg": "dist/doura.global.js",
+  "jsdelivr": "dist/doura.global.js",
+  "files": [
+    "index.js",
+    "dist"
+  ],
   "sideEffects": false,
-  "scripts": {
-    "dev": "run-p watch:*",
-    "watch:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm -w",
-    "watch:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib -w",
-    "build": "run-p clean && run-p build:*",
-    "build:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm",
-    "build:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib",
-    "build:umd": "dts build --format umd --tsconfig ./tsconfig.build.json --name doura",
-    "clean": "rimraf lib esm dist"
-  },
   "authors": [
     "liximomo"
   ],
@@ -53,16 +31,19 @@
   "bugs": {
     "url": "https://github.com/dourajs/doura/issues"
   },
+  "buildOptions": {
+    "name": "Doura",
+    "formats": [
+      "esm-bundler",
+      "esm-browser",
+      "cjs",
+      "global"
+    ]
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "files": [
-    "dist",
-    "esm",
-    "lib",
-    "./devtool.js"
-  ],
   "devDependencies": {
     "lodash": "^4.17.4"
   }

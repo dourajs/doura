@@ -18,3 +18,5 @@ export type {
 export { defineModel, nextTick } from './core'
 
 export { Doura, DouraOptions, doura } from './doura'
+
+export { default as devtool } from './devtool'

@@ -1,20 +1,14 @@
 {
   "name": "doura-plugin-log",
   "version": "0.0.0-rc.6",
-  "main": "lib/index.js",
-  "module": "esm/index.js",
-  "browser": "esm/index.js",
-  "types": "esm/index.d.ts",
+  "main": "index.js",
+  "module": "dist/doura-plugin-log.esm-bundler.js",
+  "types": "dist/doura-plugin-log.d.ts",
+  "files": [
+    "index.js",
+    "dist"
+  ],
   "sideEffects": false,
-  "scripts": {
-    "dev": "run-p watch:*",
-    "watch:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm -w",
-    "watch:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib -w",
-    "build": "run-p clean && run-p build:*",
-    "build:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm",
-    "build:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib",
-    "clean": "rimraf lib esm"
-  },
   "authors": [
     "liximomo"
   ],
@@ -37,10 +31,6 @@
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "files": [
-    "esm",
-    "lib"
-  ],
   "engines": {
     "node": ">=10"
   },

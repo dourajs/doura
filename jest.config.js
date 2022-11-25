@@ -22,6 +22,11 @@ module.exports = {
   },
   testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  moduleNameMapper: {
+    '^doura$': '<rootDir>/packages/doura/src',
+    '^doura-(.*?)$': '<rootDir>/packages/doura-$1/src',
+    '^react-doura$': '<rootDir>/packages/react-doura/src',
+  },
   rootDir: __dirname,
   testMatch: ['<rootDir>/packages/**/__tests__/**/*.test.[jt]s?(x)'],
 }

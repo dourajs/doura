@@ -2,22 +2,14 @@
   "name": "react-doura",
   "version": "0.0.0-rc.6",
   "description": "Doura React.js integration",
-  "main": "lib/index.js",
-  "module": "esm/index.js",
-  "browser": "esm/index.js",
-  "unpkg": "dist/reactDoura.umd.production.min.js",
-  "types": "esm/index.d.ts",
+  "main": "index.js",
+  "module": "dist/react-doura.esm-bundler.js",
+  "types": "dist/react-doura.d.ts",
+  "files": [
+    "index.js",
+    "dist"
+  ],
   "sideEffects": false,
-  "scripts": {
-    "dev": "run-p watch:*",
-    "watch:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm -w",
-    "watch:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib -w",
-    "build": "run-p clean && run-p build:*",
-    "build:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm",
-    "build:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib",
-    "build:umd": "dts build --format umd --tsconfig ./tsconfig.build.json --name reactDoura",
-    "clean": "rimraf lib esm dist"
-  },
   "authors": [
     "liximomo"
   ],
@@ -38,15 +30,17 @@
   "bugs": {
     "url": "https://github.com/dourajs/doura/issues"
   },
+  "buildOptions": {
+    "name": "ReactDoura",
+    "formats": [
+      "esm-bundler",
+      "cjs"
+    ]
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "files": [
-    "dist",
-    "esm",
-    "lib"
-  ],
   "dependencies": {
     "use-sync-external-store": "1.2.0"
   },
