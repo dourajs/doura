@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom'
 import App from './App'
-import { DouraRoot } from 'react-doura'
+import { DouraRoot } from '../../../packages/react-doura/esm'
 
 ReactDOM.render(
   <DouraRoot>

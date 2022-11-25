@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useModel } from 'react-doura'
+import { useModel } from '../../../../packages/react-doura/esm'
 
 import { count } from '../models/count'
 

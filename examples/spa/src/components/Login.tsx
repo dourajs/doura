@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { ModelAPI } from 'doura'
-import { useRootModel } from 'react-doura'
+import { useRootModel } from '../../../../packages/react-doura/esm'
 
 import { login, currentUser } from '../models/login'
 

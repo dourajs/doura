@@ -18,7 +18,4 @@ node_modules
 packages/*/dist/
 packages/*/lib/
 packages/*/esm/
-packages/plugins/*/dist/
-packages/plugins/*/lib/
-packages/plugins/*/esm/
 examples/*/build

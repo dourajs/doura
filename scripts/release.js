@@ -43,7 +43,7 @@ const skipBuild = args.skipBuild
 
 const ingoredPackages = []
 const skippedPackages = []
-const pkgDirs = ['../packages', '../packages/plugins']
+const pkgDirs = ['../packages']
 let packages = []
 
 for (const pkgDir of pkgDirs) {

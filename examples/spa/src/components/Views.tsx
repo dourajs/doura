@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { defineModel, ModelAPI } from 'doura'
-import { useRootModel } from 'react-doura'
+import { useRootModel } from '../../../../packages/react-doura/esm'
 
 const otherDep = defineModel({
   name: 'otherDep',

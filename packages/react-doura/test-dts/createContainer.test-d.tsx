@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { defineModel } from 'doura'
-import { createContainer, useRootStaticModel } from '../src'
+import { createContainer, useRootStaticModel } from '../src/index'
 import { IUseNamedModel, IUseNamedStaticModel } from '../src/types'
 
-import { expectType } from './'
+import { expectType } from './index'
 
 function Test() {
   const {

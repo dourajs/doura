@@ -1,7 +1,7 @@
 export function deserialize(serial: string) {
-	return JSON.parse(serial)
+  return JSON.parse(serial)
 }
 
 export function serialize(data: any) {
-	return JSON.stringify(data)
+  return JSON.stringify(data)
 }

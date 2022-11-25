@@ -1,5 +1,5 @@
 import { defineModel, ModelAPI } from 'doura'
-import { expectType, useModel, useRootModel } from './'
+import { expectType, useModel, useRootModel } from './index'
 
 type customType = 'custom' | 'custom0'
 
