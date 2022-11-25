@@ -60,27 +60,29 @@ describe('model', () => {
       },
     })
 
-    const snapshot = model.getSnapshot() as any
-    expect(snapshot).toEqual({
-      $state: {
-        a: 1,
-        arr: [1, 2],
-      },
+    const snapshot1 = model.getSnapshot() as any
+    expect(snapshot1).toEqual({
       a: 1,
       arr: [1, 2],
       firstOfArr: 1,
     })
-    expect(snapshot.arr).toBe(originState.arr)
+    expect(snapshot1.$state).toEqual({
+      a: 1,
+      arr: [1, 2],
+    })
+    expect(snapshot1.arr).toBe(originState.arr)
     ;(model.proxy as any).updateA(2)
     await nextTick()
-    expect(model.getSnapshot()).toEqual({
-      $state: {
-        a: 2,
-        arr: [1, 2],
-      },
+    const snapshot2 = model.getSnapshot()
+    expect(snapshot2).not.toBe(snapshot1)
+    expect(snapshot2).toEqual({
       a: 2,
       arr: [1, 2],
       firstOfArr: 1,
+    })
+    expect(snapshot2.$state).toEqual({
+      a: 2,
+      arr: [1, 2],
     })
   })
 

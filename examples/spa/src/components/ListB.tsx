@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { ModelData } from 'doura'
+import { ModelAPI } from 'doura'
 import { useModel } from 'doura-react'
 
 import { listB } from '../models/listB'
-export type selectorParameters = ModelData<typeof listB>
+export type selectorParameters = ModelAPI<typeof listB>
 
 const selector = function (stateAndViews: selectorParameters) {
   return {

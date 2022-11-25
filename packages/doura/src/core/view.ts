@@ -1,21 +1,8 @@
-import {
-  AnyModel,
-  Views,
-  GetModelState,
-  GetModelViews,
-  AnyObjectModel,
-} from './modelOptions'
-import { ModelInternal } from './model'
-import { EmptyObject } from '../types'
-
-export type ModelData<Model extends AnyModel> = {
-  $state: GetModelState<Model>
-} & GetModelState<Model> &
-  Views<GetModelViews<Model>> &
-  EmptyObject
+import { AnyModel, AnyObjectModel } from './modelOptions'
+import { ModelInternal, ModelAPI } from './model'
 
 export type Selector<Model extends AnyModel, TReturn = any> = (
-  stateAndViews: ModelData<Model>
+  api: ModelAPI<Model>
 ) => TReturn
 
 export interface ModelView<T extends (...args: any[]) => any = any> {

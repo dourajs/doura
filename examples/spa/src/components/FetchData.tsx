@@ -1,11 +1,11 @@
 import * as React from 'react'
-import { ModelData } from 'doura'
+import { ModelAPI } from 'doura'
 import { useModel } from 'doura-react'
 
 import { fetchA, fetchB } from '../models/fetchData'
 
-export type fetchASelectorParams = ModelData<typeof fetchA>
-export type fetchBSelectorParams = ModelData<typeof fetchB>
+export type fetchASelectorParams = ModelAPI<typeof fetchA>
+export type fetchBSelectorParams = ModelAPI<typeof fetchB>
 
 const fetchASelector = function (stateAndViews: fetchASelectorParams) {
   return {

@@ -1,4 +1,4 @@
-import { hasOwn, extend } from '../utils'
+import { hasOwn, assign } from '../utils'
 import { warn } from '../warning'
 import {
   PublicPropertiesMap,
@@ -7,6 +7,7 @@ import {
   ActionListener,
   SubscriptionCallback,
   UnSubscribe,
+  ModelAPI,
 } from './model'
 import {
   State,
@@ -15,7 +16,7 @@ import {
   GetModelActions,
   GetModelViews,
 } from './modelOptions'
-import { createView, Selector, ModelView, ModelData } from './view'
+import { createView, Selector, ModelView } from './view'
 
 export const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
@@ -29,7 +30,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
   $isolate: <T>(fn: (s: GetModelState<IModel>) => T) => T
-  $getSnapshot(): ModelData<IModel>
+  $getSnapshot(): ModelAPI<IModel>
   $createView: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
@@ -47,7 +48,7 @@ const enum AccessTypes {
 export const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
   // due to type annotation
-  /*#__PURE__*/ extend(
+  /*#__PURE__*/ assign(
     (Object.create(null),
     {
       $name: (i) => i.name,

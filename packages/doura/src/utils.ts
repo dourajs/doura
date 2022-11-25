@@ -4,7 +4,18 @@ export const NOOP = () => {}
 
 export const emptyObject = Object.create(null)
 
-export const extend = Object.assign
+export const assign = Object.assign
+
+/*#__PURE__*/
+export const extend: (d: any, b: any) => any =
+  Object.setPrototypeOf ||
+  ({ __proto__: [] } instanceof Array &&
+    function (d, b) {
+      d.__proto__ = b
+    }) ||
+  function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]
+  }
 
 const hasOwnProperty = Object.prototype.hasOwnProperty
 export const hasOwn = (

@@ -1,4 +1,4 @@
-import { isPlainObject, hasOwn, isObject, def } from '../utils'
+import { isPlainObject, hasOwn, isObject, def, extend } from '../utils'
 import { warn } from '../warning'
 import {
   view as reactiveView,
@@ -111,6 +111,11 @@ export const enum AccessContext {
   VIEW,
 }
 
+export type ModelAPI<Model extends AnyModel> = {
+  $state: GetModelState<Model>
+} & GetModelState<Model> &
+  GetModelViews<Model>
+
 function patchObj(base: Record<string, any>, patch: Record<string, any>) {
   const keys = Object.keys(patch)
   if (!keys.length) {
@@ -157,7 +162,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   isPrimitiveState!: boolean
 
-  private _snapshot: State | null = null
+  private _snapshot: ModelAPI<IModel> | null = null
   private _initState: GetModelState<IModel>
   private _currentState!: any
   private _actionListeners: Set<ActionListener> = new Set()
@@ -266,14 +271,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   getSnapshot() {
     if (this._snapshot === null) {
-      this._snapshot = {
-        $state: this._currentState,
+      const snapshot = (this._snapshot = {
         ...this._currentState,
         ...this.views,
-      }
+      })
+      def(snapshot, '$state', this._currentState)
+      extend(snapshot, this.actions)
     }
 
-    return this._snapshot
+    return this._snapshot!
   }
 
   reducer(state: GetModelState<AnyModel>, action: Action) {
@@ -426,17 +432,21 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       actionKeys.forEach((actionsName) => {
         const action = actions[actionsName]
 
-        // @ts-ignore
-        this.actions[actionsName as string] = (...args: any[]) => {
-          for (const listener of this._actionListeners) {
-            listener({
-              name: actionsName,
-              args,
-            })
-          }
+        Object.defineProperty(this.actions, actionsName, {
+          configurable: true,
+          enumerable: false,
+          writable: false,
+          value: (...args: any[]) => {
+            for (const listener of this._actionListeners) {
+              listener({
+                name: actionsName,
+                args,
+              })
+            }
 
-          return action.call(this.proxy, ...args)
-        }
+            return action.call(this.proxy, ...args)
+          },
+        })
       })
     }
   }

@@ -1,5 +1,5 @@
 import { TrackOpTypes, TriggerOpTypes } from './operations'
-import { extend, isArray, isMap, isIntegerKey } from '../utils'
+import { assign, isArray, isMap, isIntegerKey } from '../utils'
 import { DraftState } from './draft'
 import { ViewImpl, View } from './view'
 import { toBase } from './common'
@@ -203,7 +203,7 @@ export function effect<T = any>(
 
   const _effect = new ReactiveEffect(fn)
   if (options) {
-    extend(_effect, options)
+    assign(_effect, options)
     if (options.scope) recordEffectScope(_effect, options.scope)
   }
   if (!options || !options.lazy) {

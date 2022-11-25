@@ -1,11 +1,11 @@
 {
   "name": "doura-react",
   "version": "0.0.0-rc.5",
-  "description": "Doura react integration",
+  "description": "Doura React.js integration",
   "main": "lib/index.js",
   "module": "esm/index.js",
   "browser": "esm/index.js",
-  "unpkg": "dist/doura-react.umd.production.min.js",
+  "unpkg": "dist/dourareact.umd.production.min.js",
   "types": "esm/index.d.ts",
   "sideEffects": false,
   "scripts": {

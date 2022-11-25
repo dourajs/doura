@@ -1,4 +1,4 @@
-import { defineModel, ModelData } from 'doura'
+import { defineModel, ModelAPI } from 'doura'
 import { expectType, useModel, useRootModel } from './'
 
 type customType = 'custom' | 'custom0'
@@ -34,7 +34,7 @@ const count = defineModel({
   },
 })
 
-type countSelectorParameters = ModelData<typeof count>
+type countSelectorParameters = ModelAPI<typeof count>
 const countSelector = function (stateAndViews: countSelectorParameters) {
   return {
     v: stateAndViews.value,

@@ -11,7 +11,7 @@ export type {
   State,
   Action,
   Selector,
-  ModelData,
+  ModelAPI,
   ModelView,
 } from './core'
 

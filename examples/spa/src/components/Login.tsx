@@ -1,10 +1,10 @@
 import * as React from 'react'
-import { ModelData } from 'doura'
+import { ModelAPI } from 'doura'
 import { useRootModel } from 'doura-react'
 
 import { login, currentUser } from '../models/login'
 
-type currentUserSelectorParams = ModelData<typeof currentUser>
+type currentUserSelectorParams = ModelAPI<typeof currentUser>
 
 const currentUserSelector = function (
   stateAndViews: currentUserSelectorParams

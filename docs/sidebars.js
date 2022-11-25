@@ -40,8 +40,8 @@ const sidebars = {
       label: 'React integration',
       items: [
         'react/component-state',
-        'react/shared-store',
         'react/global-store',
+        'react/multiple-stores',
       ],
       collapsed: false,
       collapsible: false,
