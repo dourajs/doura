@@ -41,7 +41,7 @@ describe('model', () => {
     expect(state).toBe(originState)
   })
 
-  test('getSnapshot should return raw state and views', async () => {
+  test('getApi should return raw state and views', async () => {
     const originState = {
       a: 1,
       arr: [1, 2],
@@ -60,27 +60,27 @@ describe('model', () => {
       },
     })
 
-    const snapshot1 = model.getSnapshot() as any
-    expect(snapshot1).toEqual({
+    const api1 = model.getApi() as any
+    expect(api1).toEqual({
       a: 1,
       arr: [1, 2],
       firstOfArr: 1,
     })
-    expect(snapshot1.$state).toEqual({
+    expect(api1.$state).toEqual({
       a: 1,
       arr: [1, 2],
     })
-    expect(snapshot1.arr).toBe(originState.arr)
+    expect(api1.arr).toBe(originState.arr)
     ;(model.proxy as any).updateA(2)
     await nextTick()
-    const snapshot2 = model.getSnapshot()
-    expect(snapshot2).not.toBe(snapshot1)
-    expect(snapshot2).toEqual({
+    const api2 = model.getApi()
+    expect(api2).not.toBe(api1)
+    expect(api2).toEqual({
       a: 2,
       arr: [1, 2],
       firstOfArr: 1,
     })
-    expect(snapshot2.$state).toEqual({
+    expect(api2.$state).toEqual({
       a: 2,
       arr: [1, 2],
     })

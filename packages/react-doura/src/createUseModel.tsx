@@ -36,7 +36,7 @@ function useModel<IModel extends AnyModel>(
   model: ModelPublicInstance<IModel>,
   subscribe: SubscribeFn
 ) {
-  const view = useMemo(() => () => model.$getSnapshot(), [model])
+  const view = useMemo(() => () => model.$getApi(), [model])
 
   const state = useSyncExternalStore(subscribe, view, view)
 

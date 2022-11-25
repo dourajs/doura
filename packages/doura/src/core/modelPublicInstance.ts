@@ -30,7 +30,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
   $isolate: <T>(fn: (s: GetModelState<IModel>) => T) => T
-  $getSnapshot(): ModelAPI<IModel>
+  $getApi(): ModelAPI<IModel>
   $createView: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
@@ -60,7 +60,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
       $onAction: (i) => i.onAction,
       $subscribe: (i) => i.subscribe,
       $isolate: (i) => i.isolate,
-      $getSnapshot: (i) => i.getSnapshot,
+      $getApi: (i) => i.getApi,
       $createView: (i) => createView.bind(null, i),
     } as PublicPropertiesMap)
   )

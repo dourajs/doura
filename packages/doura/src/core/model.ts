@@ -162,7 +162,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   isPrimitiveState!: boolean
 
-  private _snapshot: ModelAPI<IModel> | null = null
+  private _api: ModelAPI<IModel> | null = null
   private _initState: GetModelState<IModel>
   private _currentState!: any
   private _actionListeners: Set<ActionListener> = new Set()
@@ -176,7 +176,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.onAction = this.onAction.bind(this)
     this.subscribe = this.subscribe.bind(this)
     this.isolate = this.isolate.bind(this)
-    this.getSnapshot = this.getSnapshot.bind(this)
+    this.getApi = this.getApi.bind(this)
 
     this.options = model
     this.name = name || ''
@@ -269,9 +269,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return this._currentState
   }
 
-  getSnapshot() {
-    if (this._snapshot === null) {
-      const snapshot = (this._snapshot = {
+  getApi() {
+    if (this._api === null) {
+      const snapshot = (this._api = {
         ...this._currentState,
         ...this.views,
       })
@@ -279,7 +279,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       extend(snapshot, this.actions)
     }
 
-    return this._snapshot!
+    return this._api!
   }
 
   reducer(state: GetModelState<AnyModel>, action: Action) {
@@ -380,7 +380,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   private _setState(newState: GetModelState<IModel>) {
-    this._snapshot = null
+    this._api = null
     this._currentState = newState
     this.isPrimitiveState = !isObject(newState)
     this.stateValue = this.stateRef.value
