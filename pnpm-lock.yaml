@@ -93,7 +93,7 @@ importers:
       doura: workspace:*
       doura-plugin-log: workspace:*
       doura-plugin-persist: workspace:*
-      doura-react: workspace:*
+      react-doura: workspace:*
       jest: 26.6.0
       react: 18.0.0
       react-dom: 18.0.0
@@ -106,7 +106,7 @@ importers:
       doura: link:../../packages/doura
       doura-plugin-log: link:../../packages/plugins/log
       doura-plugin-persist: link:../../packages/plugins/persist
-      doura-react: link:../../packages/react
+      react-doura: link:../../packages/react
       react: 18.0.0
       react-dom: 18.0.0_react@18.0.0
       react-scripts: 5.0.1_vxbcpcqnigi7cscgll6dvdf4my
@@ -120,7 +120,7 @@ importers:
       '@types/react': ^18.0.5
       '@types/react-dom': ^18.0.5
       doura: workspace:*
-      doura-react: workspace:*
+      react-doura: workspace:*
       react: 18.0.0
       react-dom: 18.0.0
       react-scripts: 5.0.1
@@ -128,7 +128,7 @@ importers:
     dependencies:
       '@craco/craco': 7.0.0_fio725kc76ojnpyeg2ko55mahq
       doura: link:../../packages/doura
-      doura-react: link:../../packages/react
+      react-doura: link:../../packages/react
       react: 18.0.0
       react-dom: 18.0.0_react@18.0.0
       react-scripts: 5.0.1_vxbcpcqnigi7cscgll6dvdf4my
@@ -144,7 +144,7 @@ importers:
       '@types/react-dom': ^18.0.5
       autocannon: ^7.8.1
       doura: workspace:*
-      doura-react: workspace:*
+      react-doura: workspace:*
       express: ^4.17.3
       express-status-monitor: ^1.3.4
       react: 18.0.0
@@ -154,7 +154,7 @@ importers:
       typescript: ^4.7.4
     dependencies:
       doura: link:../../packages/doura
-      doura-react: link:../../packages/react
+      react-doura: link:../../packages/react
       express: 4.18.1
       express-status-monitor: 1.3.4
       react: 18.0.0
@@ -174,7 +174,7 @@ importers:
       '@types/react': ^18.0.5
       '@types/react-dom': ^18.0.5
       doura: workspace:*
-      doura-react: workspace:*
+      react-doura: workspace:*
       react: 18.0.0
       react-dom: 18.0.0
       react-scripts: 5.0.1
@@ -182,7 +182,7 @@ importers:
     dependencies:
       '@craco/craco': 7.0.0_fio725kc76ojnpyeg2ko55mahq
       doura: link:../../packages/doura
-      doura-react: link:../../packages/react
+      react-doura: link:../../packages/react
       react: 18.0.0
       react-dom: 18.0.0_react@18.0.0
       react-scripts: 5.0.1_vxbcpcqnigi7cscgll6dvdf4my

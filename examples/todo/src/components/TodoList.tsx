@@ -1,4 +1,4 @@
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 import { todoModel } from '../models/todo'
 import { inputModel } from '../models/form'
 

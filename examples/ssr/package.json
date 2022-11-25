@@ -8,7 +8,7 @@
     "serve": "react-scripts-with-ssr serve"
   },
   "dependencies": {
-    "doura-react": "workspace:*",
+    "react-doura": "workspace:*",
     "doura": "workspace:*",
     "express": "^4.17.3",
     "express-status-monitor": "^1.3.4",

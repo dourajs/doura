@@ -23,7 +23,7 @@ const countModel = defineModel({
 ## Then bind your components.
 
 ```tsx
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 function Counter() {
   const [state, actions] = useModel(countModel)
@@ -42,7 +42,7 @@ function Counter() {
 If we only care a part of states, we should use selecotr to pick exact what we want:
 
 ```tsx
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 const userModel = defineModel({
   state: {

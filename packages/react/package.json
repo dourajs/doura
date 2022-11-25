@@ -1,11 +1,11 @@
 {
-  "name": "doura-react",
+  "name": "react-doura",
   "version": "0.0.0-rc.5",
   "description": "Doura React.js integration",
   "main": "lib/index.js",
   "module": "esm/index.js",
   "browser": "esm/index.js",
-  "unpkg": "dist/dourareact.umd.production.min.js",
+  "unpkg": "dist/reactDoura.umd.production.min.js",
   "types": "esm/index.d.ts",
   "sideEffects": false,
   "scripts": {
@@ -15,7 +15,7 @@
     "build": "run-p clean && run-p build:*",
     "build:esm": "tsc -p tsconfig.build.json -m esnext --outDir esm",
     "build:cjs": "tsc -p tsconfig.build.json -m commonjs --outDir lib",
-    "build:umd": "dts build --format umd --tsconfig ./tsconfig.build.json --name douraReact",
+    "build:umd": "dts build --format umd --tsconfig ./tsconfig.build.json --name reactDoura",
     "clean": "rimraf lib esm dist"
   },
   "authors": [

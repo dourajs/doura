@@ -1,5 +1,5 @@
 <div align="center">
-<h1>doura-react</h1>
+<h1>react-doura</h1>
 </div>
 
 Doura-react includes its own hook APIs, which allow your React Components to subscribe to the doura store and dispatch actions.
@@ -15,13 +15,13 @@ Doura-react includes its own hook APIs, which allow your React Components to sub
 Install with npm:
 
 ```
-npm install doura-react
+npm install react-doura
 ```
 
 Install with yarn
 
 ```
-yarn add doura-react
+yarn add react-doura
 ```
 
 ## Usage
@@ -51,7 +51,7 @@ Doura offers multiple hooks for different situations.
 // src/index.ts
 import * as React from 'react'
 import ReactDOM from 'react-dom'
-import { DouraRoot } from 'doura-react'
+import { DouraRoot } from 'react-doura'
 import App from './App'
 
 function App() {
@@ -88,7 +88,7 @@ import {
   ISelectorParams,
   createContainer,
   useRootModel,
-} from 'doura-react'
+} from 'react-doura'
 import { user } from './model'
 
 const selector = function (data: ISelectorParams<typeof user>) {
@@ -106,7 +106,7 @@ export default function App() {
 ```tsx src/ComponentWithSharedModel.tsx
 import * as React from 'react';
 import ReactDOM from 'react-dom';
-import { createContainer } from 'doura-react';
+import { createContainer } from 'react-doura';
 
 const { Provider: LocalProvider, useSharedModel, useStaticModel } = createContainer();
 
@@ -141,7 +141,7 @@ export default function ComponentWithSharedModel() {
 We can replace all `useState`, `useReducer`,  `useMemo` and `useCallback` calls by using `useModel`.
 
 ```tsx
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 function Counter() {
   const [state, actions] = useModel({
@@ -173,7 +173,7 @@ function Counter() {
 ### useModel()
 
 ```tsx
-import { useModel } from 'doura-react';
+import { useModel } from 'react-doura';
 const [state, actions] = useModel(model: IModel, selector?: ISelector);
 ```
 
@@ -182,7 +182,7 @@ Most of time you would use `useModel` to extract data from the model. It will cr
 ### useRootModel()
 
 ```tsx
-import { useRooteModel } from 'doura-react';
+import { useRooteModel } from 'react-doura';
 const [state, actions] = useRooteModel(model: IModel, selector?: ISelector);
 ```
 
@@ -191,7 +191,7 @@ Global `Provider` context, you can get the global context anywhere, even if the 
 ### useRootStaticModel()
 
 ```tsx
-import { useRootStaticModel } from 'doura-react';
+import { useRootStaticModel } from 'react-doura';
 const [state, actions] = useRootStaticModel(model: IModel, selector?: ISelector);
 ```
 
@@ -202,7 +202,7 @@ const [state, actions] = useRootStaticModel(model: IModel, selector?: ISelector)
 It returns a independent scope `Provider, useSharedModel, useStaticModel` for context and methods to consume models.
 
 ```ts title="shared"
-import { createContainer } from 'doura-react'
+import { createContainer } from 'react-doura'
 export const { Provider, useSharedModel, useStaticModel } = createContainer()
 ```
 
@@ -237,7 +237,7 @@ import App from './App'
 import { doura } from 'doura'
 import douraLog from 'doura-log'
 import persist, { createWebStorage } from 'doura-persist'
-import { DouraRoot } from 'doura-react'
+import { DouraRoot } from 'react-doura'
 
 const modelManager = doura({
   initialState: {},

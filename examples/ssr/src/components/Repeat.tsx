@@ -1,6 +1,6 @@
 // for ssr memory leak test
 import * as React from 'react'
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 import { local } from '../models/local'
 

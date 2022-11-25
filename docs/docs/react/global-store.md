@@ -18,7 +18,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import store from './store'
-import { DouraRoot } from 'doura-react'
+import { DouraRoot } from 'react-doura'
 
 // As of React 18
 const root = ReactDOM.createRoot(document.getElementById('root'))
@@ -53,7 +53,7 @@ Now we can use the React Doura hooks to let React components interact with the D
 
 ```tsx title="componnets/Counter.tsx"
 import React from 'react'
-import { useRootModel } from 'doura-react'
+import { useRootModel } from 'react-doura'
 import { countModel } from './models/count'
 
 export function Counter() {

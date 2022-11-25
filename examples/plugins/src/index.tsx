@@ -4,7 +4,7 @@ import App from './App'
 import { doura } from 'doura'
 import douraLog from 'doura-log'
 import persist, { createWebStorage } from 'doura-persist'
-import { DouraRoot } from 'doura-react'
+import { DouraRoot } from 'react-doura'
 
 const douraStore = doura({
   initialState: {},

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 import { list } from '../models/list'
 

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { ModelAPI } from 'doura'
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 import { listB } from '../models/listB'
 export type selectorParameters = ModelAPI<typeof listB>

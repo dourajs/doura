@@ -9,7 +9,7 @@
     "eject": "craco eject"
   },
   "dependencies": {
-    "doura-react": "workspace:*",
+    "react-doura": "workspace:*",
     "doura": "workspace:*",
     "doura-plugin-persist": "workspace:*",
     "doura-plugin-log": "workspace:*",

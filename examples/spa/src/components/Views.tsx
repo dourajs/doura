@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { defineModel, ModelAPI } from 'doura'
-import { useRootModel } from 'doura-react'
+import { useRootModel } from 'react-doura'
 
 const otherDep = defineModel({
   name: 'otherDep',

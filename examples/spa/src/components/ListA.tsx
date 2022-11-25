@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useModel, useRootModel } from 'doura-react'
+import { useModel, useRootModel } from 'react-doura'
 import { listA } from '../models/listA'
 import { login } from '../models/login'
 

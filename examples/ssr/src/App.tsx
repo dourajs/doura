@@ -5,7 +5,7 @@ import Views from './components/Views'
 import List from './components/List'
 import Repeat from './components/Repeat'
 import type { DouraStore } from 'doura'
-import { DouraRoot } from 'doura-react'
+import { DouraRoot } from 'react-doura'
 
 function App(props: { store?: DouraStore }) {
   return (

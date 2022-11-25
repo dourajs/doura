@@ -105,7 +105,7 @@ const todo = defineModel(
 
 ```tsx
 import * as React, { useEffect } from 'react'
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 function App() {
   const [state, actions] = useModel(users)

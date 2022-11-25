@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useRootModel } from 'doura-react'
+import { useRootModel } from 'react-doura'
 
 import { a } from '../models/a'
 

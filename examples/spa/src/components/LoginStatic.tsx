@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useRootStaticModel } from 'doura-react'
+import { useRootStaticModel } from 'react-doura'
 
 import { login } from '../models/login'
 

@@ -19,7 +19,7 @@ Doura is greatly inspired by [immer](https://github.com/immerjs/immer) and [Pini
 
 ```tsx
 import { defineModel } from 'doura'
-import { useModel } from 'doura-react'
+import { useModel } from 'react-doura'
 
 const todoModel = defineModel({
   name: 'todo',
