@@ -1,8 +1,10 @@
-import { AnyModel, AnyObjectModel } from './modelOptions'
+import { AnyModel, AnyObjectModel, ModelActions } from './modelOptions'
 import { ModelInternal, ModelAPI } from './model'
+import { ModelPublicInstance } from './modelPublicInstance'
 
 export type Selector<Model extends AnyModel, TReturn = any> = (
-  api: ModelAPI<Model>
+  api: ModelAPI<Model>,
+  actions: ModelActions<Model>
 ) => TReturn
 
 export interface ModelView<T extends (...args: any[]) => any = any> {
@@ -14,8 +16,10 @@ export function createView<IModel extends AnyObjectModel, TReturn>(
   instance: ModelInternal<IModel>,
   selector: Selector<IModel, TReturn>
 ): ModelView<Selector<IModel, TReturn>> {
-  const view = instance.createView(function (this: any) {
-    return selector(this)
+  const view = instance.createView(function (
+    this: ModelPublicInstance<IModel>
+  ) {
+    return selector(this, this.$actions)
   })
 
   const res = function () {

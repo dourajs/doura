@@ -3,9 +3,9 @@ import { doura } from 'doura'
 import type { AnyModel, Selector } from 'doura'
 import { createBatchManager } from './batchManager'
 import { createUseModel } from './createUseModel'
-import { IUseModel } from './types'
+import { UseModel } from './types'
 
-const useModel: IUseModel = <
+const useModel: UseModel = <
   IModel extends AnyModel,
   S extends Selector<IModel>
 >(

@@ -1,4 +1,4 @@
-import { isPlainObject, hasOwn, isObject, def, extend } from '../utils'
+import { isPlainObject, hasOwn, isObject, def } from '../utils'
 import { warn } from '../warning'
 import {
   view as reactiveView,
@@ -14,12 +14,11 @@ import {
 import {
   Views,
   State,
-  StateObject,
   AnyModel,
   AnyObjectModel,
-  GetModelState,
-  GetModelActions,
-  GetModelViews,
+  ModelState,
+  ModelActions,
+  ModelViews,
   validateModelOptions,
 } from './modelOptions'
 import {
@@ -27,6 +26,7 @@ import {
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
+import { AnyObject } from '../types'
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -111,10 +111,13 @@ export const enum AccessContext {
   VIEW,
 }
 
-export type ModelAPI<Model extends AnyModel> = {
-  $state: GetModelState<Model>
-} & GetModelState<Model> &
-  GetModelViews<Model>
+export type ModelData<Model extends AnyModel> = {
+  $state: ModelState<Model>
+} & ModelState<Model> &
+  ModelViews<Model>
+
+export type ModelAPI<IModel extends AnyModel> = ModelData<IModel> &
+  ModelActions<IModel>
 
 function patchObj(base: Record<string, any>, patch: Record<string, any>) {
   const keys = Object.keys(patch)
@@ -149,8 +152,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   proxy: ModelPublicInstance<IModel>
 
   // props
-  actions: GetModelActions<IModel>
-  views: Views<GetModelViews<IModel>>
+  actions: ModelActions<IModel>
+  views: Views<ModelViews<IModel>>
   viewInstances: View[] = []
   accessContext: AccessContext
 
@@ -162,8 +165,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   isPrimitiveState!: boolean
 
-  private _api: ModelAPI<IModel> | null = null
-  private _initState: GetModelState<IModel>
+  private _api: ModelData<IModel> | null = null
+  private _initState: ModelState<IModel>
   private _currentState!: any
   private _actionListeners: Set<ActionListener> = new Set()
   private _subscribers: Set<SubscriptionCallback> = new Set()
@@ -180,13 +183,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
     this.options = model
     this.name = name || ''
+    this._isDispatching = false
     this._initState = initState || model.state
-
-    this.effectScope = effectScope()
     this.stateRef = draft({
       value: this._initState,
     })
-
     const update: SchedulerJob = () => {
       this.dispatch({
         type: ActionType.MODIFY,
@@ -198,29 +199,25 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         queueJob(update)
       }
     })
+    this._setState(this._initState)
 
     this.actions = Object.create(null)
     this.views = Object.create(null)
     this.accessContext = AccessContext.DEFAULT
-
-    this._isDispatching = false
-
     this.ctx = {}
     def(this.ctx, '_', this)
-
     this.accessCache = Object.create(null)
     this.proxy = new Proxy(
       this.ctx,
       PublicInstanceProxyHandlers
     ) as ModelPublicInstance<IModel>
 
+    this.effectScope = effectScope()
     this._initActions()
     this._initViews()
-
-    this._setState(this._initState)
   }
 
-  patch(obj: StateObject) {
+  patch(obj: AnyObject) {
     if (!isPlainObject(obj)) {
       if (process.env.NODE_ENV === 'development') {
         warn(
@@ -249,7 +246,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     })
   }
 
-  replace(newState: StateObject) {
+  replace(newState: AnyObject) {
     this._watchStateChange = false
     this.stateRef.value = newState
     this._watchStateChange = true
@@ -271,18 +268,90 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   getApi() {
     if (this._api === null) {
-      const snapshot = (this._api = {
+      const data = (this._api = {
         ...this._currentState,
         ...this.views,
       })
-      def(snapshot, '$state', this._currentState)
-      extend(snapshot, this.actions)
+      def(data, '$state', this._currentState)
+      for (const action of Object.keys(this.actions)) {
+        def(data, action, this.actions[action])
+      }
     }
 
     return this._api!
   }
 
-  reducer(state: GetModelState<AnyModel>, action: Action) {
+  onAction(listener: (action: ModelAction) => any) {
+    this._actionListeners.add(listener)
+
+    return () => {
+      this._actionListeners.delete(listener)
+    }
+  }
+
+  subscribe(listener: SubscriptionCallback) {
+    this._subscribers.add(listener)
+
+    return () => {
+      this._subscribers.delete(listener)
+    }
+  }
+
+  /**
+   * Executes the given function in a scope where reactive values can be read,
+   * but they cannot cause the reactive scope of the caller to be re-evaluated
+   * when they change
+   */
+  isolate<T>(fn: (s: ModelState<IModel>) => T): T {
+    pauseTracking()
+    const res = fn(this.stateValue)
+    resetTracking()
+    return res
+  }
+
+  depend(dep: ModelInternal<any>) {
+    // collection beDepends, a depends b, when b update, call a need trigger listener
+    dep.subscribe((event) => {
+      this._triggerListener({
+        ...event,
+        model: this.proxy,
+      })
+    })
+  }
+
+  createView(viewFn: (s: ModelState<IModel>) => any) {
+    let view: View
+    this.effectScope.run(() => {
+      view = reactiveView(() => {
+        const oldCtx = this.accessContext
+        this.accessContext = AccessContext.VIEW
+        try {
+          let value = viewFn.call(this.proxy, this.proxy)
+          if (process.env.NODE_ENV === 'development') {
+            if (isObject(value)) {
+              if (value === this.proxy) {
+                warn(
+                  `detect returning "this" in view, it would cause unpected behavior`
+                )
+              } else if (value === this.proxy.$state) {
+                warn(
+                  `detect returning "this.$state" in view, it would cause unpected behavior`
+                )
+              }
+            }
+          }
+          return value
+        } finally {
+          this.accessContext = oldCtx
+        }
+      })
+    })
+
+    this.viewInstances.push(view!)
+    return view!
+  }
+
+  reducer(state: ModelState<AnyModel>, action: Action) {
     switch (action.type) {
       case ActionType.REPLACE:
       case ActionType.MODIFY:
@@ -331,23 +400,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return action
   }
 
-  onAction(listener: (action: ModelAction) => any) {
-    this._actionListeners.add(listener)
-
-    return () => {
-      this._actionListeners.delete(listener)
-    }
-  }
-
-  subscribe(listener: SubscriptionCallback) {
-    this._subscribers.add(listener)
-
-    return () => {
-      this._subscribers.delete(listener)
-    }
-  }
-
   destroy() {
+    this._api = null
     this._currentState = null
     this.stateRef = {
       value: null,
@@ -357,29 +411,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this._draftListenerHandler()
   }
 
-  /**
-   * Executes the given function in a scope where reactive values can be read,
-   * but they cannot cause the reactive scope of the caller to be re-evaluated
-   * when they change
-   */
-  isolate<T>(fn: (s: GetModelState<IModel>) => T): T {
-    pauseTracking()
-    const res = fn(this.stateValue)
-    resetTracking()
-    return res
-  }
-
-  depend(dep: ModelInternal<any>) {
-    // collection beDepends, a depends b, when b update, call a need trigger listener
-    dep.subscribe((event) => {
-      this._triggerListener({
-        ...event,
-        model: this.proxy,
-      })
-    })
-  }
-
-  private _setState(newState: GetModelState<IModel>) {
+  private _setState(newState: ModelState<IModel>) {
     this._api = null
     this._currentState = newState
     this.isPrimitiveState = !isObject(newState)
@@ -392,38 +424,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
-  createView(viewFn: (s: GetModelState<IModel>) => any) {
-    let view: View
-    this.effectScope.run(() => {
-      view = reactiveView(() => {
-        const oldCtx = this.accessContext
-        this.accessContext = AccessContext.VIEW
-        try {
-          let value = viewFn.call(this.proxy, this.proxy)
-          if (process.env.NODE_ENV === 'development') {
-            if (isObject(value)) {
-              if (value === this.proxy) {
-                warn(
-                  `detect returning "this" in view, it would cause unpected behavior`
-                )
-              } else if (value === this.proxy.$state) {
-                warn(
-                  `detect returning "this.$state" in view, it would cause unpected behavior`
-                )
-              }
-            }
-          }
-          return value
-        } finally {
-          this.accessContext = oldCtx
-        }
-      })
-    })
-
-    this.viewInstances.push(view!)
-    return view!
-  }
-
   private _initActions() {
     // map actions names to dispatch actions
     const actions = this.options.actions
@@ -434,7 +434,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
         Object.defineProperty(this.actions, actionsName, {
           configurable: true,
-          enumerable: false,
+          enumerable: true,
           writable: false,
           value: (...args: any[]) => {
             for (const listener of this._actionListeners) {
@@ -463,7 +463,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
           configurable: true,
           enumerable: true,
           get() {
-            // todo: fix dep.$state got collected by parent view
             const viewWithState = view as View & { __pre: any; __snapshot: any }
             let value = view.value
             if (view.mightChange) {

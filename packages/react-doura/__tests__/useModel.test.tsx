@@ -6,14 +6,7 @@ import React from 'react'
 import { render, act } from '@testing-library/react'
 import { defineModel, nextTick } from 'doura'
 import { useModel, useRootModel, DouraRoot } from '../src/index'
-import { countModel, countSelectorParameters } from './models/index'
-
-const countSelector = function (stateAndViews: countSelectorParameters) {
-  return {
-    v: stateAndViews.value,
-    t: stateAndViews.test,
-  }
-}
+import { countModel } from './models/index'
 
 beforeEach(() => {
   jest.useFakeTimers()
@@ -21,7 +14,7 @@ beforeEach(() => {
 
 describe('useModel', () => {
   test('model name could be not defined', async () => {
-    const tempModel = defineModel({
+    const count = defineModel({
       state: {
         value: 1,
       },
@@ -32,12 +25,12 @@ describe('useModel', () => {
       },
     })
     const App = () => {
-      const [state, actions] = useModel(tempModel)
+      const counter = useModel(count)
 
       return (
         <>
-          <div id="value">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add()}>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
             add
           </button>
         </>
@@ -62,17 +55,21 @@ describe('useModel', () => {
   describe('should always be isolation', () => {
     test('should isolation with useRootModel', async () => {
       const App = () => {
-        const [state, actions] = useRootModel('count', countModel)
-        const [state1, actions1] = useModel(countModel)
+        const counter = useRootModel('count', countModel)
+        const loacalCounter = useModel(countModel)
 
         return (
           <>
-            <div id="value">{state.value}</div>
-            <button id="button" type="button" onClick={() => actions.add(2)}>
+            <div id="value">{counter.value}</div>
+            <button id="button" type="button" onClick={() => counter.add(2)}>
               add
             </button>
-            <div id="value1">{state1.value}</div>
-            <button id="button1" type="button" onClick={() => actions1.add(2)}>
+            <div id="value1">{loacalCounter.value}</div>
+            <button
+              id="button1"
+              type="button"
+              onClick={() => loacalCounter.add(2)}
+            >
               add1
             </button>
           </>
@@ -99,17 +96,17 @@ describe('useModel', () => {
 
     test('should isolation with another useModel', async () => {
       const App = () => {
-        const [state, actions] = useModel(countModel)
-        const [state1, actions1] = useModel(countModel)
+        const counterA = useModel(countModel)
+        const counterB = useModel(countModel)
 
         return (
           <>
-            <div id="value">{state.value}</div>
-            <button id="button" type="button" onClick={() => actions.add(2)}>
+            <div id="value">{counterA.value}</div>
+            <button id="button" type="button" onClick={() => counterA.add(2)}>
               add
             </button>
-            <div id="value1">{state1.value}</div>
-            <button id="button1" type="button" onClick={() => actions1.add(2)}>
+            <div id="value1">{counterB.value}</div>
+            <button id="button1" type="button" onClick={() => counterB.add(2)}>
               add1
             </button>
           </>
@@ -135,36 +132,81 @@ describe('useModel', () => {
     })
   })
 
-  test('should support selector', async () => {
-    const App = () => {
-      const [state, actions] = useModel(countModel, countSelector)
+  describe('selector', () => {
+    test('should work', async () => {
+      const App = () => {
+        const counter = useModel(
+          countModel,
+          (state, actions) => {
+            return {
+              value: state.value,
+              test: state.test,
+              ...actions,
+            }
+          },
+          []
+        )
 
-      return (
-        <>
-          <div id="v">{state.v}</div>
-          <div id="t">{state.t}</div>
-          <button id="button" type="button" onClick={() => actions.add(2)}>
-            add
-          </button>
-        </>
+        return (
+          <>
+            <div id="v">{counter.value}</div>
+            <div id="t">{counter.test}</div>
+            <button id="button" type="button" onClick={() => counter.add(2)}>
+              add
+            </button>
+          </>
+        )
+      }
+
+      const { container } = render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
       )
-    }
 
-    const { container } = render(
-      <DouraRoot>
-        <App />
-      </DouraRoot>
-    )
-
-    expect(container.querySelector('#v')?.innerHTML).toEqual('1')
-    expect(container.querySelector('#t')?.innerHTML).toEqual('2')
-    await act(async () => {
-      container
-        .querySelector('#button')
-        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await nextTick()
+      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
+      expect(container.querySelector('#t')?.innerHTML).toEqual('2')
+      await act(async () => {
+        container
+          .querySelector('#button')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+      expect(container.querySelector('#v')?.innerHTML).toEqual('3')
+      expect(container.querySelector('#t')?.innerHTML).toEqual('4')
     })
-    expect(container.querySelector('#v')?.innerHTML).toEqual('3')
-    expect(container.querySelector('#t')?.innerHTML).toEqual('4')
+
+    test('should not work when return api directly', async () => {
+      const App = () => {
+        const counter = useModel(countModel, (s) => s, [])
+
+        return (
+          <>
+            <div id="v">{counter.value}</div>
+            <div id="t">{counter.test}</div>
+            <button id="button" type="button" onClick={() => counter.add(2)}>
+              add
+            </button>
+          </>
+        )
+      }
+
+      const { container } = render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
+      )
+
+      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
+      expect(container.querySelector('#t')?.innerHTML).toEqual('2')
+      await act(async () => {
+        container
+          .querySelector('#button')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
+      expect(container.querySelector('#t')?.innerHTML).toEqual('2')
+    })
   })
 })

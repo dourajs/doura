@@ -9,11 +9,11 @@ import {
   doura,
   AnyModel,
   Selector,
-  ModelAPI,
+  ModelData,
   nextTick,
 } from 'doura'
 import { createBatchManager } from '../src/batchManager'
-import { IUseNamedModel, IUseNamedStaticModel } from '../src/types'
+import { UseNamedModel, UseNamedStaticModel } from '../src/types'
 import {
   createUseNamedModel,
   createUseNamedStaticModel,
@@ -22,8 +22,8 @@ import { countModel } from './models/index'
 
 let douraStore: ReturnType<typeof doura>
 let batchManager: ReturnType<typeof createBatchManager>
-let useTestModel: IUseNamedModel
-let useTestStaticModel: IUseNamedStaticModel
+let useTestModel: UseNamedModel
+let useTestStaticModel: UseNamedStaticModel
 
 beforeEach(() => {
   process.env.NODE_ENV === 'development'
@@ -41,7 +41,7 @@ beforeEach(() => {
       [douraStore, batchManager]
     )(name, model, selector, depends)
   }
-  useTestStaticModel = <IModel extends AnyModel, S extends Selector<IModel>>(
+  useTestStaticModel = <IModel extends AnyModel>(
     name: string,
     model: IModel
   ) => {
@@ -66,12 +66,12 @@ describe('createUseModel', () => {
     })
 
     const App = () => {
-      const [state, _actions] = useTestModel('model', model)
+      const store = useTestModel('model', model)
 
       return (
         <>
-          <div id="v">{state.value}</div>
-          <div id="t">{state.test}</div>
+          <div id="v">{store.value}</div>
+          <div id="t">{store.test}</div>
         </>
       )
     }
@@ -84,12 +84,12 @@ describe('createUseModel', () => {
   describe('should rerender when state changed', () => {
     test('change state by doura reducer', async () => {
       const App = () => {
-        const [state, actions] = useTestModel('count', countModel)
+        const store = useTestModel('count', countModel)
 
         return (
           <>
-            <div id="value">{state.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
+            <div id="value">{store.value}</div>
+            <button id="button" type="button" onClick={() => store.add()}>
               add
             </button>
           </>
@@ -109,15 +109,15 @@ describe('createUseModel', () => {
 
     test('change state by doura action', async () => {
       const App = () => {
-        const [state, actions] = useTestModel('count', countModel)
+        const counter = useTestModel('count', countModel)
 
         return (
           <>
-            <div id="value">{state.value}</div>
+            <div id="value">{counter.value}</div>
             <button
               id="button"
               type="button"
-              onClick={() => actions.asyncAdd(2)}
+              onClick={() => counter.asyncAdd(2)}
             >
               add
             </button>
@@ -162,13 +162,14 @@ describe('createUseModel', () => {
       })
 
       const App = () => {
-        const [state, actions] = useTestModel(
+        const store = useTestModel(
           'newModel',
           newModel,
-          function (stateAndViews) {
+          function (s, actions) {
             return {
-              v: stateAndViews.value,
-              t: stateAndViews.test,
+              v: s.value,
+              t: s.test,
+              asyncAdd: actions.asyncAdd,
             }
           },
           []
@@ -176,13 +177,9 @@ describe('createUseModel', () => {
 
         return (
           <>
-            <div id="v">{state.v}</div>
-            <div id="t">{state.t}</div>
-            <button
-              id="button"
-              type="button"
-              onClick={() => actions.asyncAdd()}
-            >
+            <div id="v">{store.v}</div>
+            <div id="t">{store.t}</div>
+            <button id="button" type="button" onClick={() => store.asyncAdd()}>
               add
             </button>
           </>
@@ -210,7 +207,7 @@ describe('createUseModel', () => {
   test('should only consume model once', async () => {
     const App = () => {
       const [state, setState] = React.useState(1)
-      const [model, actions] = useTestModel(
+      const counter = useTestModel(
         'count',
         defineModel({
           state: {
@@ -229,8 +226,8 @@ describe('createUseModel', () => {
           <button id="state" onClick={() => setState((s) => s + 1)}>
             {state}
           </button>
-          <button id="count" onClick={() => actions.add()}>
-            {model.count}
+          <button id="count" onClick={() => counter.add()}>
+            {counter.count}
           </button>
         </>
       )
@@ -250,13 +247,16 @@ describe('createUseModel', () => {
 
   test('should only consume model once with selector', async () => {
     const fn = jest.fn()
-    const countSelector = (s: any) => {
+    const countSelector = (s: any, actions: any) => {
       fn()
-      return s.count
+      return {
+        count: s.count,
+        ...actions,
+      }
     }
     const App = () => {
       const [state, setState] = React.useState(1)
-      const [count, actions] = useTestModel(
+      const counter = useTestModel(
         'count',
         defineModel({
           state: {
@@ -276,8 +276,8 @@ describe('createUseModel', () => {
           <button id="state" onClick={() => setState((s) => s + 1)}>
             {state}
           </button>
-          <button id="count" onClick={() => actions.add()}>
-            {count}
+          <button id="count" onClick={() => counter.add()}>
+            {counter.count}
           </button>
         </>
       )
@@ -312,25 +312,24 @@ describe('createUseModel', () => {
     describe('no dependencies params', () => {
       test('global selector', async () => {
         const fn = jest.fn()
-        const countSelector = (s: ModelAPI<typeof countModel>) => {
+        const countSelector = (
+          s: ModelData<typeof countModel>,
+          actions: any
+        ) => {
           fn()
-          return s.count
+          return { count: s.count, add: actions.add }
         }
         const App = () => {
           const [state, setState] = React.useState(0)
-          const [count, actions] = useTestModel(
-            'count',
-            countModel,
-            countSelector
-          )
+          const counter = useTestModel('count', countModel, countSelector)
 
           return (
             <>
               <button id="state" onClick={() => setState((s) => s + 1)}>
                 {state}
               </button>
-              <button id="count" onClick={() => actions.add()}>
-                {count}
+              <button id="count" onClick={() => counter.add()}>
+                {counter.count}
               </button>
             </>
           )
@@ -360,9 +359,9 @@ describe('createUseModel', () => {
         const fn = jest.fn()
         const App = () => {
           const [state, setState] = React.useState(0)
-          const [count, actions] = useTestModel('count', countModel, (s) => {
+          const counter = useTestModel('count', countModel, (s, actions) => {
             fn()
-            return s.count
+            return { count: s.count, add: actions.add }
           })
 
           return (
@@ -370,8 +369,8 @@ describe('createUseModel', () => {
               <button id="state" onClick={() => setState((s) => s + 1)}>
                 {state}
               </button>
-              <button id="count" onClick={() => actions.add()}>
-                {count}
+              <button id="count" onClick={() => counter.add()}>
+                {counter.count}
               </button>
             </>
           )
@@ -401,12 +400,12 @@ describe('createUseModel', () => {
       const fn = jest.fn()
       const App = () => {
         const [state, setState] = React.useState(0)
-        const [count, actions] = useTestModel(
+        const counter = useTestModel(
           'count',
           countModel,
-          (s) => {
+          (s, actions) => {
             fn()
-            return s.count
+            return { count: s.count, add: actions.add }
           },
           []
         )
@@ -416,8 +415,8 @@ describe('createUseModel', () => {
             <button id="state" onClick={() => setState((s) => s + 1)}>
               {state}
             </button>
-            <button id="count" onClick={() => actions.add()}>
-              {count}
+            <button id="count" onClick={() => counter.add()}>
+              {counter.count}
             </button>
           </>
         )
@@ -443,7 +442,7 @@ describe('createUseModel', () => {
     it('should be called after deps changes', async () => {
       const fn = jest.fn()
       const SybApp = (props: { prop1: number; prop2: number }) => {
-        const [state, _actions] = useTestModel(
+        const count = useTestModel(
           'count',
           countModel,
           function (stateAndViews) {
@@ -453,7 +452,7 @@ describe('createUseModel', () => {
           [props.prop2]
         )
 
-        return <div id="value">{state}</div>
+        return <div id="value">{count}</div>
       }
       const App = () => {
         const [state1, setState1] = React.useState(0)
@@ -495,17 +494,23 @@ describe('createUseModel', () => {
     test('should clear prev selector cache', async () => {
       const selector1 = jest.fn()
       const selector2 = jest.fn()
-      const countSelector1 = function () {
+      const countSelector1 = function (_: any, actions: any) {
         selector1()
-        return 1
+        return {
+          value: 1,
+          add: actions.add,
+        }
       }
-      const countSelector2 = function () {
+      const countSelector2 = function (_: any, actions: any) {
         selector2()
-        return 2
+        return {
+          value: 2,
+          add: actions.add,
+        }
       }
       const App = () => {
         let [selectorSwitch, setSwitch] = React.useState(true)
-        const [value, actions] = useTestModel(
+        const counter = useTestModel(
           'count',
           countModel,
           selectorSwitch ? countSelector1 : countSelector2
@@ -516,8 +521,8 @@ describe('createUseModel', () => {
             <button id="switch" onClick={() => setSwitch((s) => !s)}>
               {selectorSwitch}
             </button>
-            <button id="value" onClick={() => actions.add()}>
-              {value}
+            <button id="value" onClick={() => counter.add()}>
+              {counter.value}
             </button>
           </>
         )
@@ -602,7 +607,7 @@ describe('createUseModel', () => {
 
     function App() {
       AppRenderCount += 1
-      const [{ value }, _] = useTestModel('count', countModel)
+      const { value } = useTestModel('count', countModel)
 
       return (
         <>
@@ -626,11 +631,11 @@ describe('createUseModel', () => {
   test('should render with newest state even update state during render', async () => {
     let firstRender = true
     const App = () => {
-      const [{ value }, actions] = useTestModel('count', countModel)
+      const { value, add } = useTestModel('count', countModel)
 
       if (firstRender) {
         firstRender = false
-        actions.add(1)
+        add(1)
       }
 
       return <div id="value">{value}</div>
@@ -658,12 +663,12 @@ describe('createUseStaticModel', () => {
     })
 
     const App = () => {
-      const [state, _actions] = useTestStaticModel('test', model)
+      const state = useTestStaticModel('test', model)
 
       return (
         <>
-          <div id="v">{state.current.value}</div>
-          <div id="t">{state.current.test}</div>
+          <div id="v">{state.value}</div>
+          <div id="t">{state.test}</div>
         </>
       )
     }
@@ -680,21 +685,21 @@ describe('createUseStaticModel', () => {
     const App = () => {
       renderTime += 1
 
-      const [state, dispatch] = useTestStaticModel('test', countModel)
+      const store = useTestStaticModel('test', countModel)
 
-      currentCount = state.current.value
+      currentCount = store.value
 
       return (
         <>
-          <div id="state">{state.current.value}</div>
-          <button id="add" type="button" onClick={() => dispatch.add()}>
+          <div id="state">{store.value}</div>
+          <button id="add" type="button" onClick={() => store.add()}>
             add
           </button>
           <button
             id="updateCount"
             type="button"
             onClick={() => {
-              currentCount = state.current.value
+              currentCount = store.value
             }}
           >
             updateCount
@@ -729,14 +734,14 @@ describe('createUseStaticModel', () => {
   test('should render with newest state even update state during render', () => {
     let firstRender = true
     const App = () => {
-      const [state, actions] = useTestStaticModel('test', countModel)
+      const store = useTestStaticModel('test', countModel)
 
       if (firstRender) {
         firstRender = false
-        actions.add(1)
+        store.add(1)
       }
 
-      return <div id="value">{state.current.value}</div>
+      return <div id="value">{store.value}</div>
     }
 
     const { container } = render(<App />)

@@ -26,12 +26,12 @@ const countModel = defineModel({
 import { useModel } from 'react-doura'
 
 function Counter() {
-  const [state, actions] = useModel(countModel)
+  const counter = useModel(countModel)
 
   return (
     <div>
-      <h1>Count: {state.count}</h1>
-      <button onClick={actions.inc}>inc</button>
+      <h1>Count: {counter.count}</h1>
+      <button onClick={counter.inc}>inc</button>
     </div>
   )
 }
@@ -57,12 +57,32 @@ const userModel = defineModel({
 })
 
 function Login() {
-  const [isLogin, actions] = useModel(userModel, (s) => s.isLogin)
-
-  return isLogin ? (
-    <div>Welcome</div>
-  ) : (
-    <button onClick={actions.login}>Login</button>
+  const { isLogin, login } = useModel(
+    userModel,
+    (s) => ({
+      isLogin: s.isLogin,
+      login: s.login,
+    }),
+    [] // deps of selector, empty means the seletor function won't change
   )
+
+  return isLogin ? <div>Welcome</div> : <button onClick={login}>Login</button>
+}
+```
+
+We could also pass a pre-defined selector function insteand of an inline function to eliminate the need of passing a dependencies array.
+
+```tsx
+import { Selector } from 'react-doura'
+
+const selector: Selector<typeof userModel> = (s) => ({
+  isLogin: s.isLogin,
+  login: s.login,
+})
+
+function Login() {
+  const { isLogin, login } = useModel(userModel, selector)
+
+  return isLogin ? <div>Welcome</div> : <button onClick={login}>Login</button>
 }
 ```

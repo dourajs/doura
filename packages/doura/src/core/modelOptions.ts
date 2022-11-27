@@ -1,6 +1,6 @@
 import { ModelPublicInstance } from './modelPublicInstance'
 import { warn } from '../warning'
-import { EmptyObject } from '../types'
+import { EmptyObject, AnyObject } from '../types'
 import { invariant, isPlainObject } from '../utils'
 
 export type StateObject = {
@@ -44,7 +44,7 @@ export type ModelThis<
   V extends ViewOptions = {}
 > = {
   $state: S
-  $patch: (s: StateObject) => void
+  $patch: (s: AnyObject) => void
 } & S &
   Views<V> &
   Actions<A>
@@ -93,7 +93,7 @@ export type AnyFunctionModel = FunctionModel<any, any, any>
 
 export type AnyModel = AnyObjectModel | AnyFunctionModel
 
-export type GetModelState<Model> = Model extends ModelOptions<
+export type ModelState<Model> = Model extends ModelOptions<
   infer S,
   any,
   any,
@@ -102,7 +102,7 @@ export type GetModelState<Model> = Model extends ModelOptions<
   ? { [K in keyof S]: S[K] }
   : never
 
-export type GetModelActions<Model> = Model extends ModelOptions<
+export type ModelActions<Model> = Model extends ModelOptions<
   any,
   infer A,
   any,
@@ -111,7 +111,7 @@ export type GetModelActions<Model> = Model extends ModelOptions<
   ? Actions<A> & EmptyObject
   : never
 
-export type GetModelViews<Model> = Model extends ModelOptions<
+export type ModelViews<Model> = Model extends ModelOptions<
   any,
   any,
   infer V,

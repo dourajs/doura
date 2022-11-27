@@ -6,6 +6,7 @@ import {
   ModelView,
   ModelPublicInstance,
   hasOwn,
+  ModelAPI,
 } from 'doura'
 import { useSyncExternalStore } from 'use-sync-external-store/shim'
 import { createBatchManager } from './batchManager'
@@ -21,6 +22,8 @@ function readonlyModel(model: ModelPublicInstance<AnyModel>) {
         return target.$state[key]
       } else if (hasOwn(target.$views, key)) {
         return target.$views[key]
+      } else if (hasOwn(target.$actions, key)) {
+        return target.$actions[key]
       }
 
       return undefined
@@ -42,7 +45,7 @@ function useModel<IModel extends AnyModel>(
 
   useDebugValue(state)
 
-  return [state, model.$actions] as [any, any]
+  return state
 }
 
 function useModelWithSelector<
@@ -72,7 +75,7 @@ function useModelWithSelector<
 
   useDebugValue(state)
 
-  return [state, model.$actions] as [any, any]
+  return state
 }
 
 function useModelInstance<IModel extends AnyModel>(
@@ -153,24 +156,17 @@ export const createUseNamedStaticModel =
     const modelInstance = useMemo(
       () => doura.getModel(name, model),
       // ignore model's change
-      [doura]
+      [name, doura]
     )
-    const value = useRef<any>()
 
     // only run this once against a model
-    const stateRef = useMemo(() => {
-      return {
-        get current() {
-          if (process.env.NODE_ENV === 'development') {
-            return readonlyModel(modelInstance)
-          } else {
-            return modelInstance
-          }
-        },
+    const store = useMemo(() => {
+      if (process.env.NODE_ENV === 'development') {
+        return readonlyModel(modelInstance)
+      } else {
+        return modelInstance
       }
     }, [modelInstance])
 
-    value.current = stateRef
-
-    return [value.current, modelInstance.$actions] as [any, any]
+    return store as any as ModelAPI<IModel>
   }

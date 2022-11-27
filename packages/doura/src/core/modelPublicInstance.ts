@@ -12,9 +12,9 @@ import {
 import {
   State,
   AnyModel,
-  GetModelState,
-  GetModelActions,
-  GetModelViews,
+  ModelState,
+  ModelActions,
+  ModelViews,
 } from './modelOptions'
 import { createView, Selector, ModelView } from './view'
 
@@ -22,21 +22,21 @@ export const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $name: string
-  $rawState: GetModelState<IModel>
-  $state: GetModelState<IModel>
-  $actions: GetModelActions<IModel>
-  $views: GetModelViews<IModel>
+  $rawState: ModelState<IModel>
+  $state: ModelState<IModel>
+  $actions: ModelActions<IModel>
+  $views: ModelViews<IModel>
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
-  $isolate: <T>(fn: (s: GetModelState<IModel>) => T) => T
+  $isolate: <T>(fn: (s: ModelState<IModel>) => T) => T
   $getApi(): ModelAPI<IModel>
   $createView: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
-} & GetModelState<IModel> &
-  GetModelViews<IModel> &
-  GetModelActions<IModel>
+} & ModelState<IModel> &
+  ModelViews<IModel> &
+  ModelActions<IModel>
 
 const enum AccessTypes {
   STATE,

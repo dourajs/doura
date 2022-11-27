@@ -49,7 +49,7 @@ describe('createContainer', () => {
     })
 
     const SubApp = () => {
-      const [_state] = useSharedModel('count', countModel)
+      const _ignore = useSharedModel('count', countModel)
 
       return null
     }
@@ -67,12 +67,12 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const [state, actions] = useSharedModel('count', countModel)
+      const counter = useSharedModel('count', countModel)
 
       return (
         <>
-          <div id="state">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add()}>
+          <div id="state">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
             add
           </button>
         </>
@@ -102,24 +102,24 @@ describe('createContainer', () => {
       createContainer()
 
     const C = () => {
-      const [stateA, _actionsA] = useSharedModelA('count', countModel)
-      const [stateB, _actionsB] = useSharedModelB('count', countModel)
+      const counterA = useSharedModelA('count', countModel)
+      const counterB = useSharedModelB('count', countModel)
 
       return (
         <>
-          <div id="stateCA">{stateA.value}</div>
-          <div id="stateCB">{stateB.value}</div>
+          <div id="stateCA">{counterA.value}</div>
+          <div id="stateCB">{counterB.value}</div>
         </>
       )
     }
 
     const A = () => {
-      const [state, actions] = useSharedModelA('count', countModel)
+      const counterA = useSharedModelA('count', countModel)
 
       return (
         <>
-          <div id="stateA">{state.value}</div>
-          <button id="buttonA" type="button" onClick={() => actions.add()}>
+          <div id="stateA">{counterA.value}</div>
+          <button id="buttonA" type="button" onClick={() => counterA.add()}>
             add
           </button>
           <C></C>
@@ -128,12 +128,12 @@ describe('createContainer', () => {
     }
 
     const B = () => {
-      const [state, actions] = useSharedModelB('count', countModel)
+      const counterB = useSharedModelB('count', countModel)
 
       return (
         <>
-          <div id="stateB">{state.value}</div>
-          <button id="buttonB" type="button" onClick={() => actions.add()}>
+          <div id="stateB">{counterB.value}</div>
+          <button id="buttonB" type="button" onClick={() => counterB.add()}>
             add
           </button>
           <C></C>
@@ -171,15 +171,15 @@ describe('createContainer', () => {
       createContainer()
 
     const A = (props: { id: number }) => {
-      const [state, actions] = useSharedModelA('count', countModel)
+      const counter = useSharedModelA('count', countModel)
 
       return (
         <>
-          <div id={`stateA${props.id}`}>{state.value}</div>
+          <div id={`stateA${props.id}`}>{counter.value}</div>
           <button
             id={`buttonA${props.id}`}
             type="button"
-            onClick={() => actions.add()}
+            onClick={() => counter.add()}
           >
             add
           </button>
@@ -222,24 +222,24 @@ describe('createContainer', () => {
       createContainer()
 
     const C = () => {
-      const [stateA, _actionsA] = useSharedModelA('count', countModel)
-      const [stateB, _actionsB] = useSharedModelB('count', countModel)
+      const counterA = useSharedModelA('count', countModel)
+      const counterB = useSharedModelB('count', countModel)
 
       return (
         <>
-          <div id="stateCA">{stateA.value}</div>
-          <div id="stateCB">{stateB.value}</div>
+          <div id="stateCA">{counterA.value}</div>
+          <div id="stateCB">{counterB.value}</div>
         </>
       )
     }
 
     const A = () => {
-      const [state, actions] = useSharedModelA('count', countModel)
+      const counterA = useSharedModelA('count', countModel)
 
       return (
         <>
-          <div id="stateA">{state.value}</div>
-          <button id="buttonA" type="button" onClick={() => actions.add()}>
+          <div id="stateA">{counterA.value}</div>
+          <button id="buttonA" type="button" onClick={() => counterA.add()}>
             add
           </button>
           <C></C>
@@ -248,12 +248,12 @@ describe('createContainer', () => {
     }
 
     const B = () => {
-      const [state, actions] = useSharedModelB('count', countModel)
+      const counterB = useSharedModelB('count', countModel)
 
       return (
         <>
-          <div id="stateB">{state.value}</div>
-          <button id="buttonB" type="button" onClick={() => actions.add()}>
+          <div id="stateB">{counterB.value}</div>
+          <button id="buttonB" type="button" onClick={() => counterB.add()}>
             add
           </button>
           <C></C>
@@ -290,12 +290,12 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const [state, actions] = useSharedModel('count', countModel)
+      const counter = useSharedModel('count', countModel)
 
       return (
         <>
-          <div id="state">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add()}>
+          <div id="state">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
             add
           </button>
         </>
@@ -343,12 +343,12 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const [state, actions] = useSharedModel('count', countModel)
+      const counter = useSharedModel('count', countModel)
 
       return (
         <>
-          <div id="state">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add()}>
+          <div id="state">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
             add
           </button>
         </>
@@ -402,11 +402,11 @@ describe('createContainer', () => {
 describe('createContainer/DouraRoot', () => {
   test('DouraRoot should worked without props douraStore', async () => {
     const App = () => {
-      const [state, actions] = useRootModel('count', countModel)
+      const counter = useRootModel('count', countModel)
       return (
         <>
-          <div id="value">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add()}>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
             add
           </button>
         </>
@@ -431,10 +431,10 @@ describe('createContainer/DouraRoot', () => {
 
   test('DouraRoot props douraStore could overwrite default douraStore', () => {
     const App = () => {
-      const [state] = useRootModel('count', countModel)
+      const counter = useRootModel('count', countModel)
       return (
         <>
-          <div id="value">{state.value}</div>
+          <div id="value">{counter.value}</div>
         </>
       )
     }
@@ -458,128 +458,94 @@ describe('createContainer/DouraRoot', () => {
 })
 
 describe('createContainer/useRootModel', () => {
-  describe('valid', () => {
-    test('name should be required', async () => {
-      const tempModel = defineModel({
-        state: {
-          value: 1,
+  test('name should be required', async () => {
+    const countModel = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
         },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
-          },
-        },
-      })
-
-      const App = () => {
-        const [state, actions] = useRootModel(undefined as any, tempModel)
-
-        return (
-          <>
-            <div id="value">{state.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
-              add
-            </button>
-          </>
-        )
-      }
-
-      expect(() => {
-        render(
-          <DouraRoot>
-            <App />
-          </DouraRoot>
-        )
-      }).toThrow()
+      },
     })
 
-    test('name should not be empty', async () => {
-      const tempModel = defineModel({
-        state: {
-          value: 1,
-        },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
-          },
-        },
-      })
+    const App1 = () => {
+      const counter = useRootModel(undefined as any, countModel)
+      return <div id="value">{counter.value}</div>
+    }
 
-      const App = () => {
-        const [state, actions] = useRootModel('', tempModel)
+    const App2 = () => {
+      const counter = useRootModel('', countModel)
+      return <div id="value">{counter.value}</div>
+    }
 
-        return (
-          <>
-            <div id="value">{state.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
-              add
-            </button>
-          </>
-        )
-      }
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App1 />
+        </DouraRoot>
+      )
+    }).toThrow()
 
-      expect(() => {
-        render(
-          <DouraRoot>
-            <App />
-          </DouraRoot>
-        )
-      }).toThrow()
-    })
-
-    test('useRootModel should has parent DouraRoot', async () => {
-      const tempModel = defineModel({
-        state: {
-          value: 1,
-        },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
-          },
-        },
-      })
-
-      const App = () => {
-        const [state, actions] = useRootModel('count', tempModel)
-
-        return (
-          <>
-            <div id="value">{state.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
-              add
-            </button>
-          </>
-        )
-      }
-
-      expect(() => {
-        render(<App />)
-      }).toThrow()
-    })
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App2 />
+        </DouraRoot>
+      )
+    }).toThrow()
   })
 
-  test('should keep state same ref in different component', async () => {
-    let AppState: any = null
-    let AppState1: any = null
+  test('useRootModel should has parent DouraRoot', async () => {
+    const countModel = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
+        },
+      },
+    })
+
     const App = () => {
-      const [state, actions] = useRootModel('count', countModel)
-      const [state1, _actions1] = useRootModel('count', countModel)
-      AppState = state
-      AppState1 = state1
+      const counter = useRootModel('count', countModel)
+
       return (
         <>
-          <div id="value">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add(1)}>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    expect(() => {
+      render(<App />)
+    }).toThrow()
+  })
+
+  test('should return same ref', async () => {
+    let ref1: any = null
+    let ref2: any = null
+    const App = () => {
+      const counter = useRootModel('count', countModel)
+      ref1 = counter
+      return (
+        <>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add(1)}>
             add
           </button>
           <SubApp></SubApp>
         </>
       )
     }
-    let SubAppState: any = null
     function SubApp() {
-      const [state, _actions] = useRootModel('count', countModel)
-      SubAppState = state
+      const counter = useRootModel('count', countModel)
+      ref2 = counter
       return <></>
     }
 
@@ -591,9 +557,7 @@ describe('createContainer/useRootModel', () => {
 
     expect(container.querySelector('#value')?.innerHTML).toEqual('1')
 
-    expect(AppState).toBeTruthy()
-    expect(AppState === AppState1).toBeTruthy()
-    expect(AppState === SubAppState).toBeTruthy()
+    expect(ref1).toBe(ref2)
     await act(async () => {
       container
         .querySelector('#button')
@@ -602,32 +566,32 @@ describe('createContainer/useRootModel', () => {
     })
 
     expect(container.querySelector('#value')?.innerHTML).toEqual('2')
-    expect(AppState === AppState1).toBeTruthy()
-    expect(AppState === SubAppState).toBeTruthy()
+    expect(ref1).toBe(ref2)
   })
 
-  test('should keep actions same ref', async () => {
-    let AppActions: any = null
-    let AppActions1: any = null
+  // OPTIMIZE: return same ref for same selector
+  test('should not return same ref (with selector)', async () => {
+    let ref1: any = null
+    let ref2: any = null
+    const selector = (s: any, a: any) => {
+      return { value: s.value, ...a }
+    }
     const App = () => {
-      const [state, actions] = useRootModel('count', countModel)
-      const [_state1, actions1] = useRootModel('count', countModel)
-      AppActions = actions
-      AppActions1 = actions1
+      const counter = useRootModel('count', countModel, selector)
+      ref1 = counter
       return (
         <>
-          <div id="value">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add(1)}>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add(1)}>
             add
           </button>
           <SubApp></SubApp>
         </>
       )
     }
-    let SubAppActions: any = null
     function SubApp() {
-      const [_state, actions] = useRootModel('count', countModel)
-      SubAppActions = actions
+      const counter = useRootModel('count', countModel, selector)
+      ref2 = counter
       return <></>
     }
 
@@ -639,9 +603,7 @@ describe('createContainer/useRootModel', () => {
 
     expect(container.querySelector('#value')?.innerHTML).toEqual('1')
 
-    expect(AppActions).toBeTruthy()
-    expect(AppActions === AppActions1).toBeTruthy()
-    expect(AppActions === SubAppActions).toBeTruthy()
+    expect(ref1).not.toBe(ref2)
     await act(async () => {
       container
         .querySelector('#button')
@@ -650,18 +612,17 @@ describe('createContainer/useRootModel', () => {
     })
 
     expect(container.querySelector('#value')?.innerHTML).toEqual('2')
-    expect(AppActions === AppActions1).toBeTruthy()
-    expect(AppActions === SubAppActions).toBeTruthy()
+    expect(ref1).not.toBe(ref2)
   })
 
   test("should keep data's state with component unmount or not", async () => {
     const SubApp = () => {
-      const [state, actions] = useRootModel('count', countModel)
+      const counter = useRootModel('count', countModel)
 
       return (
         <>
-          <div id="state">{state.value}</div>
-          <button id="button" type="button" onClick={() => actions.add()}>
+          <div id="state">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
             add
           </button>
         </>
@@ -712,104 +673,71 @@ describe('createContainer/useRootModel', () => {
 })
 
 describe('createContainer/useRootStaticModel', () => {
-  describe('valid', () => {
-    test('name should be required', async () => {
-      const tempModel = defineModel({
-        state: {
-          value: 1,
+  test('name should not be empty', async () => {
+    const count = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
         },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
-          },
-        },
-      })
-
-      const App = () => {
-        const [state, actions] = useRootStaticModel(undefined as any, tempModel)
-
-        return (
-          <>
-            <div id="value">{state.current.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
-              add
-            </button>
-          </>
-        )
-      }
-
-      expect(() => {
-        render(
-          <DouraRoot>
-            <App />
-          </DouraRoot>
-        )
-      }).toThrow()
+      },
     })
 
-    test('name should not be empty', async () => {
-      const tempModel = defineModel({
-        state: {
-          value: 1,
+    const App1 = () => {
+      const counter = useRootStaticModel(undefined as any, count)
+      return <div id="value">{counter.value}</div>
+    }
+    const App2 = () => {
+      const counter = useRootStaticModel('', count)
+      return <div id="value">{counter.value}</div>
+    }
+
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App1 />
+        </DouraRoot>
+      )
+    }).toThrow()
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App2 />
+        </DouraRoot>
+      )
+    }).toThrow()
+  })
+
+  test('useRootStaticModel should has parent DouraRoot', async () => {
+    const count = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
         },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
-          },
-        },
-      })
-
-      const App = () => {
-        const [state, actions] = useRootStaticModel('', tempModel)
-
-        return (
-          <>
-            <div id="value">{state.current.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
-              add
-            </button>
-          </>
-        )
-      }
-
-      expect(() => {
-        render(
-          <DouraRoot>
-            <App />
-          </DouraRoot>
-        )
-      }).toThrow()
+      },
     })
 
-    test('useRootStaticModel should has parent DouraRoot', async () => {
-      const tempModel = defineModel({
-        state: {
-          value: 1,
-        },
-        actions: {
-          add(payload: number = 1) {
-            this.value += payload
-          },
-        },
-      })
+    const App = () => {
+      const counter = useRootStaticModel('count', count)
 
-      const App = () => {
-        const [state, actions] = useRootStaticModel('temp', tempModel)
+      return (
+        <>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
+            add
+          </button>
+        </>
+      )
+    }
 
-        return (
-          <>
-            <div id="value">{state.current.value}</div>
-            <button id="button" type="button" onClick={() => actions.add()}>
-              add
-            </button>
-          </>
-        )
-      }
-
-      expect(() => {
-        render(<App />)
-      }).toThrow()
-    })
+    expect(() => {
+      render(<App />)
+    }).toThrow()
   })
 
   test('should state keep same ref in one component', async () => {
@@ -817,23 +745,23 @@ describe('createContainer/useRootStaticModel', () => {
     let stateRef1: any
 
     const StaticApp = () => {
-      const [state, dispatch] = useRootStaticModel('count', countModel)
+      const counter = useRootStaticModel('count', countModel)
       const [_, setValue] = React.useState(false)
 
       if (!stateRef) {
-        stateRef = state
+        stateRef = counter
       }
 
-      stateRef1 = state
+      stateRef1 = counter
 
       return (
         <>
-          <div id="state">{state.current.value}</div>
+          <div id="state">{counter.value}</div>
           <button
             id="add"
             type="button"
             onClick={() => {
-              dispatch.add()
+              counter.add()
               setValue(true)
             }}
           >

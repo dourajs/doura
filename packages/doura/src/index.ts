@@ -11,8 +11,12 @@ export type {
   State,
   Action,
   Selector,
-  ModelAPI,
   ModelView,
+  ModelState,
+  ModelActions,
+  ModelViews,
+  ModelData,
+  ModelAPI,
 } from './core'
 
 export { defineModel, nextTick } from './core'

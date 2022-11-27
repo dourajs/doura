@@ -179,6 +179,7 @@ export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
   return new Proxy(shallowCopy(obj), handler)
 }
 
+// OPTIMIZE: return value if draft wasn't modified
 export function snapshot<T extends any>(value: T, draft: Drafted): T {
   if (!isObject(value)) {
     return value

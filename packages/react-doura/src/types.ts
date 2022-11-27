@@ -1,32 +1,28 @@
-import { AnyModel, Selector, ModelPublicInstance, ModelAPI } from 'doura'
+import { AnyModel, Selector, ModelAPI } from 'doura'
 
-type IActions<IModel extends AnyModel> = ModelPublicInstance<IModel>['$actions']
-
-export interface IUseModel {
-  <IModel extends AnyModel>(model: IModel): [ModelAPI<IModel>, IActions<IModel>]
+export interface UseModel {
+  <IModel extends AnyModel>(model: IModel, depends?: any[]): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     model: IModel,
     selectors: S,
     depends?: any[]
-  ): [ReturnType<S>, IActions<IModel>]
+  ): ReturnType<S>
 }
 
-export interface IUseNamedModel {
-  <IModel extends AnyModel>(name: string, model: IModel): [
-    ModelAPI<IModel>,
-    IActions<IModel>
-  ]
+export interface UseNamedModel {
+  <IModel extends AnyModel>(
+    name: string,
+    model: IModel,
+    depends?: any[]
+  ): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
     model: IModel,
     selectors: S,
     depends?: any[]
-  ): [ReturnType<S>, IActions<IModel>]
+  ): ReturnType<S>
 }
 
-export interface IUseNamedStaticModel {
-  <IModel extends AnyModel>(name: string, model: IModel): [
-    { current: ModelAPI<IModel> },
-    IActions<IModel>
-  ]
+export interface UseNamedStaticModel {
+  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
 }

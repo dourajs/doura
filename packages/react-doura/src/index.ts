@@ -5,6 +5,10 @@ import createContainer, {
 } from './createContainer'
 import { useModel } from './useModel'
 
+export { Selector } from 'doura'
+
+export * from './types'
+
 export {
   createContainer,
   DouraRoot,

@@ -13,7 +13,7 @@ import {
   createUseNamedStaticModel,
 } from './createUseModel'
 import { createBatchManager } from './batchManager'
-import { IUseNamedModel, IUseNamedStaticModel } from './types'
+import { UseNamedModel, UseNamedStaticModel } from './types'
 import { invariant } from './utils'
 
 const createContainer = function (options?: DouraOptions) {
@@ -54,7 +54,7 @@ const createContainer = function (options?: DouraOptions) {
     return <Context.Provider value={contextValue}>{children}</Context.Provider>
   }
 
-  const useSharedModel: IUseNamedModel = <
+  const useSharedModel: UseNamedModel = <
     IModel extends AnyModel,
     S extends Selector<IModel>
   >(
@@ -79,7 +79,7 @@ const createContainer = function (options?: DouraOptions) {
     )(name, model, selector, depends)
   }
 
-  const useStaticModel: IUseNamedStaticModel = <IModel extends AnyModel>(
+  const useStaticModel: UseNamedStaticModel = <IModel extends AnyModel>(
     name: string,
     model: IModel
   ) => {
