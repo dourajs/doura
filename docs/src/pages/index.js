@@ -111,11 +111,11 @@ function Features() {
 }
 
 function Home() {
+  const context = useDocusaurusContext()
+  const { tagline } = context
+
   return (
-    <Layout
-      permalink={'/'}
-      description={'Set up a modern web app by running one command.'}
-    >
+    <Layout permalink={'/'} description={tagline}>
       <HeroBanner />
       <Features />
     </Layout>
