@@ -10,6 +10,8 @@ const allDocHomesPaths = ['/docs/']
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Doura',
+  tagline:
+    "The simple, intuitive and reactive state manager you've been waiting for.",
   projectName: 'doura', // Usually your repo name.
   organizationName: 'dourajs', // Usually your GitHub org/user name.
   url: 'https://dourajs.github.io/',
