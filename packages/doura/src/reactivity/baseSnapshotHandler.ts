@@ -5,6 +5,8 @@ import { DraftState } from './draft'
 export type DraftSnapshot = Map<DraftState, any>
 
 export function snapshotHandler(snapshot: DraftSnapshot) {
+  const proxyMap = new WeakMap<any, any>()
+
   const objectTraps: ProxyHandler<any> = {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver)
@@ -12,9 +14,22 @@ export function snapshotHandler(snapshot: DraftSnapshot) {
         return value
       }
 
-      return isDraft(value)
-        ? new Proxy(snapshot.get(value[ReactiveFlags.STATE]), objectTraps)
-        : value
+      if (isDraft(value)) {
+        let proxy = proxyMap.get(value)
+        if (!proxy) {
+          proxyMap.set(
+            value,
+            (proxy = new Proxy(
+              snapshot.get(value[ReactiveFlags.STATE]),
+              objectTraps
+            ))
+          )
+        }
+
+        return proxy
+      }
+
+      return value
     },
     set(
       target,

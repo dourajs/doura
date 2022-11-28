@@ -1,11 +1,16 @@
-import { draft, finishDraft, snapshot } from '../draft'
+import { draft, snapshot } from '../draft'
+import { isModified } from '../common'
 import { each } from '../../utils'
 
 const produce = <T extends any = any>(value: T, cb: (v: T) => void) => {
   const obj = draft(value as any)
   cb(obj)
-  const result = finishDraft(obj)
-  return result
+
+  if (!isModified(obj)) {
+    return value
+  }
+
+  return snapshot(obj, obj)
 }
 
 function enumerableOnly(x: any) {
@@ -425,22 +430,6 @@ describe(`reactivity/draft`, () => {
       })
     })
 
-    it('optimization: does not visit properties of new data structures if autofreeze is disabled and no drafts are unfinalized', () => {
-      const newData: any = {}
-      Object.defineProperty(newData, 'x', {
-        enumerable: true,
-        get() {
-          throw new Error('visited!')
-        },
-      })
-
-      const run = () =>
-        produce({} as any, (d) => {
-          d.data = newData
-        })
-      expect(run).toThrow()
-    })
-
     it('supports a base state with multiple references to an object', () => {
       const obj: any = {}
       const res = produce({ a: obj, b: obj }, (d) => {
@@ -449,7 +438,8 @@ describe(`reactivity/draft`, () => {
         d.a.z = true
         expect(d.b.z).toBeUndefined()
       })
-      expect(res.b).toBe(obj)
+      // res.b is a proxy
+      expect(res.b).not.toBe(obj)
       expect(res.a).not.toBe(res.b)
       expect(res.a.z).toBeTruthy()
     })
@@ -794,5 +784,36 @@ describe(`reactivity/snapshot`, () => {
     expect(value.aProp).toEqual(1)
     expect(value.anArray[0]).toEqual(1)
     expect(value.anObject.nested.yummie).toEqual(false)
+  })
+
+  it("should not visit objects which aren't modified", () => {
+    const newData: any = {}
+    Object.defineProperty(newData, 'x', {
+      enumerable: true,
+      get() {
+        throw new Error('visited!')
+      },
+    })
+
+    const state = {
+      aProp: 'hi' as any,
+      anObject: {
+        get nested() {
+          throw new Error('visited!')
+        },
+        coffee: false,
+      },
+      data: null as any,
+    }
+
+    const drafted = draft(state)
+    drafted.data = newData
+    // read anObject
+    void drafted.anObject
+
+    const run = () => {
+      snapshot(drafted, drafted)
+    }
+    expect(run).not.toThrow()
   })
 })

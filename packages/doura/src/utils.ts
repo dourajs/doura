@@ -81,19 +81,6 @@ export const def = (obj: object, key: string | symbol, value: any) => {
   })
 }
 
-export function patchObj(
-  obj: Record<string, any>,
-  partObj: Record<string, any>
-) {
-  Object.keys(partObj as Record<string, any>).forEach(function (key) {
-    if (obj.hasOwnProperty(key) && isObject(partObj[key])) {
-      patchObj(obj[key], partObj[key])
-    } else {
-      ;(obj as Record<string, any>)[key] = partObj[key]
-    }
-  })
-}
-
 export function invariant(condition: any, message?: string): asserts condition {
   if (condition) {
     return
@@ -130,12 +117,6 @@ export function shallowCopy(base: any) {
       }
   }
   return Object.create(Object.getPrototypeOf(base), descriptors)
-}
-
-export function isFrozen(obj: any): boolean {
-  if (obj == null || typeof obj !== 'object') return true
-  // See #600, IE dies on non-objects in Object.isFrozen
-  return Object.isFrozen(obj)
 }
 
 export const ownKeys: (target: object) => PropertyKey[] =

@@ -1,5 +1,5 @@
 export { toState, toBase, isDraft, isModified } from './common'
 export { View, view, ViewGetter } from './view'
-export { draft, snapshot, finishDraft, watch } from './draft'
+export { draft, snapshot, watch } from './draft'
 export { ReactiveEffect, pauseTracking, resetTracking } from './effect'
 export { EffectScope, effectScope } from './effectScope'
