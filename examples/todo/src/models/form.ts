@@ -2,7 +2,6 @@ import { defineModel } from 'doura'
 import React from 'react'
 
 export const inputModel = defineModel({
-  name: 'input',
   state: {
     value: '',
   },

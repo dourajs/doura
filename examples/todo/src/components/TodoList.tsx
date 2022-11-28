@@ -3,17 +3,18 @@ import { todoModel } from '../models/todo'
 import { inputModel } from '../models/form'
 
 export default function TodoList() {
-  const [state, action] = useModel(todoModel)
-  const [todoContent, { update, reset }] = useModel(inputModel)
+  const { todos, filteredTodos, addTodo, toggleTodo, clear } =
+    useModel(todoModel)
+  const { value: todoContent, update, reset } = useModel(inputModel)
 
   return (
     <div>
       <div>
-        <input type="text" value={todoContent.value} onChange={update} />
+        <input type="text" value={todoContent} onChange={update} />
         <button
           onClick={() => {
-            if (todoContent.value) {
-              action.addTodo(todoContent.value)
+            if (todoContent) {
+              addTodo(todoContent)
               reset()
             }
           }}
@@ -22,14 +23,14 @@ export default function TodoList() {
         </button>
       </div>
       <ul>
-        {state.filteredTodos.map((todo) => {
+        {filteredTodos.map((todo) => {
           console.log('todo', todo.isFinished)
           return (
             <li key={todo.id}>
               <input
                 type="checkbox"
                 checked={todo.isFinished}
-                onChange={() => action.toggleTodo(todo.id)}
+                onChange={() => toggleTodo(todo.id)}
               />
               {todo.content}
             </li>
@@ -37,7 +38,7 @@ export default function TodoList() {
         })}
       </ul>
       <div>
-        <button disabled={!state.todos.length} onClick={action.clear}>
+        <button disabled={!todos.length} onClick={clear}>
           Clear todos
         </button>
       </div>

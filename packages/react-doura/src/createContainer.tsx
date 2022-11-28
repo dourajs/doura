@@ -6,8 +6,7 @@ import React, {
   useMemo,
   useState,
 } from 'react'
-import { doura, devtool } from 'doura'
-import type { Doura, AnyModel, DouraOptions, Selector } from 'doura'
+import { Doura, AnyModel, DouraOptions, Selector, doura, devtool } from 'doura'
 import {
   createUseNamedModel,
   createUseNamedStaticModel,
@@ -114,6 +113,6 @@ const {
   plugins: process.env.NODE_ENV === 'development' ? [[devtool]] : [],
 })
 
-export { DouraRoot, useRootModel, useRootStaticModel }
+export type { Doura }
 
-export default createContainer
+export { DouraRoot, useRootModel, useRootStaticModel, createContainer }

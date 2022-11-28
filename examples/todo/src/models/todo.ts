@@ -7,7 +7,6 @@ interface Todo {
 }
 
 export const todoModel = defineModel({
-  name: 'todo',
   state: {
     todos: [] as Todo[],
     filter: 'all',

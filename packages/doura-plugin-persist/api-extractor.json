@@ -3,5 +3,8 @@
   "mainEntryPointFilePath": "./dist/packages/<unscopedPackageName>/src/index.d.ts",
   "dtsRollup": {
     "publicTrimmedFilePath": "./dist/<unscopedPackageName>.d.ts"
+  },
+  "compiler": {
+    "tsconfigFilePath": "./tsconfig.build.json"
   }
 }
