@@ -11,7 +11,7 @@ Doura brings the reactivity to React. It's provided an intuitive and simple way 
 
 :::info
 
-Doura is greatly inspired by [Immer](https://github.com/immerjs/immer), [Vuejs](https://github.com/vuejs) and [Pinia](https://github.com/vuejs/pinia). Thanks for their excellent work.
+Doura is greatly inspired by [Immer](https://github.com/immerjs/immer), [Vue.js](https://github.com/vuejs) and [Pinia](https://github.com/vuejs/pinia). Thanks for their excellent work.
 
 :::
 
