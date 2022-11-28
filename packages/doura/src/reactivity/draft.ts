@@ -126,14 +126,6 @@ export function finishDraft(draft: AnyObject) {
   return finalize(draft, [])
 }
 
-export function updateDraft(draft: Drafted, base: AnyObject) {
-  const state: DraftState = draft[ReactiveFlags.STATE]
-  if (state.disposed) {
-    throw new Error('todo')
-  }
-  updateState(state, base)
-}
-
 export function watch(draft: any, cb: () => void): () => void {
   const state: DraftState = draft[ReactiveFlags.STATE]
   if (state.disposed) {
@@ -150,7 +142,7 @@ export function watch(draft: any, cb: () => void): () => void {
   }
 }
 
-export function getSnapshotFromDraft(draft: Drafted): DraftSnapshot {
+export function takeSnapshotFromDraft(draft: Drafted): DraftSnapshot {
   const draftSnapshot: DraftSnapshot = new Map()
   if (!isDraft(draft)) {
     return draftSnapshot
@@ -158,10 +150,16 @@ export function getSnapshotFromDraft(draft: Drafted): DraftSnapshot {
 
   const queue = [draft[ReactiveFlags.STATE]]
   while (queue.length) {
-    const target = queue.pop()!
-    const value = target.modified ? shallowCopy(target.copy) : target.base
-    draftSnapshot.set(target, value)
-    for (const c of target.children) {
+    const state = queue.pop()!
+    let value: any
+    if (state.modified) {
+      value = shallowCopy(state.copy)
+      updateDraftState(state, value)
+    } else {
+      value = state.base
+    }
+    draftSnapshot.set(state, value)
+    for (const c of state.children) {
       queue.push(c)
     }
   }
@@ -179,13 +177,12 @@ export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
   return new Proxy(shallowCopy(obj), handler)
 }
 
-// OPTIMIZE: return value if draft wasn't modified
 export function snapshot<T extends any>(value: T, draft: Drafted): T {
   if (!isObject(value)) {
     return value
   }
 
-  const draftSnapshot = getSnapshotFromDraft(draft)
+  const draftSnapshot = takeSnapshotFromDraft(draft)
   return createSnapshotProxy(value, draftSnapshot)
 }
 
@@ -218,15 +215,12 @@ function finalize(value: any, path?: PatchPath) {
   each(result, (key, childValue) =>
     finalizeProperty(state, result, key, childValue, path)
   )
-  // make draft point to result
-  updateState(state, result)
   return result
 }
 
-function updateState(state: DraftState, base: AnyObject) {
+function updateDraftState(state: DraftState, base: AnyObject) {
   state.modified = false
   state.base = base
-  state.copy = null
   state.assigned = {}
 }
 

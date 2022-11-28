@@ -749,28 +749,6 @@ describe(`reactivity/draft`, () => {
     })
   })
 
-  describe('reusable draft', () => {
-    it('should work', () => {
-      const baseState = {
-        a: 0,
-        b: {
-          foo: 'foo',
-        },
-      }
-      const draftState = draft(baseState)
-      draftState.a = 1
-      const state1 = finishDraft(draftState)
-      expect(state1.a).toEqual(1)
-      expect(state1.b).toBe(baseState.b)
-
-      draftState.b.foo = 'bar'
-      const state2 = finishDraft(draftState)
-      expect(state2.a).toEqual(1)
-      expect(state2.b).not.toBe(state1.b)
-      expect(state2.b.foo).toEqual('bar')
-    })
-  })
-
   describe.skip('edge case', () => {
     it.only('supports modifying nested objects', () => {
       const baseState = [{ a: 1 }, {}] as any

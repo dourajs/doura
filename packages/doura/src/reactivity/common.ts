@@ -67,6 +67,10 @@ export function toBase<T>(observed: T): T {
   return raw ? toBase(raw.base as any) : observed
 }
 
+export function isModified(draft: Drafted): boolean {
+  return draft[ReactiveFlags.STATE].modified
+}
+
 export function toState<T>(observed: T): DraftState | undefined {
   return observed && (observed as Target)[ReactiveFlags.STATE]
 }

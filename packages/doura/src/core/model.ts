@@ -10,6 +10,7 @@ import {
   snapshot,
   pauseTracking,
   resetTracking,
+  isModified,
 } from '../reactivity'
 import {
   Views,
@@ -27,6 +28,7 @@ import {
 } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { AnyObject } from '../types'
+import { Drafted } from '../reactivity/common'
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -173,6 +175,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
+  private _destroyed: boolean = false
 
   constructor(model: IModel, { name, initState }: ModelInternalOptions) {
     this.patch = this.patch.bind(this)
@@ -188,12 +191,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.stateRef = draft({
       value: this._initState,
     })
-    const update: SchedulerJob = () => {
-      this.dispatch({
-        type: ActionType.MODIFY,
-        payload: snapshot(this.stateRef.value, this.stateRef.value),
-      })
-    }
+    const update: SchedulerJob = this._update.bind(this)
     this._draftListenerHandler = watch(this.stateRef, () => {
       if (this._watchStateChange) {
         queueJob(update)
@@ -401,6 +399,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   destroy() {
+    this._destroyed = true
     this._api = null
     this._currentState = null
     this.stateRef = {
@@ -416,6 +415,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this._currentState = newState
     this.isPrimitiveState = !isObject(newState)
     this.stateValue = this.stateRef.value
+  }
+
+  private _update() {
+    if (this._destroyed || !isModified(this.stateRef as any as Drafted)) {
+      return
+    }
+
+    this.dispatch({
+      type: ActionType.MODIFY,
+      payload: snapshot(this.stateRef.value, this.stateRef as any as Drafted),
+    })
   }
 
   private _triggerListener(event: ModelChangeEvent) {
@@ -444,7 +454,16 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
               })
             }
 
-            return action.call(this.proxy, ...args)
+            let res: any
+            try {
+              res = action.call(this.proxy, ...args)
+            } finally {
+              // flush changes to model synchronously right after an action.
+              // this prevent issues like https://github.com/pmndrs/valtio/issues/270
+              this._update()
+            }
+
+            return res
           },
         })
       })

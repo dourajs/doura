@@ -254,6 +254,7 @@ function flushJobs(seen?: CountMap) {
         try {
           job()
         } catch (err) {
+          console.log('err', err)
           error(err, ErrorCodes.SCHEDULER)
         }
       }
