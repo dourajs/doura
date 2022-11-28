@@ -10,6 +10,7 @@ function HeroBanner() {
   const context = useDocusaurusContext()
   const {
     siteConfig: { baseUrl },
+    tagline,
   } = context
 
   return (
@@ -27,9 +28,7 @@ function HeroBanner() {
             />
           </span>
         </h1>
-        <p className={styles.heroTagline}>
-          The React Store that is reactive like Vue.
-        </p>
+        <p className={styles.heroTagline}>{tagline}</p>
         <div className={clsx(styles.indexCtas)}>
           <Link className="button button--primary" to="/docs">
             <Translate>Get Started</Translate>
