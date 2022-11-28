@@ -113,9 +113,7 @@ export const enum AccessContext {
   VIEW,
 }
 
-export type ModelData<Model extends AnyModel> = {
-  $state: ModelState<Model>
-} & ModelState<Model> &
+export type ModelData<Model extends AnyModel> = ModelState<Model> &
   ModelViews<Model>
 
 export type ModelAPI<IModel extends AnyModel> = ModelData<IModel> &
@@ -164,8 +162,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
   stateValue!: any
   effectScope: EffectScope
-
-  isPrimitiveState!: boolean
 
   private _api: ModelData<IModel> | null = null
   private _initState: ModelState<IModel>
@@ -270,7 +266,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         ...this._currentState,
         ...this.views,
       })
-      def(data, '$state', this._currentState)
       for (const action of Object.keys(this.actions)) {
         def(data, action, this.actions[action])
       }
@@ -413,7 +408,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _setState(newState: ModelState<IModel>) {
     this._api = null
     this._currentState = newState
-    this.isPrimitiveState = !isObject(newState)
     this.stateValue = this.stateRef.value
   }
 

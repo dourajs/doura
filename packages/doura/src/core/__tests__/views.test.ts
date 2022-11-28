@@ -612,62 +612,6 @@ describe('defineModel/views', () => {
     })
   })
 
-  describe('primitive state/simple value', () => {
-    it("should not be invoked when deps don't change", () => {
-      let numberOfCalls = 0
-      const numberModel = defineModel({
-        state: 0,
-        actions: {
-          doNothing: () => {},
-        },
-        views: {
-          double() {
-            numberOfCalls++
-            return this.$state * 2
-          },
-        },
-      })
-
-      const numberStore = modelMgr.getModel('number', numberModel)
-
-      expect(numberOfCalls).toBe(0)
-      expect(numberStore.double).toBe(0)
-      expect(numberOfCalls).toBe(1)
-
-      numberStore.doNothing()
-      expect(numberStore.double).toBe(0)
-      expect(numberOfCalls).toBe(1)
-    })
-
-    it('should return last value', () => {
-      let numberOfCalls = 0
-      const numberModel = defineModel({
-        state: 0,
-        actions: {
-          increment() {
-            this.$state += 1
-          },
-        },
-        views: {
-          double() {
-            numberOfCalls++
-            return this.$state * 2
-          },
-        },
-      })
-
-      const numberStore = modelMgr.getModel('number', numberModel)
-
-      expect(numberOfCalls).toBe(0)
-      expect(numberStore.double).toBe(0)
-      expect(numberOfCalls).toBe(1)
-
-      numberStore.increment()
-      expect(numberStore.double).toBe(2)
-      expect(numberOfCalls).toBe(2)
-    })
-  })
-
   describe('primitive state/array', () => {
     it("should not be invoked when deps don't change", () => {
       let numberOfCalls = 0

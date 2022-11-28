@@ -66,10 +66,6 @@ describe('model', () => {
       arr: [1, 2],
       firstOfArr: 1,
     })
-    expect(api1.$state).toEqual({
-      a: 1,
-      arr: [1, 2],
-    })
     expect(api1.arr).toBe(originState.arr)
     ;(model.proxy as any).updateA(2)
     await nextTick()
@@ -79,10 +75,6 @@ describe('model', () => {
       a: 2,
       arr: [1, 2],
       firstOfArr: 1,
-    })
-    expect(api2.$state).toEqual({
-      a: 2,
-      arr: [1, 2],
     })
   })
 

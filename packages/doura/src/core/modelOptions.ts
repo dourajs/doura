@@ -7,15 +7,7 @@ export type StateObject = {
   [x: string]: any
 }
 
-export type StatePrimitive =
-  | String
-  | Number
-  | Boolean
-  | any[]
-  | undefined
-  | null
-
-export type State = StateObject | StatePrimitive
+export type State = StateObject
 
 export type ActionOptions = Record<string, Function>
 

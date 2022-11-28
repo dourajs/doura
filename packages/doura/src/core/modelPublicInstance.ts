@@ -53,7 +53,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
     {
       $name: (i) => i.name,
       $rawState: (i) => i.getState(),
-      $state: (i) => (i.isPrimitiveState ? i.stateRef.value : i.stateValue),
+      $state: (i) => i.stateValue,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
       $patch: (i) => i.patch,
