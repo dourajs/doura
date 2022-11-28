@@ -1,6 +1,6 @@
 {
   "name": "react-doura",
-  "version": "0.0.0-rc.6",
+  "version": "0.0.0-rc.7",
   "description": "Doura React.js integration",
   "main": "index.js",
   "module": "dist/react-doura.esm-bundler.js",
@@ -54,7 +54,7 @@
     "react-dom": "18.1.0"
   },
   "peerDependencies": {
-    "doura": "0.0.0-rc.6",
+    "doura": "0.0.0-rc.7",
     "react": ">=16.8",
     "react-dom": ">=16.8"
   }
