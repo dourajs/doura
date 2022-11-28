@@ -65,5 +65,5 @@ function Counter() {
 Doura is greatly inspired by following excellent projects:
 
 - [Immer](https://github.com/immerjs/immer)
-- [Vuejs](https://github.com/vuejs)
+- [Vue.js](https://github.com/vuejs)
 - [Pinia](https://github.com/vuejs/pinia)
