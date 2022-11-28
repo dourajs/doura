@@ -57,12 +57,12 @@ import { useRootModel } from 'react-doura'
 import { countModel } from './models/count'
 
 export function Counter() {
-  const [state, actions] = useRootModel('count', countModel)
+  const { count, inc } = useRootModel('count', countModel)
 
   return (
     <div>
-      <h1>Count: {state.count}</h1>
-      <button onClick={actions.inc}>inc</button>
+      <h1>Count: {count}</h1>
+      <button onClick={inc}>inc</button>
     </div>
   )
 }

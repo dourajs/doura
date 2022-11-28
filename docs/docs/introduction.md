@@ -61,7 +61,8 @@ const todoModel = defineModel({
 })
 
 export function TodoApp() {
-  const [state, actions] = useModel(todoModel)
+  // type of `filteredTodos` and `setFilter` are inferred automatically
+  const { filteredTodos, setFilter } = useModel(todoModel)
 
   return (
     <div>
@@ -70,14 +71,13 @@ export function TodoApp() {
           type="checkbox"
           id="filter"
           onClick={(event) =>
-            actions.setFilter(event.target.checked ? 'unfinished' : 'all')
+            setFilter(event.target.checked ? 'unfinished' : 'all')
           }
         />
         <label htmlFor="filter">Only show unfinished</label>
       </div>
       <ul>
-        {/* type of `filteredTodos` are inferred */}
-        {state.filteredTodos.map((todo) => (
+        {filteredTodos.map((todo) => (
           <li key={todo.id}>
             <input type="checkbox" checked={todo.isFinished} />
             {todo.text}
