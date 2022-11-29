@@ -162,17 +162,10 @@ describe('reactivity/createDraft', () => {
   })
 
   test('non-observable values', () => {
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
-    const originNodeEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
     const assertValue = (value: any) => {
-      draft(value)
-      warn.mock.calls[warn.mock.calls.length - 1][0].includes(
-        `value cannot be made draft: ${String(value)}`
-      )
+      expect(draft(value)).toBe(value)
     }
 
-    // number
     assertValue(1)
     // string
     assertValue('foo')
@@ -183,19 +176,11 @@ describe('reactivity/createDraft', () => {
     // undefined
     assertValue(undefined)
     // symbol
-    const s = Symbol()
-    assertValue(s)
-
+    assertValue(Symbol())
     // built-ins should work and return same value
-    const p = Promise.resolve()
-    expect(draft(p)).toBe(p)
-    const r = new RegExp('')
-    expect(draft(r)).toBe(r)
-    const d = new Date()
-    expect(draft(d)).toBe(d)
-
-    warn.mockRestore()
-    process.env.NODE_ENV = originNodeEnv
+    assertValue(Promise.resolve())
+    assertValue(new RegExp(''))
+    assertValue(new Date())
   })
 
   test('markRaw', () => {
