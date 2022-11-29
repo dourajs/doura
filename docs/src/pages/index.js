@@ -9,8 +9,7 @@ import styles from './styles.module.css'
 function HeroBanner() {
   const context = useDocusaurusContext()
   const {
-    siteConfig: { baseUrl },
-    tagline,
+    siteConfig: { baseUrl, tagline },
   } = context
 
   return (
@@ -112,7 +111,9 @@ function Features() {
 
 function Home() {
   const context = useDocusaurusContext()
-  const { tagline } = context
+  const {
+    siteConfig: { tagline },
+  } = context
 
   return (
     <Layout permalink={'/'} description={tagline}>
