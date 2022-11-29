@@ -15,7 +15,7 @@ Doura is greatly inspired by [Immer](https://github.com/immerjs/immer), [Vue.js]
 
 :::
 
-## React Example
+## Example
 
 ```tsx
 import { defineModel } from 'doura'
