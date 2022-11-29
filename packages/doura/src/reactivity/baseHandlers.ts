@@ -1,12 +1,10 @@
-import { DraftState, draft, draftMap } from './draft'
+import { ObjectDraftState, draft, draftMap } from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import {
   ReactiveFlags,
-  Target,
   toBase,
   toState,
   latest,
-  prepareCopy,
   markChanged,
   isDraft,
 } from './common'
@@ -19,7 +17,15 @@ import {
   resetTracking,
   triggerDraft,
 } from './effect'
-import { isObject, hasOwn, isSymbol, is, isArray, isIntegerKey } from '../utils'
+import {
+  isObject,
+  hasOwn,
+  isSymbol,
+  is,
+  isArray,
+  isIntegerKey,
+  shallowCopy,
+} from '../utils'
 import { warn } from '../warning'
 
 export type ProxyGetterHandler = ProxyHandler<object>['get']
@@ -39,8 +45,14 @@ const builtInSymbols = new Set(
     .filter(isSymbol)
 )
 
+function prepareCopy(state: { base: any; copy: any }) {
+  if (!state.copy) {
+    state.copy = shallowCopy(state.base)
+  }
+}
+
 // Access a property without creating a proxy.
-function peek(obj: Target, prop: PropertyKey) {
+function peek(obj: any, prop: PropertyKey) {
   const state = obj[ReactiveFlags.STATE]
   const source = state ? latest(state) : obj
   return (source as any)[prop]
@@ -56,10 +68,10 @@ function createArrayInstrumentations() {
   // values
   ;(['includes', 'indexOf', 'lastIndexOf'] as const).forEach((key) => {
     instrumentations[key] = function (this: unknown[], ...args: unknown[]) {
-      const state = toState(this)!
+      const state = toState(this) as ObjectDraftState
       const arr = latest(state)
       for (let i = 0, l = this.length; i < l; i++) {
-        track(state, TrackOpTypes.GET, i + '', Reflect.get(arr, i))
+        track(state, TrackOpTypes.GET, i + '')
       }
       // we run the method using the original args first (which may be reactive)
       const res = arr[key](...args)
@@ -76,7 +88,7 @@ function createArrayInstrumentations() {
   ;(['push', 'pop', 'shift', 'unshift', 'splice'] as const).forEach((key) => {
     instrumentations[key] = function (this: unknown[], ...args: unknown[]) {
       pauseTracking()
-      let state = toState(this)!
+      let state = toState(this) as ObjectDraftState
       let target = latest(state)
       const res = target[key].apply(this, args)
       resetTracking()
@@ -87,7 +99,11 @@ function createArrayInstrumentations() {
 }
 
 function createGetter(): ProxyGetter {
-  return function get(state: DraftState, prop: PropertyKey, receiver: object) {
+  return function get(
+    state: ObjectDraftState,
+    prop: PropertyKey,
+    receiver: object
+  ) {
     const target = latest(state)
     if (prop === ReactiveFlags.IS_REACTIVE) {
       return true
@@ -110,7 +126,7 @@ function createGetter(): ProxyGetter {
       return value
     }
 
-    track(state, TrackOpTypes.GET, prop, value)
+    track(state, TrackOpTypes.GET, prop)
 
     if (!hasOwn(target, prop)) {
       // non-existing or non-own property...
@@ -139,7 +155,7 @@ const set = /*#__PURE__*/ createSetter()
 
 function createSetter() {
   return function set(
-    state: DraftState,
+    state: ObjectDraftState,
     prop: string /* strictly not, but helps TS */,
     value: unknown,
     receiver: object
@@ -154,10 +170,9 @@ function createSetter() {
 
     if (!state.modified) {
       // special case, if we assigning the original value to a draft, we can ignore the assignment
-      const currentState: DraftState = current?.[ReactiveFlags.STATE]
+      const currentState: ObjectDraftState = current?.[ReactiveFlags.STATE]
       if (currentState && currentState.base === value) {
         state.copy![prop] = value
-        state.assigned[prop] = false
         return true
       }
 
@@ -181,7 +196,6 @@ function createSetter() {
       return true
 
     state.copy![prop] = value
-    state.assigned[prop] = true
 
     // don't trigger if target is something up in the prototype chain of original
     if (state === toState(receiver)) {
@@ -197,18 +211,14 @@ function createSetter() {
   }
 }
 
-function deleteProperty(state: DraftState, prop: string): boolean {
+function deleteProperty(state: ObjectDraftState, prop: string): boolean {
   const hadKey = hasOwn(latest(state), prop)
   const current = peek(state.base, prop)
 
   // The `undefined` check is a fast path for pre-existing keys.
   if (current !== undefined || prop in state.base) {
-    state.assigned[prop] = false
     prepareCopy(state)
     markChanged(state)
-  } else {
-    // if an originally not assigned property was deleted
-    delete state.assigned[prop]
   }
 
   if (state.copy) {
@@ -222,27 +232,22 @@ function deleteProperty(state: DraftState, prop: string): boolean {
   return true
 }
 
-function has(state: DraftState, prop: PropertyKey): boolean {
+function has(state: ObjectDraftState, prop: PropertyKey): boolean {
   const target = latest(state)
   const result = Reflect.has(target, prop)
   if (!isSymbol(prop) || !builtInSymbols.has(prop)) {
-    track(state, TrackOpTypes.HAS, prop, result)
+    track(state, TrackOpTypes.HAS, prop)
   }
   return result
 }
 
-function ownKeys(state: DraftState): (string | symbol)[] {
+function ownKeys(state: ObjectDraftState): (string | symbol)[] {
   const target = latest(state)
-  track(
-    state,
-    TrackOpTypes.ITERATE,
-    isArray(target) ? 'length' : ITERATE_KEY,
-    null
-  )
+  track(state, TrackOpTypes.ITERATE, isArray(target) ? 'length' : ITERATE_KEY)
   return Reflect.ownKeys(target)
 }
 
-function getOwnPropertyDescriptor(state: DraftState, key: any) {
+function getOwnPropertyDescriptor(state: ObjectDraftState, key: any) {
   const target = latest(state)
   const desc = Reflect.getOwnPropertyDescriptor(target, key)
   if (!desc) return desc
@@ -254,7 +259,7 @@ function getOwnPropertyDescriptor(state: DraftState, key: any) {
   }
 }
 
-function setPrototypeOf(state: DraftState, v: object | null): boolean {
+function setPrototypeOf(state: ObjectDraftState, v: object | null): boolean {
   if (process.env.NODE_ENV === 'development') {
     warn(`not allow setPrototypeOf to set prototype`)
   }

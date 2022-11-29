@@ -236,12 +236,7 @@ export function resetTracking() {
   shouldTrack = last === undefined ? true : last
 }
 
-export function track(
-  target: object,
-  type: TrackOpTypes,
-  key: unknown,
-  value: any
-) {
+export function track(target: object, type: TrackOpTypes, key: unknown) {
   if (shouldTrack && activeEffect) {
     let depsMap = targetMap.get(target)
     if (!depsMap) {

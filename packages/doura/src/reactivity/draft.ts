@@ -9,26 +9,30 @@ import {
 import { mutableHandlers } from './baseHandlers'
 import { DraftSnapshot, snapshotHandler } from './baseSnapshotHandler'
 import { NOOP, isObject, shallowCopy } from '../utils'
-import { AnyObject, Objectish } from '../types'
+import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
 export type PatchPath = (string | number)[]
 
 export const draftMap = new WeakMap<any, any>()
 
-export interface DraftState {
+export const enum DraftType {
+  Map,
+  Set,
+  Object,
+}
+
+interface DraftStateBase<T extends AnyObject = AnyObject> {
   id: number
   // The root state.
   root: DraftState
   // The parent state.
   parent?: DraftState
   // The base object.
-  base: AnyObject
+  base: T
   // The base proxy.
-  proxy: AnyObject
+  proxy: T
   // The base copy with any updated values.
-  copy: AnyObject | null
-  // Track which properties have been assigned (true) or deleted (false).
-  assigned: Record<string, boolean>
+  copy: T | null
   // True for both shallow and deep changes.
   modified: boolean
   // Ture after being disposed
@@ -38,6 +42,21 @@ export interface DraftState {
   // all drafts created by the root.
   children: DraftState[]
 }
+
+export interface ObjectDraftState extends DraftStateBase<AnyObject> {
+  type: DraftType.Object
+}
+
+export interface MapDraftState extends DraftStateBase<AnyMap> {
+  type: DraftType.Map
+}
+
+export interface SetDraftState extends DraftStateBase<AnySet> {
+  type: DraftType.Set
+  drafts: Map<any, Drafted> // maps the original value to the draft value in the new set
+}
+
+export type DraftState = ObjectDraftState | MapDraftState | SetDraftState
 
 export function isDraftable(value: any): boolean {
   if (!value) return false
@@ -55,9 +74,6 @@ export function draft<T extends Objectish>(
   parent?: DraftState
 ): T & Drafted {
   if (!isObject(target)) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(`value cannot be made reactive: ${String(target)}`)
-    }
     return target
   }
 
@@ -72,22 +88,30 @@ export function draft<T extends Objectish>(
     return target as any
   }
 
-  const isArray = Array.isArray(target)
   let state: DraftState = {
+    type: DraftType.Object,
     id: uid++,
     root: null as any, // set below
     parent: parent,
     base: target,
     proxy: null as any, // set below
     copy: null,
-    assigned: {},
     modified: false,
     disposed: false,
     listeners: [],
     children: [],
   }
-  if (isArray) {
+
+  if (targetType === TargetType.SET) {
+    state = state as any as SetDraftState
+    state.type = DraftType.Set
+    state.drafts = new Map()
+  } else if (targetType === TargetType.MAP) {
+    state = state as any as MapDraftState
+    state.type = DraftType.Map
+  } else if (Array.isArray(target)) {
     const initValue = state
+    // in order to pass the check of "obj instanceof Array"
     state = [] as any as DraftState
     Object.keys(initValue).forEach((key) => {
       Object.defineProperty(state, key, {
@@ -177,5 +201,4 @@ export function snapshot<T extends any>(value: T, draft: Drafted): T {
 function updateDraftState(state: DraftState, base: AnyObject) {
   state.modified = false
   state.base = base
-  state.assigned = {}
 }
