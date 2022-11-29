@@ -49,7 +49,7 @@ const userModel = defineModel(({ use }) => {
     state: {},
     views: {
       countOne() {
-        return count; // ⚠️ countOne won't update once count is changed
+        return count; // ⚠️ countOne won't update even count has changed
       }
       countTwo() {
         return counter.count // ✅ always access props by `someModel.xx` in a view function
