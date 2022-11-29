@@ -168,6 +168,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _currentState!: any
   private _actionListeners: Set<ActionListener> = new Set()
   private _subscribers: Set<SubscriptionCallback> = new Set()
+  private _depListenersHandlers: UnSubscribe[] = []
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
@@ -282,7 +283,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
-  subscribe(listener: SubscriptionCallback) {
+  subscribe(listener: SubscriptionCallback): UnSubscribe {
     this._subscribers.add(listener)
 
     return () => {
@@ -304,12 +305,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   depend(dep: ModelInternal<any>) {
     // collection beDepends, a depends b, when b update, call a need trigger listener
-    dep.subscribe((event) => {
-      this._triggerListener({
-        ...event,
-        model: this.proxy,
+    this._depListenersHandlers.push(
+      dep.subscribe((event) => {
+        this._triggerListener({
+          ...event,
+          model: this.proxy,
+        })
       })
-    })
+    )
   }
 
   createView(viewFn: (s: ModelState<IModel>) => any) {
@@ -394,6 +397,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   destroy() {
+    // reset props
     this._destroyed = true
     this._api = null
     this._currentState = null
@@ -402,6 +406,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
     this._subscribers.clear()
     this.effectScope.stop()
+
+    // clear subscriptions
+    for (const unsub of this._depListenersHandlers) {
+      unsub()
+    }
     this._draftListenerHandler()
   }
 
