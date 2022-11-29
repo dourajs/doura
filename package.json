@@ -1,6 +1,6 @@
 {
   "name": "dourajs",
-  "version": "0.0.0-rc.8",
+  "version": "0.0.1",
   "private": true,
   "description": "The root package for doura",
   "keywords": [
