@@ -58,21 +58,6 @@ export const isIntegerKey = (key: unknown) =>
 export const is = (value: any, oldValue: any): boolean =>
   Object.is(value, oldValue)
 
-const cacheStringFunction = <T extends (str: string) => string>(fn: T): T => {
-  const cache: Record<string, string> = Object.create(null)
-  return ((str: string) => {
-    const hit = cache[str]
-    return hit || (cache[str] = fn(str))
-  }) as any
-}
-
-/**
- * @private
- */
-export const capitalize = cacheStringFunction(
-  (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
-)
-
 export const def = (obj: object, key: string | symbol, value: any) => {
   Object.defineProperty(obj, key, {
     configurable: true,
