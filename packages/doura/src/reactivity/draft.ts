@@ -131,7 +131,11 @@ export function watch(draft: any, cb: () => void): () => void {
 }
 
 export function takeSnapshotFromDraft(draft: Drafted): DraftSnapshot {
-  const draftSnapshot: DraftSnapshot = new Map()
+  const copies = new Map()
+  const draftSnapshot: DraftSnapshot = {
+    copies,
+    proxies: new Map(),
+  }
   const queue = [draft[ReactiveFlags.STATE]]
   while (queue.length) {
     const state = queue.pop()!
@@ -142,7 +146,7 @@ export function takeSnapshotFromDraft(draft: Drafted): DraftSnapshot {
     } else {
       value = state.base
     }
-    draftSnapshot.set(state, value)
+    copies.set(state, value)
     for (const c of state.children) {
       queue.push(c)
     }
@@ -155,7 +159,7 @@ export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
   const handler = snapshotHandler(draftSnapshot)
   if (isDraft(obj)) {
     const state: DraftState = obj[ReactiveFlags.STATE]
-    return new Proxy(draftSnapshot.get(state), handler)
+    return new Proxy(draftSnapshot.copies.get(state), handler)
   }
 
   return new Proxy(shallowCopy(obj), handler)

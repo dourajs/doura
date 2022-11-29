@@ -2,11 +2,12 @@ import { isObject } from '../utils'
 import { isDraft, ReactiveFlags } from './common'
 import { DraftState } from './draft'
 
-export type DraftSnapshot = Map<DraftState, any>
+export type DraftSnapshot = {
+  copies: Map<DraftState, any>
+  proxies: Map<any, any>
+}
 
-export function snapshotHandler(snapshot: DraftSnapshot) {
-  const proxyMap = new WeakMap<any, any>()
-
+export function snapshotHandler({ copies, proxies }: DraftSnapshot) {
   const objectTraps: ProxyHandler<any> = {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver)
@@ -15,12 +16,12 @@ export function snapshotHandler(snapshot: DraftSnapshot) {
       }
 
       if (isDraft(value)) {
-        let proxy = proxyMap.get(value)
+        let proxy = proxies.get(value)
         if (!proxy) {
-          proxyMap.set(
+          proxies.set(
             value,
             (proxy = new Proxy(
-              snapshot.get(value[ReactiveFlags.STATE]),
+              copies.get(value[ReactiveFlags.STATE]),
               objectTraps
             ))
           )
