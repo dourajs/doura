@@ -139,14 +139,11 @@ function createGetter(): ProxyGetter {
 
     if (!isDraft(value)) {
       prepareCopy(state)
-      const res = (state.copy![prop as any] = draft(value, state))
-      const resState = toState(res)
-      resState && trackDraft(res[ReactiveFlags.STATE])
-      return res
-    } else {
-      const resState = toState(value)!
-      trackDraft(resState)
+      value = state.copy![prop as any] = draft(value, state)
     }
+
+    trackDraft(value)
+
     return value
   }
 }

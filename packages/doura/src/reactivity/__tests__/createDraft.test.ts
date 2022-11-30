@@ -1,13 +1,13 @@
 import { draft } from '../draft'
-import { isReactive, markRaw, toBase } from '../common'
+import { isDraft, markRaw, toBase } from '../common'
 
 describe('reactivity/createDraft', () => {
   test('Object', () => {
     const original = { foo: 1 }
     const observed = draft(original)
     expect(observed).not.toBe(original)
-    expect(isReactive(observed)).toBe(true)
-    expect(isReactive(original)).toBe(false)
+    expect(isDraft(observed)).toBe(true)
+    expect(isDraft(original)).toBe(false)
     // get
     expect(observed.foo).toBe(1)
     // has
@@ -19,14 +19,14 @@ describe('reactivity/createDraft', () => {
   test('proto', () => {
     const obj = {}
     const reactiveObj = draft(obj)
-    expect(isReactive(reactiveObj)).toBe(true)
+    expect(isDraft(reactiveObj)).toBe(true)
     // read prop of reactiveObject will cause reactiveObj[prop] to be draft
     // @ts-ignore
     const prototype = reactiveObj['__proto__']
     const otherObj = { data: ['a'] }
-    expect(isReactive(otherObj)).toBe(false)
+    expect(isDraft(otherObj)).toBe(false)
     const reactiveOther = draft(otherObj)
-    expect(isReactive(reactiveOther)).toBe(true)
+    expect(isDraft(reactiveOther)).toBe(true)
     expect(reactiveOther.data[0]).toBe('a')
   })
 
@@ -38,9 +38,9 @@ describe('reactivity/createDraft', () => {
       array: [{ bar: 2 }],
     }
     const observed = draft(original)
-    expect(isReactive(observed.nested)).toBe(true)
-    expect(isReactive(observed.array)).toBe(true)
-    expect(isReactive(observed.array[0])).toBe(true)
+    expect(isDraft(observed.nested)).toBe(true)
+    expect(isDraft(observed.array)).toBe(true)
+    expect(isDraft(observed.array[0])).toBe(true)
   })
 
   // test('observing subtypes of IterableCollections(Map, Set)', () => {
@@ -49,17 +49,17 @@ describe('reactivity/createDraft', () => {
   //   const cmap = draft(new CustomMap())
 
   //   expect(cmap instanceof Map).toBe(true)
-  //   expect(isReactive(cmap)).toBe(true)
+  //   expect(isDraft(cmap)).toBe(true)
 
   //   cmap.set('key', {})
-  //   expect(isReactive(cmap.get('key'))).toBe(true)
+  //   expect(isDraft(cmap.get('key'))).toBe(true)
 
   //   // subtypes of Set
   //   class CustomSet extends Set {}
   //   const cset = draft(new CustomSet())
 
   //   expect(cset instanceof Set).toBe(true)
-  //   expect(isReactive(cset)).toBe(true)
+  //   expect(isDraft(cset)).toBe(true)
 
   //   let dummy
   //   effect(() => (dummy = cset.has('value')))
@@ -76,18 +76,18 @@ describe('reactivity/createDraft', () => {
   //   const cmap = draft(new CustomMap())
 
   //   expect(cmap instanceof WeakMap).toBe(true)
-  //   expect(isReactive(cmap)).toBe(true)
+  //   expect(isDraft(cmap)).toBe(true)
 
   //   const key = {}
   //   cmap.set(key, {})
-  //   expect(isReactive(cmap.get(key))).toBe(true)
+  //   expect(isDraft(cmap.get(key))).toBe(true)
 
   //   // subtypes of WeakSet
   //   class CustomSet extends WeakSet {}
   //   const cset = draft(new CustomSet())
 
   //   expect(cset instanceof WeakSet).toBe(true)
-  //   expect(isReactive(cset)).toBe(true)
+  //   expect(isDraft(cset)).toBe(true)
 
   //   let dummy
   //   effect(() => (dummy = cset.has(key)))
@@ -129,7 +129,7 @@ describe('reactivity/createDraft', () => {
     const raw = { n: Math.random() }
     observed.foo = raw
     expect(observed.foo).toEqual(raw)
-    expect(isReactive(observed.foo)).toBe(true)
+    expect(isDraft(observed.foo)).toBe(true)
   })
 
   test('observing already observed value should return same Proxy', () => {
@@ -188,8 +188,8 @@ describe('reactivity/createDraft', () => {
       foo: { a: 1 },
       bar: markRaw({ b: 2 }),
     })
-    expect(isReactive(obj.foo)).toBe(true)
-    expect(isReactive(obj.bar)).toBe(false)
+    expect(isDraft(obj.foo)).toBe(true)
+    expect(isDraft(obj.bar)).toBe(false)
   })
 
   test('should not observe non-extensible objects', () => {
@@ -199,9 +199,9 @@ describe('reactivity/createDraft', () => {
       bar: Object.freeze({ a: 1 }),
       baz: Object.seal({ a: 1 }),
     })
-    expect(isReactive(obj.foo)).toBe(false)
-    expect(isReactive(obj.bar)).toBe(false)
-    expect(isReactive(obj.baz)).toBe(false)
+    expect(isDraft(obj.foo)).toBe(false)
+    expect(isDraft(obj.bar)).toBe(false)
+    expect(isDraft(obj.baz)).toBe(false)
   })
 
   test('should not observe objects with __v_skip', () => {
@@ -210,6 +210,6 @@ describe('reactivity/createDraft', () => {
       __r_skip: true,
     }
     const observed = draft(original)
-    expect(isReactive(observed)).toBe(false)
+    expect(isDraft(observed)).toBe(false)
   })
 })
