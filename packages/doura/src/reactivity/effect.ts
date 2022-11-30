@@ -2,7 +2,7 @@ import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { assign, isArray, isMap, isIntegerKey } from '../utils'
 import { DraftState } from './draft'
 import { ViewImpl, View } from './view'
-import { toBase } from './common'
+import { ReactiveFlags, toBase } from './common'
 import { EffectScope, recordEffectScope } from './effectScope'
 import {
   Dep,
@@ -52,19 +52,6 @@ export type DraftMap = Map<any, any>
 export type OriginMap = Map<any, any>
 
 export type EffectScheduler = (...args: any[]) => any
-
-export type DebuggerEvent = {
-  effect: ReactiveEffect
-} & DebuggerEventExtraInfo
-
-export type DebuggerEventExtraInfo = {
-  target: object
-  type: TrackOpTypes | TriggerOpTypes
-  key: any
-  newValue?: any
-  oldValue?: any
-  oldTarget?: Map<any, any> | Set<any>
-}
 
 export let activeEffect: ReactiveEffect | undefined
 
@@ -251,11 +238,16 @@ export function track(target: object, type: TrackOpTypes, key: unknown) {
   }
 }
 
-export function trackDraft(target: DraftState) {
+export function trackDraft(target: any) {
   if (shouldTrack && activeEffect) {
-    let dep = referenceMap.get(target)
+    const state = target[ReactiveFlags.STATE]
+    if (!state) {
+      return
+    }
+
+    let dep = referenceMap.get(state)
     if (!dep) {
-      referenceMap.set(target, (dep = createDep()))
+      referenceMap.set(state, (dep = createDep()))
     }
 
     trackEffects(dep)
@@ -319,8 +311,7 @@ export function trigger(
   type: TriggerOpTypes,
   key?: unknown,
   newValue?: unknown,
-  oldValue?: unknown,
-  oldTarget?: Map<unknown, unknown> | Set<unknown>
+  oldValue?: unknown
 ) {
   const depsMap = targetMap.get(state)
   const target = state.base

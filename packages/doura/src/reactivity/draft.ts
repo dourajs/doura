@@ -2,12 +2,13 @@ import {
   Target,
   TargetType,
   ReactiveFlags,
-  getTargetType,
   isDraft,
   Drafted,
+  getTargetType,
 } from './common'
 import { mutableHandlers } from './baseHandlers'
-import { DraftSnapshot, snapshotHandler } from './baseSnapshotHandler'
+import { mutableCollectionHandlers } from './collectionHandlers'
+import { DraftSnapshot, snapshotHandler } from './snapshotHandler'
 import { NOOP, isObject, shallowCopy } from '../utils'
 import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
@@ -16,9 +17,9 @@ export type PatchPath = (string | number)[]
 export const draftMap = new WeakMap<any, any>()
 
 export const enum DraftType {
+  Object,
   Map,
   Set,
-  Object,
 }
 
 interface DraftStateBase<T extends AnyObject = AnyObject> {
@@ -58,11 +59,6 @@ export interface SetDraftState extends DraftStateBase<AnySet> {
 
 export type DraftState = ObjectDraftState | MapDraftState | SetDraftState
 
-export function isDraftable(value: any): boolean {
-  if (!value) return false
-  return getTargetType(value) !== TargetType.INVALID
-}
-
 export function disposeDraft(draft: Drafted) {
   const state: DraftState = draft[ReactiveFlags.STATE]
   state.disposed = true
@@ -73,18 +69,18 @@ export function draft<T extends Objectish>(
   target: T & Target,
   parent?: DraftState
 ): T & Drafted {
-  if (!isObject(target)) {
-    return target
+  // only specific value types can be observed.
+  const targetType = getTargetType(target)
+  if (targetType === TargetType.INVALID) {
+    return target as any
+  }
+
+  if (target[ReactiveFlags.SKIP] || !Object.isExtensible(target)) {
+    return target as any
   }
 
   // target is already a Draft, return it.
   if (target[ReactiveFlags.STATE]) {
-    return target as any
-  }
-
-  // only specific value types can be observed.
-  const targetType = getTargetType(target)
-  if (targetType === TargetType.INVALID) {
     return target as any
   }
 
@@ -101,41 +97,48 @@ export function draft<T extends Objectish>(
     listeners: [],
     children: [],
   }
+  let proxyTarget: DraftState = state
+  let proxyHandlers: ProxyHandler<any> = mutableHandlers
 
   if (targetType === TargetType.SET) {
     state = state as any as SetDraftState
     state.type = DraftType.Set
     state.drafts = new Map()
+    proxyTarget = new Set() as any as DraftState
+    proxyHandlers = mutableCollectionHandlers
   } else if (targetType === TargetType.MAP) {
     state = state as any as MapDraftState
     state.type = DraftType.Map
-  } else if (Array.isArray(target)) {
-    const initValue = state
+    proxyTarget = new Map() as any as DraftState
+    proxyHandlers = mutableCollectionHandlers
+  } else if (targetType === TargetType.ARRAY) {
     // in order to pass the check of "obj instanceof Array"
-    state = [] as any as DraftState
-    Object.keys(initValue).forEach((key) => {
-      Object.defineProperty(state, key, {
+    proxyTarget = new Array() as any as DraftState
+  }
+
+  if (proxyTarget !== state) {
+    Object.keys(state).forEach((key) => {
+      Object.defineProperty(proxyTarget, key, {
         configurable: true,
         enumerable: true,
         writable: true,
-        value: initValue[key as keyof typeof initValue],
+        value: (state as any)[key],
       })
     })
   }
 
-  const proxy = new Proxy(state, mutableHandlers)
-  state.proxy = proxy
+  const proxy = new Proxy(proxyTarget, proxyHandlers)
+  proxyTarget.proxy = proxy
   if (parent) {
-    state.root = parent.root
-    parent.children.push(state)
+    proxyTarget.root = parent.root
+    parent.children.push(proxyTarget)
   } else {
-    state.root = state
+    proxyTarget.root = proxyTarget
   }
 
-  state.children = []
-  draftMap.set(state, proxy)
+  draftMap.set(proxyTarget, proxy)
 
-  return state.proxy as any
+  return proxyTarget.proxy as any
 }
 
 export function watch(draft: any, cb: () => void): () => void {
@@ -180,7 +183,7 @@ export function takeSnapshotFromDraft(draft: Drafted): DraftSnapshot {
 }
 
 export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
-  const handler = snapshotHandler(draftSnapshot)
+  const handler = snapshotHandler(obj, draftSnapshot)
   if (isDraft(obj)) {
     const state: DraftState = obj[ReactiveFlags.STATE]
     return new Proxy(draftSnapshot.copies.get(state), handler)

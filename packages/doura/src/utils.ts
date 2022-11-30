@@ -80,6 +80,8 @@ export function invariant(condition: any, message?: string): asserts condition {
 const slice = Array.prototype.slice
 
 export function shallowCopy(base: any) {
+  if (isMap(base)) return new Map(base)
+  if (isSet(base)) return new Set(base)
   if (Array.isArray(base)) return slice.call(base)
   const descriptors = Object.getOwnPropertyDescriptors(base)
   let keys = Reflect.ownKeys(descriptors)

@@ -3,10 +3,9 @@ import {
   MapDraftState,
   SetDraftState,
   DraftType,
-  isDraftable,
   DraftState,
 } from './draft'
-import { ReactiveFlags, latest, markChanged, isDraft, toState } from './common'
+import { ReactiveFlags, latest, markChanged, isDraft, Drafted } from './common'
 import {
   track,
   trackDraft,
@@ -15,16 +14,12 @@ import {
   MAP_KEY_ITERATE_KEY,
 } from './effect'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
-import { hasOwn, is } from '../utils'
-import { AnyMap } from '../types'
+import { hasOwn, is, isObject } from '../utils'
+import { AnyMap, AnySet, CollectionTypes, Iterable, Iterator } from '../types'
 
-type IterableCollections = Map<any, any> | Set<any>
-type WeakCollections = WeakMap<any, any> | WeakSet<any>
-
-export type CollectionTypes = IterableCollections | WeakCollections
 export type CollectionState = MapDraftState | SetDraftState
 
-function prepareMapCopy(state: { base: Map<any, any>; copy: Map<any, any> }) {
+function prepareMapCopy(state: MapDraftState) {
   if (!state.copy) {
     state.copy = new Map(state.base)
   }
@@ -32,11 +27,14 @@ function prepareMapCopy(state: { base: Map<any, any>; copy: Map<any, any> }) {
 
 function prepareSetCopy(state: SetDraftState) {
   if (!state.copy) {
-    state.copy = new Set(state.base as Set<any>)
-    ;(state.base as Set<any>).forEach((value: any) => {
-      if (isDraftable(value)) {
-        const drafted = draft(value, state as any)
-        state.drafts.set(value, drafted)
+    state.copy = new Set()
+    state.base.forEach((value: any) => {
+      if (isObject(value)) {
+        const drafted = draft(value, state)
+        trackDraft(drafted)
+        if (value !== drafted) {
+          state.drafts.set(value, drafted)
+        }
         state.copy!.add(drafted)
       } else {
         state.copy!.add(value)
@@ -47,181 +45,182 @@ function prepareSetCopy(state: SetDraftState) {
 
 function prepareCopy(state: DraftState) {
   state.type === DraftType.Map
-    ? prepareMapCopy(state as any)
-    : prepareSetCopy(state as any)
+    ? prepareMapCopy(state)
+    : prepareSetCopy(state as SetDraftState)
 }
 
 const getProto = <T extends CollectionTypes>(v: T): any =>
   Reflect.getPrototypeOf(v)
 
-function get(this: MapDraftState, key: unknown) {
-  const target = latest(this)
-  track(this, TrackOpTypes.GET, key)
-  const value = target.get(key)
-  if (!isDraft(value)) {
-    prepareCopy(this)
-    const res = draft(value, this)
-    this.copy!.set(key, res)
-    const resState = toState(res)
-    resState && trackDraft(res[ReactiveFlags.STATE])
-    return res
+function get(this: AnyMap & Drafted, key: unknown) {
+  const state = this[ReactiveFlags.STATE] as MapDraftState
+  const target = latest(state)
+  track(state, TrackOpTypes.GET, key)
+
+  const { has } = getProto(target)
+  if (!has.call(target, key)) {
+    return
   }
+
+  let value = target.get(key)
+  if (!isObject(value)) {
+    return value
+  }
+
+  if (!isDraft(value)) {
+    prepareCopy(state)
+    value = draft(value, state)
+    state.copy!.set(key, value)
+  }
+
+  trackDraft(value)
 
   return value
 }
 
-function has(this: CollectionState, key: unknown): boolean {
-  track(this, TrackOpTypes.HAS, key)
-  if (!this.copy) {
-    return this.base.has(key)
-  }
-
-  if (this.copy.has(key)) {
-    return true
-  }
-
-  return this.type === DraftType.Set
-    ? this.drafts.has(key) && this.drafts.has(this.drafts.get(key))
-    : false
-}
-
-function size(state: CollectionState) {
-  track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
-  return (latest(state) as IterableCollections).size
-}
-
-function add(this: SetDraftState, value: unknown) {
-  const target = latest(this)
-  const proto = getProto(target)
-  const hadKey = proto.has.call(target, value)
-  if (!hadKey) {
-    target.add(value)
-    trigger(this, TriggerOpTypes.ADD, value, value)
-  }
-  return this
-}
-
-function set(this: MapDraftState, key: any, value: unknown) {
-  const target = latest(this)
+function set(this: AnyMap & Drafted, key: any, value: unknown) {
+  const state = this[ReactiveFlags.STATE] as MapDraftState
+  const target = latest(state)
   const { has, get } = getProto(target)
 
   const hadKey = has.call(target, key)
   const oldValue = get.call(target, key)
 
   const _doSet = () => {
-    prepareCopy(this)
-    markChanged(this)
-    this.copy!.set(key, value)
+    prepareCopy(state)
+    markChanged(state)
+    state.copy!.set(key, value)
   }
 
   if (!hadKey) {
     _doSet()
-    trigger(this, TriggerOpTypes.ADD, key, value)
+    trigger(state, TriggerOpTypes.ADD, key, value)
   } else if (!is(value, oldValue)) {
     _doSet()
-    trigger(this, TriggerOpTypes.SET, key, value, oldValue)
+    trigger(state, TriggerOpTypes.SET, key, value, oldValue)
   }
 
   return this
 }
 
-function keys(this: CollectionState) {
-  track(this, TrackOpTypes.ITERATE, MAP_KEY_ITERATE_KEY)
-  return (latest(this) as any).keys()
+function add(this: AnySet & Drafted, value: unknown) {
+  const state = this[ReactiveFlags.STATE] as SetDraftState
+  const target = latest(state)
+  const proto = getProto(target)
+  const hadKey = proto.has.call(target, value)
+  if (!hadKey) {
+    prepareSetCopy(state)
+    markChanged(state)
+    state.copy!.add(value)
+    trigger(state, TriggerOpTypes.ADD, value, value)
+  }
+  return this
 }
 
-function deleteEntry(this: CollectionState, key: unknown) {
-  const target = latest(this)
+function has(this: CollectionTypes & Drafted, key: unknown): boolean {
+  const state = this[ReactiveFlags.STATE] as CollectionState
+  track(state, TrackOpTypes.HAS, key)
+  if (!state.copy) {
+    return state.base.has(key)
+  }
+
+  if (state.copy.has(key)) {
+    return true
+  }
+
+  return state.type === DraftType.Set
+    ? state.drafts.has(key) && state.drafts.has(state.drafts.get(key))
+    : false
+}
+
+function size(state: CollectionState) {
+  track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
+  return latest(state).size
+}
+
+function setKeys(state: SetDraftState) {
+  track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
+  prepareSetCopy(state)
+  return state.copy!.values()
+}
+
+function mapKeys(state: MapDraftState) {
+  track(state, TrackOpTypes.ITERATE, MAP_KEY_ITERATE_KEY)
+  return latest(state).keys()
+}
+
+function deleteEntry(this: CollectionTypes & Drafted, key: unknown) {
+  const state = this[ReactiveFlags.STATE] as CollectionState
+  const target = latest(state)
   const { has, get } = getProto(target)
   const hadKey = has.call(target, key)
 
   const oldValue = get ? get.call(target, key) : undefined
   // forward the operation before queueing reactions
-  prepareCopy(this)
-  markChanged(this)
-  let result = this.copy!.delete(key)
-  if (this.type === DraftType.Set && !result) {
-    result = this.drafts.has(key)
-      ? this.copy!.delete(this.drafts.get(key))
+  prepareCopy(state)
+  markChanged(state)
+  let result = state.copy!.delete(key)
+  if (state.type === DraftType.Set && !result) {
+    result = state.drafts.has(key)
+      ? state.drafts.delete(state.drafts.get(key))
       : false
   }
   if (hadKey) {
-    trigger(this, TriggerOpTypes.DELETE, key, undefined, oldValue)
+    trigger(state, TriggerOpTypes.DELETE, key, undefined, oldValue)
   }
   return result
 }
 
-function clear(this: CollectionState) {
-  const target = latest(this) as IterableCollections
+function clear(this: CollectionTypes & Drafted) {
+  const state = this[ReactiveFlags.STATE] as CollectionState
+  const target = latest(state)
   const hadItems = target.size !== 0
-  const oldTarget = __DEV__
-    ? this.type === DraftType.Map
-      ? new Map(target)
-      : new Set(target)
-    : undefined
   // forward the operation before queueing reactions
   const result = target.clear()
   if (hadItems) {
-    prepareCopy(this)
-    markChanged(this)
-    ;(this.copy as any).clear()
-    trigger(this, TriggerOpTypes.CLEAR, undefined, undefined, oldTarget)
+    prepareCopy(state)
+    markChanged(state)
+    ;(state.copy as any).clear()
+    trigger(state, TriggerOpTypes.CLEAR, undefined, undefined)
   }
   return result
 }
 
-function createForEach() {
-  return function forEach(
-    this: CollectionState,
-    callback: Function,
-    thisArg?: unknown
-  ) {
-    if (this.type === DraftType.Map) {
-      track(this, TrackOpTypes.ITERATE, ITERATE_KEY)
-      ;(latest(this) as IterableCollections).forEach(
-        (_value: any, key: any) => {
-          // important: make sure the callback is
-          // 1. invoked with the reactive map as `this` and 3rd arg
-          // 2. the value received should be a corresponding draft.
-          return callback.call(
-            thisArg,
-            (this.proxy as AnyMap).get(key),
-            key,
-            this
-          )
-        }
-      )
-    } else {
-      const iterator = (this.proxy as Set<any>).values()
-      let result = iterator.next()
-      while (!result.done) {
-        callback.call(thisArg, result.value, result.value, this)
-        result = iterator.next()
-      }
-    }
+function setForEach(
+  self: CollectionTypes,
+  state: CollectionState,
+  callback: Function,
+  thisArg?: unknown
+) {
+  const iterator = (state.proxy as Set<any>).values()
+  let result = iterator.next()
+  while (!result.done) {
+    callback.call(thisArg, result.value, result.value, self)
+    result = iterator.next()
   }
 }
 
-interface Iterable {
-  [Symbol.iterator](): Iterator
-}
-
-interface Iterator {
-  next(value?: any): IterationResult
-}
-
-interface IterationResult {
-  value: any
-  done?: boolean
+function mapForEach(
+  self: CollectionTypes,
+  state: CollectionState,
+  callback: Function,
+  thisArg?: unknown
+) {
+  track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
+  latest(state).forEach((_value: any, key: any) => {
+    // important: make sure the callback is
+    // 1. invoked with the reactive map as `this` and 3rd arg
+    // 2. the value received should be a corresponding draft.
+    return callback.call(thisArg, (state.proxy as AnyMap).get(key), key, self)
+  })
 }
 
 function createIterableMethod(method: string | symbol) {
   return function (
-    this: CollectionState,
+    this: CollectionTypes & Drafted,
     ...args: unknown[]
   ): Iterable & Iterator {
-    const state = this
-    const target = latest(state) as IterableCollections
+    const state = this[ReactiveFlags.STATE] as CollectionState
     const targetIsMap = state.type === DraftType.Map
     const isPair =
       method === 'entries' || (method === Symbol.iterator && targetIsMap)
@@ -239,7 +238,7 @@ function createIterableMethod(method: string | symbol) {
           return done
             ? { value, done }
             : {
-                value: isPair ? [key, value] : key,
+                value: isPair ? [key, value] : value,
                 done,
               }
         },
@@ -252,7 +251,7 @@ function createIterableMethod(method: string | symbol) {
 
     track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
     prepareSetCopy(state)
-    return (target as any)[method](...args)
+    return (state.copy as any)[method](...args)
   }
 }
 
@@ -260,15 +259,29 @@ function createInstrumentations() {
   const mutableInstrumentations: Record<string, Function> = {
     get,
     get size() {
-      return size(this as unknown as CollectionState) as any
+      return size((this as any)[ReactiveFlags.STATE]) as any
     },
     has,
     add,
     set,
-    keys,
     delete: deleteEntry,
     clear,
-    forEach: createForEach(),
+    keys(this: CollectionTypes & Drafted) {
+      const state = this[ReactiveFlags.STATE] as CollectionState
+      return state.type === DraftType.Map ? mapKeys(state) : setKeys(state)
+    },
+    forEach(
+      this: CollectionTypes & Drafted,
+      callback: Function,
+      thisArg?: unknown
+    ) {
+      const state = this[ReactiveFlags.STATE] as CollectionState
+      if (state.type === DraftType.Map) {
+        mapForEach(this, state, callback, thisArg)
+      } else {
+        setForEach(this, state, callback, thisArg)
+      }
+    },
   }
 
   const iteratorMethods = ['values', 'entries', Symbol.iterator]
@@ -284,11 +297,7 @@ const [mutableInstrumentations] = /* #__PURE__*/ createInstrumentations()
 function createInstrumentationGetter() {
   const instrumentations = mutableInstrumentations
 
-  return (
-    state: CollectionState,
-    key: string | symbol,
-    receiver: CollectionTypes
-  ) => {
+  return (state: CollectionState, key: string | symbol, receiver: any) => {
     if (key === ReactiveFlags.IS_REACTIVE) {
       return true
     } else if (key === ReactiveFlags.STATE) {

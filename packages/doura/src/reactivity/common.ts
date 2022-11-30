@@ -1,5 +1,5 @@
 import { AnyObject, AnySet, AnyMap } from '../types'
-import { shallowCopy, toRawType, def } from '../utils'
+import { toRawType, def } from '../utils'
 import {
   DraftState,
   ObjectDraftState,
@@ -12,6 +12,7 @@ export declare const RawSymbol: unique symbol
 export const enum ReactiveFlags {
   SKIP = '__r_skip',
   IS_REACTIVE = '__r_isReactive',
+  RAW = '__r_raw',
   STATE = '__r_state',
 }
 
@@ -28,34 +29,24 @@ export type Drafted = {
 export const enum TargetType {
   INVALID = 0,
   COMMON = 1,
-  SET = 2,
-  MAP = 3,
+  ARRAY = 2,
+  SET = 3,
+  MAP = 4,
 }
 
-function targetTypeMap(rawType: string) {
-  switch (rawType) {
+export function getTargetType(value: any) {
+  switch (toRawType(value)) {
     case 'Object':
-    case 'Array':
       return TargetType.COMMON
+    case 'Array':
+      return TargetType.ARRAY
     case 'Set':
-    case 'WeakSet':
       return TargetType.SET
     case 'Map':
-    case 'WeakMap':
       return TargetType.MAP
     default:
       return TargetType.INVALID
   }
-}
-
-export function getTargetType(value: Target) {
-  return value[ReactiveFlags.SKIP] || !Object.isExtensible(value)
-    ? TargetType.INVALID
-    : targetTypeMap(toRawType(value))
-}
-
-export function isReactive(value: unknown): boolean {
-  return !!(value && (value as Target)[ReactiveFlags.IS_REACTIVE])
 }
 
 export function markRaw<T extends object>(
@@ -92,12 +83,6 @@ export function latest<T extends DraftState>(
   ? AnyObject
   : AnyObject {
   return state.copy || (state.base as any)
-}
-
-export function prepareCopy(state: { base: any; copy: any }) {
-  if (!state.copy) {
-    state.copy = shallowCopy(state.base)
-  }
 }
 
 export function markChanged(state: DraftState) {
