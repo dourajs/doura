@@ -49,16 +49,12 @@ function prepareCopy(state: DraftState) {
     : prepareSetCopy(state as SetDraftState)
 }
 
-const getProto = <T extends CollectionTypes>(v: T): any =>
-  Reflect.getPrototypeOf(v)
-
 function get(this: AnyMap & Drafted, key: unknown) {
   const state = this[ReactiveFlags.STATE] as MapDraftState
   const target = latest(state)
   track(state, TrackOpTypes.GET, key)
 
-  const { has } = getProto(target)
-  if (!has.call(target, key)) {
+  if (!target.has(key)) {
     return
   }
 
@@ -81,10 +77,9 @@ function get(this: AnyMap & Drafted, key: unknown) {
 function set(this: AnyMap & Drafted, key: any, value: unknown) {
   const state = this[ReactiveFlags.STATE] as MapDraftState
   const target = latest(state)
-  const { has, get } = getProto(target)
 
-  const hadKey = has.call(target, key)
-  const oldValue = get.call(target, key)
+  const hadKey = target.has(key)
+  const oldValue = target.get(key)
 
   const _doSet = () => {
     prepareCopy(state)
@@ -106,8 +101,7 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
 function add(this: AnySet & Drafted, value: unknown) {
   const state = this[ReactiveFlags.STATE] as SetDraftState
   const target = latest(state)
-  const proto = getProto(target)
-  const hadKey = proto.has.call(target, value)
+  const hadKey = target.has(value)
   if (!hadKey) {
     prepareSetCopy(state)
     markChanged(state)
@@ -152,10 +146,9 @@ function mapKeys(state: MapDraftState) {
 function deleteEntry(this: CollectionTypes & Drafted, key: unknown) {
   const state = this[ReactiveFlags.STATE] as CollectionState
   const target = latest(state)
-  const { has, get } = getProto(target)
-  const hadKey = has.call(target, key)
+  const hadKey = target.has(key)
 
-  const oldValue = get ? get.call(target, key) : undefined
+  const oldValue = 'get' in target ? target.get(key) : undefined
   // forward the operation before queueing reactions
   prepareCopy(state)
   markChanged(state)

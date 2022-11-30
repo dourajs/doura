@@ -73,5 +73,160 @@ describe('reactivity/collections', () => {
         expect(base.map.get('set2')).toBe(set2)
       })
     })
+
+    test('should not throw', () => {
+      const project = produce(new Map(), (draft) => {
+        draft.set('bar1', { blocked: false })
+        draft.set('bar2', { blocked: false })
+      })
+
+      // Read before write -- no error
+      produce(project, (draft) => {
+        const bar1 = draft.get('bar1')
+        const bar2 = draft.get('bar2')
+        bar1.blocked = true
+        bar2.blocked = true
+      })
+
+      // Read/write interleaved -- error
+      produce(project, (draft) => {
+        const bar1 = draft.get('bar1')
+        bar1.blocked = true
+        const bar2 = draft.get('bar2')
+        bar2.blocked = true
+      })
+
+      expect(true).toBe(true)
+    })
+
+    test('nested map ', () => {
+      const obj = {
+        map: new Map([
+          [
+            'a',
+            new Map([
+              ['b', true],
+              ['c', true],
+              ['d', true],
+            ]),
+          ],
+          ['b', new Map([['a', true]])],
+          ['c', new Map([['a', true]])],
+          ['d', new Map([['a', true]])],
+        ]),
+      }
+      const result = produce(obj, (draft) => {
+        const aMap = draft.map.get('a')!
+        aMap.forEach((_, other) => {
+          const otherMap = draft.map.get(other)!
+          otherMap.delete('a')
+        })
+      })
+      expect(result).toEqual({
+        map: new Map([
+          [
+            'a',
+            new Map([
+              ['b', true],
+              ['c', true],
+              ['d', true],
+            ]),
+          ],
+          ['b', new Map()],
+          ['c', new Map()],
+          ['d', new Map()],
+        ]),
+      })
+    })
+
+    test('nested map 1', () => {
+      const obj = {
+        map: new Map([
+          [
+            'a',
+            new Map([
+              ['b', true],
+              ['c', true],
+              ['d', true],
+            ]),
+          ],
+          ['b', new Map([['a', true]])],
+          ['c', new Map([['a', true]])],
+          ['d', new Map([['a', true]])],
+        ]),
+      }
+      const obj1 = produce(obj, (_draft) => {})
+      const result = produce(obj1, (draft) => {
+        const aMap = draft.map.get('a')
+        aMap.forEach((_: any, other: any) => {
+          const otherMap = draft.map.get(other)
+          otherMap.delete('a')
+        })
+      })
+      expect(result).toEqual({
+        map: new Map([
+          [
+            'a',
+            new Map([
+              ['b', true],
+              ['c', true],
+              ['d', true],
+            ]),
+          ],
+          ['b', new Map([])],
+          ['c', new Map([])],
+          ['d', new Map([])],
+        ]),
+      })
+    })
+
+    test('should work after iterating over a Set', () => {
+      const base = new Set([1, 2])
+      const set = produce(base, (draftSet) => {
+        expect(Array.from(draftSet)).toEqual([1, 2])
+        draftSet.add(3)
+      })
+      expect(Array.from(set).sort()).toEqual([1, 2, 3])
+    })
+
+    test('new map key with value=undefined', () => {
+      const map = new Map()
+      const map1 = produce(map, (draft) => {
+        draft.set('key', undefined)
+      })
+      expect(map1.has('key')).toBe(true)
+      expect(map1.get('key')).toBe(undefined)
+    })
+
+    test('clear map & set', () => {
+      const map = new Map([
+        ['a', 'b'],
+        ['b', 'c'],
+      ])
+      let result = produce(map, (draft) => {
+        draft.clear()
+      })
+      expect(result).toEqual(new Map())
+
+      const set = new Set(['a', 'b'])
+      result = produce(set, (draft) => {
+        draft.clear()
+      })
+      expect(result).toEqual(new Set())
+    })
+
+    test('Clearing empty Set&Map should be noop', () => {
+      const map = new Map()
+      let result = produce(map, (draft) => {
+        draft.clear()
+      })
+      expect(result).toBe(map)
+
+      const set = new Set()
+      result = produce(set, (draft) => {
+        draft.clear()
+      })
+      expect(result).toBe(set)
+    })
   })
 })
