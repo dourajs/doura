@@ -86,6 +86,11 @@ export function snapshotHandler(
   }
 
   const collectionInstrumentations: Record<string, Function> = {
+    get size() {
+      const proxied = this as any
+      const target = proxied[ReactiveFlags.RAW]
+      return target.size
+    },
     get(this: AnyMap, key: unknown) {
       const proxied = this as any
       const target = proxied[ReactiveFlags.RAW]
@@ -108,7 +113,7 @@ export function snapshotHandler(
     },
   }
 
-  const normalMethods = ['size', 'has', 'add', 'set', 'delete', 'clear']
+  const normalMethods = ['has', 'add', 'set', 'delete', 'clear']
   normalMethods.forEach((method) => {
     collectionInstrumentations[method as string] = createNormalMethod(method)
   })

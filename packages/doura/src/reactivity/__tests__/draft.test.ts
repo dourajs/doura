@@ -113,7 +113,6 @@ describe(`reactivity/draft`, () => {
       expect(nextState.anObject.nested).toBe(undefined)
     })
 
-    // Found by: https://github.com/mweststrate/immer/pull/267
     it('can delete props added in the producer', () => {
       const nextState = produce(baseState, (s) => {
         s.anObject.test = true
@@ -123,7 +122,6 @@ describe(`reactivity/draft`, () => {
       expect(nextState).toEqual(baseState)
     })
 
-    // Found by: https://github.com/mweststrate/immer/issues/328
     it('can set a property that was just deleted', () => {
       const baseState = { a: 1 } as any
       const nextState = produce(baseState, (s) => {
@@ -251,7 +249,6 @@ describe(`reactivity/draft`, () => {
         expect(nextState.anArray.length).toBe(baseLength + 1)
       })
 
-      // Reported here: https://github.com/mweststrate/immer/issues/116
       it('can pop then push', () => {
         const base = [1, 2, 3]
         const origin = base
@@ -617,7 +614,6 @@ describe(`reactivity/draft`, () => {
       })
     })
 
-    // See here: https://github.com/mweststrate/immer/issues/89
     it('supports the spread operator', () => {
       const base = { foo: { x: 0, y: 0 }, bar: [0, 0] } as any
       const result = produce(base, (draft) => {
