@@ -9,10 +9,10 @@
     "eject": "craco eject"
   },
   "dependencies": {
-    "react-doura": "workspace:*",
     "doura": "workspace:*",
     "react": "18.0.0",
     "react-dom": "18.0.0",
+    "react-doura": "workspace:*",
     "react-scripts": "5.0.1",
     "@craco/craco": "7.0.0",
     "typescript": "^4.7.4"

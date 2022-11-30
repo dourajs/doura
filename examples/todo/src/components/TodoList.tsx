@@ -24,7 +24,6 @@ export default function TodoList() {
       </div>
       <ul>
         {filteredTodos.map((todo) => {
-          console.log('todo', todo.isFinished)
           return (
             <li key={todo.id}>
               <input
