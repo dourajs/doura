@@ -17,6 +17,9 @@ export type {
   ModelViews,
   ModelData,
   ModelAPI,
+  ModelOptions,
+  FunctionModel,
+  ObjectModel,
 } from './core'
 
 export { defineModel, nextTick } from './core'
