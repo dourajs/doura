@@ -6,7 +6,6 @@ export type {
   ModelPublicInstance,
   ModelManagerOptions,
   AnyObjectModel,
-  FunctionModel,
   AnyFunctionModel,
   AnyModel,
   State,
@@ -18,6 +17,9 @@ export type {
   ModelViews,
   ModelData,
   ModelAPI,
+  ModelOptions,
+  FunctionModel,
+  ObjectModel,
 } from './core'
 
 export { defineModel, nextTick } from './core'
