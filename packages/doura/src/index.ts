@@ -6,6 +6,7 @@ export type {
   ModelPublicInstance,
   ModelManagerOptions,
   AnyObjectModel,
+  FunctionModel,
   AnyFunctionModel,
   AnyModel,
   State,
