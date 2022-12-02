@@ -1,15 +1,17 @@
 export * from './utils'
 
 export type {
-  ModelManager,
-  Plugin,
-  ModelPublicInstance,
-  ModelManagerOptions,
+  State,
+  Action,
+  ActionOptions,
+  ViewOptions,
+  ModelOptions,
+  ObjectModel,
+  FunctionModel,
+  DefineModel,
   AnyObjectModel,
   AnyFunctionModel,
   AnyModel,
-  State,
-  Action,
   Selector,
   ModelView,
   ModelState,
@@ -17,9 +19,10 @@ export type {
   ModelViews,
   ModelData,
   ModelAPI,
-  ModelOptions,
-  FunctionModel,
-  ObjectModel,
+  ModelPublicInstance,
+  ModelManager,
+  ModelManagerOptions,
+  Plugin,
 } from './core'
 
 export { defineModel, nextTick } from './core'
