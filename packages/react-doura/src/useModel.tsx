@@ -13,13 +13,11 @@ const useModel: UseModel = <
   selector?: S,
   depends?: any[]
 ) => {
-  let [douraStore, batchManager] = useMemo(function () {
-    return [doura(), createBatchManager()]
-  }, [])
-
+  // for hmr feature
+  // useRef can keep context
   const context = useRef({
-    douraStore,
-    batchManager,
+    douraStore: doura(),
+    batchManager: createBatchManager(),
   })
 
   return useMemo(
