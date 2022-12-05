@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { doura } from 'doura'
-import type { AnyModel, Selector } from 'doura'
+import type { AnyModel, Selector, Doura } from 'doura'
 import { createBatchManager } from './batchManager'
 import { createUseModel } from './createUseModel'
 import { UseModel } from './types'
@@ -15,16 +15,23 @@ const useModel: UseModel = <
 ) => {
   // for hmr feature
   // useRef can keep context
-  const context = useRef({
-    douraStore: doura(),
-    batchManager: createBatchManager(),
-  })
+  const context = useRef<{
+    douraStore: Doura
+    batchManager: ReturnType<typeof createBatchManager>
+  } | null>(null)
+
+  if (!context.current) {
+    context.current = {
+      douraStore: doura(),
+      batchManager: createBatchManager(),
+    }
+  }
 
   return useMemo(
     function () {
       return createUseModel(
-        context.current.douraStore,
-        context.current.batchManager
+        context.current!.douraStore,
+        context.current!.batchManager
       )
     },
     [context.current.douraStore, context.current.batchManager]
