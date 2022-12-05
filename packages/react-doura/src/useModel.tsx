@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { doura } from 'doura'
-import type { AnyModel, Selector } from 'doura'
+import type { AnyModel, Selector, Doura } from 'doura'
 import { createBatchManager } from './batchManager'
 import { createUseModel } from './createUseModel'
 import { UseModel } from './types'
@@ -13,15 +13,28 @@ const useModel: UseModel = <
   selector?: S,
   depends?: any[]
 ) => {
-  let [douraStore, batchManager] = useMemo(function () {
-    return [doura(), createBatchManager()]
-  }, [])
+  // for hmr feature
+  // useRef can keep context
+  const context = useRef<{
+    douraStore: Doura
+    batchManager: ReturnType<typeof createBatchManager>
+  } | null>(null)
+
+  if (!context.current) {
+    context.current = {
+      douraStore: doura(),
+      batchManager: createBatchManager(),
+    }
+  }
 
   return useMemo(
     function () {
-      return createUseModel(douraStore, batchManager)
+      return createUseModel(
+        context.current!.douraStore,
+        context.current!.batchManager
+      )
     },
-    [douraStore, batchManager]
+    [context.current.douraStore, context.current.batchManager]
   )(model, selector, depends)
 }
 
