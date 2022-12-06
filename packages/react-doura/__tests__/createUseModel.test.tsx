@@ -595,7 +595,9 @@ describe('createUseModel', () => {
       expect(() => {
         render(<App />)
       }).toThrow()
-      expect('Cannot change state in view function').toHaveBeenWarned()
+      expect(
+        'Attempting to change state "value". State are readonly in "views"'
+      ).toHaveBeenWarned()
     })
   })
 

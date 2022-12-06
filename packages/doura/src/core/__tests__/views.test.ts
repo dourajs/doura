@@ -47,7 +47,9 @@ describe('defineModel/views', () => {
     })
     const store = modelMgr.getModel('test', model)
     expect(() => store.view).toThrow()
-    expect('Cannot change state in view function').toHaveBeenWarned()
+    expect(
+      'Attempting to change state "a". State are readonly in "views"'
+    ).toHaveBeenWarned()
   })
 
   it('should warn when return "this" or "this.$state"', () => {

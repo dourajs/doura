@@ -113,6 +113,13 @@ export const enum AccessContext {
   VIEW,
 }
 
+export const enum AccessTypes {
+  STATE,
+  ACTION,
+  VIEW,
+  CONTEXT,
+}
+
 export type ModelData<Model extends AnyModel> = ModelState<Model> &
   ModelViews<Model>
 
@@ -144,7 +151,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   options: IModel
 
   ctx: Record<string, any>
-  accessCache: Record<string, any>
+  accessCache: Record<string, AccessTypes>
 
   /**
    * proxy for public this
@@ -163,9 +170,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   stateValue!: any
   effectScope: EffectScope
 
-  private _api: ModelData<IModel> | null = null
+  private _api: ModelAPI<IModel> | null = null
   private _initState: ModelState<IModel>
-  private _currentState!: any
+  private _currentState: any
   private _actionListeners: Set<ActionListener> = new Set()
   private _subscribers: Set<SubscriptionCallback> = new Set()
   private _depListenersHandlers: UnSubscribe[] = []
@@ -272,7 +279,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       }
     }
 
-    return this._api!
+    return this._api
   }
 
   onAction(listener: (action: ModelAction) => any) {
@@ -400,6 +407,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // reset props
     this._destroyed = true
     this._api = null
+
     this._currentState = null
     this.stateRef = {
       value: null,
@@ -441,18 +449,18 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // map actions names to dispatch actions
     const actions = this.options.actions
     if (actions) {
-      const actionKeys = Object.keys(actions)
-      actionKeys.forEach((actionsName) => {
-        const action = actions[actionsName]
+      for (const actionName of Object.keys(actions)) {
+        this.accessCache[actionName] = AccessTypes.ACTION
+        const action = actions[actionName]
 
-        Object.defineProperty(this.actions, actionsName, {
+        Object.defineProperty(this.actions, actionName, {
           configurable: true,
           enumerable: true,
           writable: false,
           value: (...args: any[]) => {
             for (const listener of this._actionListeners) {
               listener({
-                name: actionsName,
+                name: actionName,
                 args,
               })
             }
@@ -469,7 +477,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
             return res
           },
         })
-      })
+      }
     }
   }
 
@@ -477,6 +485,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const views = this.options.views
     if (views) {
       for (const viewName of Object.keys(views)) {
+        this.accessCache[viewName] = AccessTypes.VIEW
         const viewFn = views[viewName]
         const view = this.createView(viewFn)
 
