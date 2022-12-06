@@ -54,7 +54,7 @@ export class ViewImpl<T> {
   }
 
   set value(_newValue: T) {
-    if (process.env.NODE_ENV === 'development') {
+    if (__DEV__) {
       warn('Write operation failed: computed value is readonly')
     }
   }

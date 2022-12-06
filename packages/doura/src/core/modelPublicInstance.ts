@@ -138,7 +138,7 @@ export const PublicInstanceProxyHandlers = {
       stateRef: { value: state },
     } = instance
     if (accessContext === AccessContext.VIEW) {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(`Cannot change state in view function`, instance)
       }
       return false
@@ -149,7 +149,7 @@ export const PublicInstanceProxyHandlers = {
       return true
     } else if (key === '$state') {
       if (typeof value === 'bigint' || typeof value === 'symbol') {
-        if (process.env.NODE_ENV === 'development') {
+        if (__DEV__) {
           warn("'BigInt' and 'Symbol' are not assignable to the State")
         }
         return false
@@ -159,7 +159,7 @@ export const PublicInstanceProxyHandlers = {
       instance.replace(value)
       return true
     } else if (hasOwn(actions, key)) {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(
           `Attempting to mutate action "${key}". Actions are readonly.`,
           instance
@@ -167,7 +167,7 @@ export const PublicInstanceProxyHandlers = {
       }
       return false
     } else if (hasOwn(views, key)) {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(
           `Attempting to mutate view "${key}". Views are readonly.`,
           instance
@@ -177,7 +177,7 @@ export const PublicInstanceProxyHandlers = {
     }
 
     if (key[0] === '$' && hasOwn(publicPropertiesMap, key)) {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(
           `Attempting to mutate public property "${key}". ` +
             `Properties starting with $ are reserved and readonly.`,

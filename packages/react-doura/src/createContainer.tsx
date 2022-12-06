@@ -110,7 +110,7 @@ const {
   useSharedModel: useRootModel,
   useStaticModel: useRootStaticModel,
 } = createContainer({
-  plugins: process.env.NODE_ENV === 'development' ? [[devtool]] : [],
+  plugins: __DEV__ ? [[devtool]] : [],
 })
 
 export type { Doura }

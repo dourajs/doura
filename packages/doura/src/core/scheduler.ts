@@ -2,8 +2,6 @@ import { ErrorCodes, error } from '../errors'
 import { isArray, NOOP } from '../utils'
 import { warn } from '../warning'
 
-const __DEV__ = process.env.NODE_ENV === 'development'
-
 export interface SchedulerJob extends Function {
   id?: number
   active?: boolean
@@ -247,7 +245,7 @@ function flushJobs(seen?: CountMap) {
     for (flushIndex = 0; flushIndex < queue.length; flushIndex++) {
       const job = queue[flushIndex]
       if (job && job.active !== false) {
-        if (process.env.NODE_ENV === 'development' && check(job)) {
+        if (__DEV__ && check(job)) {
           continue
         }
         // console.log(`running:`, job.id)

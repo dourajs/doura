@@ -1,7 +1,3 @@
-/**
- * @jest-environment jsdom
- */
-
 import React, { useMemo } from 'react'
 import { render, act } from '@testing-library/react'
 import {
@@ -599,6 +595,7 @@ describe('createUseModel', () => {
       expect(() => {
         render(<App />)
       }).toThrow()
+      expect('Cannot change state in view function').toHaveBeenWarned()
     })
   })
 
