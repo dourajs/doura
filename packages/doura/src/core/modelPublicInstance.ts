@@ -8,6 +8,7 @@ import {
   SubscriptionCallback,
   UnSubscribe,
   ModelAPI,
+  AccessTypes,
 } from './model'
 import {
   State,
@@ -38,13 +39,6 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   ModelViews<IModel> &
   ModelActions<IModel>
 
-const enum AccessTypes {
-  STATE,
-  ACTION,
-  VIEW,
-  CONTEXT,
-}
-
 export const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
   // due to type annotation
@@ -65,8 +59,8 @@ export const publicPropertiesMap: PublicPropertiesMap =
     } as PublicPropertiesMap)
   )
 
-export const PublicInstanceProxyHandlers = {
-  get: ({ _: instance }: ProxyContext, key: string) => {
+export const PublicInstanceProxyHandlers: ProxyHandler<ProxyContext> = {
+  get: ({ _: instance }, key: string) => {
     const {
       actions,
       views,
@@ -96,15 +90,6 @@ export const PublicInstanceProxyHandlers = {
       } else if (hasOwn(state, key)) {
         accessCache[key] = AccessTypes.STATE
         return state[key]
-      } else if (hasOwn(views, key)) {
-        accessCache[key] = AccessTypes.VIEW
-        return views[key]
-      } else if (hasOwn(actions, key)) {
-        if (accessContext === AccessContext.VIEW) {
-          return
-        }
-        accessCache[key] = AccessTypes.ACTION
-        return actions[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -129,7 +114,7 @@ export const PublicInstanceProxyHandlers = {
     }
   },
 
-  set({ _: instance }: ProxyContext, key: string, value: any): boolean {
+  set({ _: instance }, key: string, value: any): boolean {
     const {
       ctx,
       actions,
@@ -139,24 +124,16 @@ export const PublicInstanceProxyHandlers = {
     } = instance
     if (accessContext === AccessContext.VIEW) {
       if (__DEV__) {
-        warn(`Cannot change state in view function`, instance)
+        warn(
+          `Attempting to change state "${key}". State are readonly in "views".`,
+          instance
+        )
       }
       return false
     }
 
     if (hasOwn(state, key)) {
       state[key] = value
-      return true
-    } else if (key === '$state') {
-      if (typeof value === 'bigint' || typeof value === 'symbol') {
-        if (__DEV__) {
-          warn("'BigInt' and 'Symbol' are not assignable to the State")
-        }
-        return false
-      }
-
-      // allow to assign $state to replace state
-      instance.replace(value)
       return true
     } else if (hasOwn(actions, key)) {
       if (__DEV__) {
@@ -176,7 +153,18 @@ export const PublicInstanceProxyHandlers = {
       return false
     }
 
-    if (key[0] === '$' && hasOwn(publicPropertiesMap, key)) {
+    if (key === '$state') {
+      if (typeof value === 'bigint' || typeof value === 'symbol') {
+        if (__DEV__) {
+          warn("'BigInt' and 'Symbol' are not assignable to the State")
+        }
+        return false
+      }
+
+      // allow to assign $state to replace state
+      instance.replace(value)
+      return true
+    } else if (key[0] === '$' && hasOwn(publicPropertiesMap, key)) {
       if (__DEV__) {
         warn(
           `Attempting to mutate public property "${key}". ` +
@@ -192,7 +180,7 @@ export const PublicInstanceProxyHandlers = {
     return true
   },
 
-  has({ _: instance }: ProxyContext, key: string) {
+  has({ _: instance }, key: string) {
     const {
       actions,
       views,
