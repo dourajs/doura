@@ -1,7 +1,3 @@
-/**
- * @jest-environment jsdom
- */
-
 import React from 'react'
 import { render, act } from '@testing-library/react'
 import { defineModel, nextTick } from 'doura'
@@ -197,6 +193,9 @@ describe('useModel', () => {
         </DouraRoot>
       )
 
+      expect(
+        `detected that "self" is returned in view, it would cause unpected behavior`
+      ).toHaveBeenWarned()
       expect(container.querySelector('#v')?.innerHTML).toEqual('1')
       expect(container.querySelector('#t')?.innerHTML).toEqual('2')
       await act(async () => {

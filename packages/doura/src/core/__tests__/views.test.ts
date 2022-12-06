@@ -69,11 +69,11 @@ describe('defineModel/views', () => {
 
     void modelStore.This
     expect(
-      `detect returning "this" in view, it would cause unpected behavior`
+      `detected that "self" is returned in view, it would cause unpected behavior`
     ).toHaveBeenWarned()
     void modelStore.state
     expect(
-      `detect returning "this.$state" in view, it would cause unpected behavior`
+      `detected that "$state" is returned in view, it would cause unpected behavior`
     ).toHaveBeenWarned()
   })
 

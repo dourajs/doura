@@ -214,7 +214,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   patch(obj: AnyObject) {
     if (!isPlainObject(obj)) {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(
           `patch argument should be an object, but receive a ${Object.prototype.toString.call(
             obj
@@ -323,15 +323,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         this.accessContext = AccessContext.VIEW
         try {
           let value = viewFn.call(this.proxy, this.proxy)
-          if (process.env.NODE_ENV === 'development') {
+          if (__DEV__) {
             if (isObject(value)) {
               if (value === this.proxy) {
                 warn(
-                  `detect returning "this" in view, it would cause unpected behavior`
+                  `detected that "self" is returned in view, it would cause unpected behavior`
                 )
               } else if (value === this.proxy.$state) {
                 warn(
-                  `detect returning "this.$state" in view, it would cause unpected behavior`
+                  `detected that "$state" is returned in view, it would cause unpected behavior`
                 )
               }
             }
@@ -360,7 +360,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   dispatch(action: Action) {
     if (typeof action.type === 'undefined') {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(
           `Actions may not have an undefined "type" property. You may have misspelled an action type string constant.`
         )
@@ -369,7 +369,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
 
     if (this._isDispatching) {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         warn(`Cannot dispatch action from a reducer.`)
       }
       return action
@@ -498,7 +498,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
             return viewWithState.__snapshot
           },
           set() {
-            if (process.env.NODE_ENV === 'development') {
+            if (__DEV__) {
               warn(`cannot change view property '${String(viewName)}'`)
             }
             return false
@@ -513,7 +513,7 @@ export function createModelInstnace<IModel extends AnyObjectModel>(
   modelOptions: IModel,
   options: ModelInternalOptions = {}
 ) {
-  if (process.env.NODE_ENV === 'development') {
+  if (__DEV__) {
     validateModelOptions(modelOptions)
   }
 

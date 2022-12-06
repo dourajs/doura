@@ -1,7 +1,3 @@
-/**
- * @jest-environment jsdom
- */
-
 import React from 'react'
 import { render, act } from '@testing-library/react'
 import { defineModel, doura, Plugin, nextTick } from 'doura'

@@ -55,12 +55,8 @@ export type EffectScheduler = (...args: any[]) => any
 
 export let activeEffect: ReactiveEffect | undefined
 
-export const ITERATE_KEY = Symbol(
-  process.env.NODE_ENV === 'development' ? 'iterate' : ''
-)
-export const MAP_KEY_ITERATE_KEY = Symbol(
-  process.env.NODE_ENV === 'development' ? 'Map key iterate' : ''
-)
+export const ITERATE_KEY = Symbol(__DEV__ ? 'iterate' : '')
+export const MAP_KEY_ITERATE_KEY = Symbol(__DEV__ ? 'Map key iterate' : '')
 
 export const NODE_DELETE = Symbol('delete')
 

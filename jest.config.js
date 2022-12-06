@@ -1,10 +1,18 @@
 module.exports = {
+  testEnvironment: 'jsdom',
   preset: 'ts-jest/presets/js-with-ts',
   setupFilesAfterEnv: ['./scripts/setupJestEnv.ts'],
   verbose: true,
   forceExit: false,
   bail: false,
   globals: {
+    __DEV__: true,
+    __TEST__: true,
+    __VERSION__: require('./package.json').version,
+    __BROWSER__: false,
+    __GLOBAL__: false,
+    __ESM_BUNDLER__: true,
+    __ESM_BROWSER__: false,
     'ts-jest': {
       tsconfig: {
         jsx: 'react',
@@ -20,7 +28,6 @@ module.exports = {
       },
     },
   },
-  testEnvironment: 'node',
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {
     '^doura$': '<rootDir>/packages/doura/src',

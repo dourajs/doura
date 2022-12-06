@@ -161,7 +161,7 @@ export const createUseNamedStaticModel =
 
     // only run this once against a model
     const store = useMemo(() => {
-      if (process.env.NODE_ENV === 'development') {
+      if (__DEV__) {
         return readonlyModel(modelInstance)
       } else {
         return modelInstance

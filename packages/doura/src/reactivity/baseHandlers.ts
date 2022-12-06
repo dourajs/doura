@@ -26,7 +26,6 @@ import {
   isIntegerKey,
   shallowCopy,
 } from '../utils'
-import { warn } from '../warning'
 
 export type ProxyGetterHandler = ProxyHandler<object>['get']
 
@@ -257,9 +256,6 @@ function getOwnPropertyDescriptor(state: ObjectDraftState, key: any) {
 }
 
 function setPrototypeOf(state: ObjectDraftState, v: object | null): boolean {
-  if (process.env.NODE_ENV === 'development') {
-    warn(`not allow setPrototypeOf to set prototype`)
-  }
   const res = Reflect.setPrototypeOf(state.base, v)
   if (res && state.copy) {
     Reflect.setPrototypeOf(state.copy, v)
