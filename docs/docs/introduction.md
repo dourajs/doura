@@ -22,7 +22,6 @@ import { defineModel } from 'doura'
 import { useModel } from 'react-doura'
 
 const todoModel = defineModel({
-  name: 'todo',
   state: {
     todos: [
       {
