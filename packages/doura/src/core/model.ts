@@ -170,6 +170,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   stateValue!: any
   effectScope: EffectScope
 
+  private _actionDepth = 0
   private _api: ModelAPI<IModel> | null = null
   private _initState: ModelState<IModel>
   private _currentState: any
@@ -458,20 +459,20 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
           enumerable: true,
           writable: false,
           value: (...args: any[]) => {
-            for (const listener of this._actionListeners) {
-              listener({
-                name: actionName,
-                args,
-              })
-            }
-
+            this._actionDepth++
             let res: any
             try {
+              for (const listener of this._actionListeners) {
+                listener({
+                  name: actionName,
+                  args,
+                })
+              }
               res = action.call(this.proxy, ...args)
             } finally {
               // flush changes to model synchronously right after an action.
               // this prevent issues like https://github.com/pmndrs/valtio/issues/270
-              this._update()
+              --this._actionDepth === 0 && this._update()
             }
 
             return res
