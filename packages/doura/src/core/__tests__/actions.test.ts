@@ -91,12 +91,12 @@ describe('defineModel/actions', () => {
     expect(store.$state.value).toBe(2)
   })
 
-  it('shouldb batch update and only triggered once', async () => {
+  it('should batch updates and emit change event once', async () => {
     const fn = jest.fn()
     const count = defineModel({
       state: { value: 0 },
       actions: {
-        add() {
+        inc() {
           this.value += 1
           this.value += 1
         },
@@ -105,19 +105,45 @@ describe('defineModel/actions', () => {
 
     const store = modelMgr.getModel('count', count)
     store.$subscribe(fn)
-    store.add()
+    store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
     await nextTick()
     expect(fn).toHaveBeenCalledTimes(1)
     expect(store.$state).toEqual({ value: 2 })
   })
 
-  it('shouldb batch update and only triggered once (async action)', async () => {
+  it('should batch updates and emit change event once (nested actions)', async () => {
     const fn = jest.fn()
     const count = defineModel({
       state: { value: 0 },
       actions: {
-        async add() {
+        inc() {
+          this.value += 1
+          this.nested()
+          this.value += 1
+        },
+        nested() {
+          this.value += 1
+          this.value += 1
+        },
+      },
+    })
+
+    const store = modelMgr.getModel('count', count)
+    store.$subscribe(fn)
+    store.inc()
+    expect(fn).toHaveBeenCalledTimes(1)
+    await nextTick()
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(store.$state).toEqual({ value: 4 })
+  })
+
+  it('should batch update and only triggered once (async action)', async () => {
+    const fn = jest.fn()
+    const count = defineModel({
+      state: { value: 0 },
+      actions: {
+        async inc() {
           this.value += 1
           this.value += 1
           await timeout(10)
@@ -129,7 +155,7 @@ describe('defineModel/actions', () => {
 
     const store = modelMgr.getModel('count', count)
     store.$subscribe(fn)
-    store.add()
+    store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
     await nextTick()
     expect(fn).toHaveBeenCalledTimes(1)
@@ -139,12 +165,12 @@ describe('defineModel/actions', () => {
     expect(store.$state).toEqual({ value: 4 })
   })
 
-  it('shouldb batch update and only triggered once (async action)', async () => {
+  it('should batch update and only triggered once (async action)', async () => {
     const fn = jest.fn()
     const count = defineModel({
       state: { value: 0 },
       actions: {
-        async add() {
+        async inc() {
           this.value += 1
           this.value += 1
           await timeout(10)
@@ -156,7 +182,7 @@ describe('defineModel/actions', () => {
 
     const store = modelMgr.getModel('count', count)
     store.$subscribe(fn)
-    store.add()
+    store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
     await nextTick()
     expect(fn).toHaveBeenCalledTimes(1)
