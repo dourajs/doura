@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import Link from '@docusaurus/Link';
-import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 
 import styles from './styles.module.css';
 
 export function DocCardList({title, sections }) {
-  console.log("![sections] =>", sections)
   const [filterString, setFilterString] = useState('');
 
   const normalize = s => s?.toLowerCase().replace(/-/g, ' ');
