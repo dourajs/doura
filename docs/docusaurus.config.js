@@ -66,6 +66,11 @@ const config = {
             label: 'Docs',
           },
           {
+            label: 'API',
+            position: 'right',
+            to: 'docs/api',
+          },
+          {
             href: 'https://github.com/dourajs/doura',
             position: 'right',
             className: 'header-github-link',

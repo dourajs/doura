@@ -1,0 +1,224 @@
+/**
+ * Copyright (c) 2017-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+.header {
+  height: 400px;
+  background: url("/img/bg.jpg");
+  text-align: center;
+  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.header h1,
+.header h2 {
+  font-size: 34px;
+  line-height: 48px;
+  color: #f5f6f7;
+}
+
+.header h2 {
+  font-weight: lighter;
+}
+
+.hero {
+  background-color: #2b3137;
+  padding: 48px;
+}
+
+.heroInner {
+  margin: 0 auto;
+  max-width: 1100px;
+  padding: 0 20px;
+}
+
+.heroProjectTagline {
+  color: #fff;
+  font-size: 60px;
+  margin: 0;
+}
+
+.heroTitleTextHtml b {
+  color: var(--ifm-color-primary);
+}
+
+.heroLogo {
+  animation-duration: 2s;
+  animation-name: jack-in-the-box;
+  float: right;
+  margin-top: 20px;
+  padding: 0 20px 20px;
+  height: auto;
+}
+
+.indexCtas {
+  --ifm-button-size-multiplier: 1.6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.indexCtas a,
+.indexCtas a:hover {
+  color: black;
+}
+
+.indexCtas a:last-of-type {
+  margin: 20px 36px;
+}
+
+.indexCtasGitHubButtonWrapper {
+  display: flex;
+}
+
+.indexCtasGitHubButton {
+  overflow: hidden;
+}
+
+.indexCtaTryNowButton:hover {
+  color: var(--ifm-color-primary);
+}
+
+.featuresWrapper {
+}
+
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 90px 0;
+  text-align: center;
+  background: var(--docsearch-modal-background);
+}
+
+.feature {
+  width: 22%;
+}
+
+.feature h3 {
+  font-size: 24px;
+  line-height: 24px;
+  font-weight: 300;
+}
+
+.featureImg {
+  width: 145px;
+  height: 145px;
+  background: var(--docsearch-searchbox-background);
+  border-radius: 50%;
+  margin: 20px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.featureContent {
+  font-size: 16px;
+  font-weight: 300;
+}
+
+.header {
+  height: 400px;
+  background: url("/img/bg.jpg");
+  text-align: center;
+  background-size: cover;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.header h1,
+.header h2 {
+  font-size: 34px;
+  line-height: 48px;
+  color: #f5f6f7;
+}
+
+.header h2 {
+  font-weight: lighter;
+}
+
+.featureShowCases {
+  padding: 120px 0;
+}
+
+.featureShowCasesTilte {
+  text-align: center;
+  margin-bottom: 110px;
+}
+
+.featureShowCasesTilte h2 {
+  font-size: 34px;
+}
+
+.featureShowCases p {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 28px;
+}
+
+.featureShowcase {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 80px;
+}
+
+.featureShowcase > div:first-child,
+.featureShowcase > pre:first-child {
+  margin-right: 200px;
+}
+
+.featureShowcaseLink {
+  background: var(--ifm-bg-primary);
+  padding: 10px 42px;
+  border-radius: 4px;
+}
+
+.featureShowcaseCode {
+  padding: 1em;
+  flex: 1;
+  border-radius: 14px;
+}
+
+@media only screen and (max-width: 768px) {
+  .hero {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .heroInner {
+    padding: 0;
+  }
+
+  .heroProjectTagline {
+    font-size: 36px;
+    text-align: center;
+  }
+
+  .heroLogo {
+    display: block;
+    float: none;
+    margin: 0 auto;
+  }
+
+  .indexCtas {
+    justify-content: center;
+  }
+
+  .indexCtas a {
+    margin: 20px 36px;
+  }
+
+  .indexCtasGitHubButton {
+    display: none;
+  }
+}
