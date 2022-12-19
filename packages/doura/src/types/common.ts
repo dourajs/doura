@@ -8,8 +8,6 @@ export type AnyMap = Map<any, any>
 
 export type CollectionTypes = Map<any, any> | Set<any>
 
-export type EmptyObject = { [X: string | number | symbol]: never }
-
 export interface Iterable {
   [Symbol.iterator](): Iterator
 }

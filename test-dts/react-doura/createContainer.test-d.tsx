@@ -1,23 +1,19 @@
-import * as React from 'react'
 import { defineModel } from 'doura'
-import { createContainer, useStaticModel } from '../src/index'
-import { UseNamedModel, UseStaticModel } from '../src/types'
+import {
+  createContainer,
+  useStaticModel,
+  UseNamedModel,
+  UseStaticModel,
+} from 'react-doura'
+import { expectType } from '../helper'
 
-import { expectType } from './index'
-
-function Test() {
+export function Test() {
   const {
     Provider: _Provider,
     useSharedModel: _useSharedModel,
     useStaticModel: _useStaticModel,
   } = createContainer()
 
-  const testElement = (
-    <_Provider>
-      <></>
-    </_Provider>
-  )
-  expectType<JSX.Element>(testElement)
   expectType<UseNamedModel>(_useSharedModel)
   expectType<UseStaticModel>(_useStaticModel)
 

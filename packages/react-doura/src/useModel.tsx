@@ -1,11 +1,13 @@
 import { useMemo, useRef } from 'react'
-import { doura } from 'doura'
-import type { AnyModel, Selector, Doura } from 'doura'
+import { doura, AnyModel, Selector, Doura } from 'doura'
 import { createBatchManager } from './batchManager'
 import { createUseModel } from './createUseModel'
-import { UseModel } from './types'
+import { UseAnonymousModel, UseModel, UseStaticModel } from './types'
+import { DouraRoot, useRootModel, useRootStaticModel } from './global'
 
-const useModel: UseModel = <
+const ANONYMOUS_MODEL_NAME = 'anonymous model'
+
+const useAnonymousModel: UseAnonymousModel = <
   IModel extends AnyModel,
   S extends Selector<IModel>
 >(
@@ -35,7 +37,19 @@ const useModel: UseModel = <
       )
     },
     [context.current.douraStore, context.current.batchManager]
-  )(model, selector, depends)
+  )(ANONYMOUS_MODEL_NAME, model, selector, depends)
 }
 
-export { useModel }
+const useModel = ((name: any, model: any, selector?: any, depends?: any) => {
+  if (typeof name === 'string') {
+    return useRootModel(name, model, selector, depends)
+  }
+
+  return useAnonymousModel(name, model, selector)
+}) as UseModel
+
+const useStaticModel: UseStaticModel = (name, model) => {
+  return useRootStaticModel(name, model)
+}
+
+export { DouraRoot, useModel, useStaticModel }

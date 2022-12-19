@@ -32,7 +32,7 @@ describe('defineModel/views', () => {
     expect(store.double).toBe(2)
   })
 
-  it('should throw if changed state in a view', () => {
+  it('should warn when changing state in a view', () => {
     let initState = {
       a: 0,
     }
@@ -41,7 +41,7 @@ describe('defineModel/views', () => {
       views: {
         view() {
           this.a = 1
-          return this.$state
+          return this.a
         },
       },
     })
@@ -49,6 +49,31 @@ describe('defineModel/views', () => {
     expect(() => store.view).toThrow()
     expect(
       'Attempting to change state "a". State are readonly in "views"'
+    ).toHaveBeenWarned()
+  })
+
+  it('should warn when calling action in a view', () => {
+    let initState = {
+      a: 0,
+    }
+    const model = defineModel({
+      state: initState,
+      actions: {
+        set(v: number) {
+          this.a = v
+        },
+      },
+      views: {
+        view() {
+          ;(this as any).set(1)
+          return this.a
+        },
+      },
+    })
+    const store = modelMgr.getModel('test', model)
+    expect(store.view).toEqual(0)
+    expect(
+      'Action "set" is called in view function, it will be ignored and has no effect.'
     ).toHaveBeenWarned()
   })
 
