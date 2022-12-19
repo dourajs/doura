@@ -5,13 +5,25 @@ title: React Doura
 
 ## useModel
 
-`useModel` can replace `useState`, and enjoy doura features.
-
-### Type
+### Types
 
 ```ts
-interface UseModel {
-  <IModel extends AnyModel>(model: IModel, depends?: any[]): ModelAPI<IModel>
+declare interface UseModel extends UseAnonymousModel, UseNamedModel {}
+```
+
+:::caution
+With the param `name` or not, `useModel` has very different behavior.
+:::
+
+## useModel Without Name
+
+`useModel` can replace `useState`, and enjoy doura features.
+
+### Types
+
+```ts
+declare interface UseAnonymousModel {
+  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     model: IModel,
     selectors: S,
@@ -22,7 +34,7 @@ interface UseModel {
 
 ### Example
 
-sample to replace `useState`, no need care about warp with `useCallback`.
+Easy to replace `useState`, no need care about warp `add` with `useCallback`.
 
 ```js
 const count = defineModel({
@@ -49,9 +61,9 @@ const App = () => {
 }
 ```
 
-Use selecotr to pick exact what we want
+Use selector to pick exact what we want
 
-### Selectors Type
+### Selector Types
 
 ```ts
 type Selector<Model extends AnyModel, TReturn = any> = (
@@ -60,9 +72,26 @@ type Selector<Model extends AnyModel, TReturn = any> = (
 ) => TReturn
 ```
 
+#### Example
+
 ```ts
-import { ModelData } from 'doura'
-type countSelectorParameters = ModelData<typeof countModel>
+import { Selector } from 'react-doura'
+const countSelector: Selector<
+  typeof countModel,
+  { count: number; add: () => void }
+> = (s, actions) => {
+  return { count: s.count, add: actions.add }
+}
+```
+
+```ts
+import { ModelAPI， ModelActions } from 'doura'
+const countSelector = (
+  s: ModelAPI<typeof countModel>,
+  actions: ModelActions<typeof countModel>
+) => {
+  return { count: s.count, add: actions.add }
+}
 ```
 
 when depends not changed, the `selectors` function will be old one, it works like `useCallback`.
@@ -115,7 +144,9 @@ const App = () => {
 
 ## DouraRoot
 
-Provider context for `useRootModel` and `useRootStaticModel`.
+Provider context for `useModel` and `useStaticModel`.
+
+### Types
 
 ```ts
 declare const DouraRoot: (
@@ -133,17 +164,15 @@ declare const DouraRoot: (
 </DouraRoot>
 ```
 
-## useRootModel
+## useModel With Name
 
 Get global state by anywhere.
 
+### Types
+
 ```ts
 declare interface UseNamedModel {
-  <IModel extends AnyModel>(
-    name: string,
-    model: IModel,
-    depends?: any[]
-  ): ModelAPI<IModel>
+  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
     model: IModel,
@@ -157,7 +186,7 @@ declare interface UseNamedModel {
 
 ```tsx
 const App = () => {
-  const counter = useRootModel(
+  const counter = useModel(
     'count',
     countModel,
     (s, actions) => {
@@ -174,32 +203,68 @@ const App = () => {
   )
 }
 ```
-## useRootStaticModel
 
-Apis is same as `useRootModel`. 
+## useStaticModel
 
-:::info
+:::caution
 State change will not trigger render.
 :::
+
+### Types
+
+```ts
+declare interface UseStaticModel {
+  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
+}
+```
+
+### Example
+
+```tsx
+const model = defineModel({
+  state: { value: 1 },
+  views: {
+    test() {
+      return this.value * 2
+    },
+  },
+})
+
+const App = () => {
+  const state = useStaticModel('test', model)
+
+  return (
+    <>
+      <div id="v">{state.value}</div>
+      <div id="t">{state.test}</div>
+    </>
+  )
+}
+```
 
 ## createContainer
 
 Create a group api for share states.
 
+### Types
+
 ```ts
 declare const createContainer: (options?: DouraOptions) => {
-    Provider: (props: PropsWithChildren<{
-        store?: Doura;
-    }>) => JSX.Element;
-    useSharedModel: UseNamedModel;
-    useStaticModel: UseNamedStaticModel;
-};
+  Provider: (
+    props: PropsWithChildren<{
+      store?: Doura
+    }>
+  ) => JSX.Element
+  useSharedModel: UseNamedModel
+  useStaticModel: UseStaticModel
+}
 ```
+### Example
 
 ```ts
 const {
   Provider, // context as same as DouraRoot
-  useSharedModel, // as same as useRootModel
-  useStaticModel, // as same as useRootStaticModel
+  useSharedModel, // as same as useModel and it first param must be `name`
+  useStaticModel, // as same as useStaticModel
 } = createContainer()
 ```

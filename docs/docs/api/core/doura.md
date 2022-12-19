@@ -5,6 +5,8 @@ title: Doura
 
 ## State
 
+### Types
+
 ```ts
 type StateObject = {
   [x: string]: any
@@ -13,11 +15,13 @@ type StateObject = {
 
 ## Action
 
+### Types
+
 ```ts
 type ActionOptions = Record<string, Function>
 ```
 
-#### Example
+### Example
 
 ```tsx
 const count = defineModel({
@@ -45,6 +49,8 @@ const count = defineModel({
 
 ## View
 
+### Types
+
 ```ts
 type ViewOptions<State = any> = Record<
   string,
@@ -52,7 +58,7 @@ type ViewOptions<State = any> = Record<
 >
 ```
 
-#### Example
+### Example
 
 ```tsx
 const count = defineModel({
