@@ -1,5 +1,6 @@
 import { defineModel } from 'doura'
-import { expectType, useModel, Selector } from './index'
+import { useModel, Selector } from 'react-doura'
+import { expectType } from '../helper'
 
 type customType = 'custom' | 'custom0'
 
@@ -47,7 +48,7 @@ const countSelector: Selector<typeof count> = function (
   }
 }
 
-function Test() {
+export function Test() {
   const model = useModel(count, countSelector)
   expectType<number>(model.n)
   expectType<number>(model.v)

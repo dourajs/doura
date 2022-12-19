@@ -276,7 +276,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         ...this.views,
       })
       for (const action of Object.keys(this.actions)) {
-        def(data, action, this.actions[action])
+        def(data, action, (this.actions as any)[action])
       }
     }
 
@@ -459,6 +459,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
           enumerable: true,
           writable: false,
           value: (...args: any[]) => {
+            if (this.accessContext === AccessContext.VIEW) {
+              if (__DEV__) {
+                warn(
+                  `Action "${String(
+                    actionName
+                  )}" is called in view function, it will be ignored and has no effect.`
+                )
+              }
+              return
+            }
+
             this._actionDepth++
             let res: any
             try {

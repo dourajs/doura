@@ -30,15 +30,42 @@ yarn add doura
 
 ```tsx
 import { defineModel } from 'doura'
+import { useModel } from 'react-doura'
 
-const countModel = defineModel({
+const todoModel = defineModel({
   state: {
-    count: 0,
+    todos: [
+      {
+        id: 0,
+        text: 'read books',
+        isFinished: true,
+      },
+    ],
+    /** @type {'all' | 'unfinished'} */
+    filter: 'all',
+  },
+  views: {
+    unfinishedTodos() {
+      // autocompletion! ✨
+      return this.todos.filter((todo) => !todo.isFinished)
+    },
+    filteredTodos() {
+      if (this.filter === 'unfinished') {
+        return this.unfinishedTodos
+      }
+      return this.todos
+    },
   },
   actions: {
-    inc() {
-      this.count += 1
+    // any amount of arguments, return a promise or not
+    setFilter(filter) {
+      // you can directly mutate the state
+      this.filter = filter
     },
+    // action can be asynchronous
+    async getTodos() {
+      this.todos = await fetchTodos('httpds://api.example.com/todos')
+    }
   },
 })
 ```
@@ -48,13 +75,30 @@ const countModel = defineModel({
 ```tsx
 import { useModel } from 'react-doura'
 
-function Counter() {
-  const counter = useModel(countModel)
+export function TodoApp() {
+  // type of `filteredTodos` and `setFilter` are inferred automatically
+  const { filteredTodos, setFilter } = useModel(todoModel)
 
   return (
     <div>
-      <h1>Count: {counter.count}</h1>
-      <button onClick={counter.inc}>inc</button>
+      <div>
+        <input
+          type="checkbox"
+          id="filter"
+          onClick={(event) =>
+            setFilter(event.target.checked ? 'unfinished' : 'all')
+          }
+        />
+        <label htmlFor="filter">Only show unfinished</label>
+      </div>
+      <ul>
+        {filteredTodos.map((todo) => (
+          <li key={todo.id}>
+            <input type="checkbox" checked={todo.isFinished} />
+            {todo.text}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

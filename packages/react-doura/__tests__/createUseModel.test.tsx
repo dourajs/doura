@@ -10,17 +10,14 @@ import {
   nextTick,
 } from 'doura'
 import { createBatchManager } from '../src/batchManager'
-import { UseNamedModel, UseNamedStaticModel } from '../src/types'
-import {
-  createUseNamedModel,
-  createUseNamedStaticModel,
-} from '../src/createUseModel'
+import { UseNamedModel, UseStaticModel } from '../src/types'
+import { createUseModel, createUseStaticModel } from '../src/createUseModel'
 import { countModel } from './models/index'
 
 let douraStore: ReturnType<typeof doura>
 let batchManager: ReturnType<typeof createBatchManager>
 let useTestModel: UseNamedModel
-let useTestStaticModel: UseNamedStaticModel
+let useTestStaticModel: UseStaticModel
 
 beforeEach(() => {
   process.env.NODE_ENV === 'development'
@@ -34,7 +31,7 @@ beforeEach(() => {
     depends?: any[]
   ) => {
     return useMemo(
-      () => createUseNamedModel(douraStore, batchManager),
+      () => createUseModel(douraStore, batchManager),
       [douraStore, batchManager]
     )(name, model, selector, depends)
   }
@@ -43,7 +40,7 @@ beforeEach(() => {
     model: IModel
   ) => {
     return useMemo(
-      () => createUseNamedStaticModel(douraStore, batchManager),
+      () => createUseStaticModel(douraStore),
       [douraStore, batchManager]
     )(name, model)
   }
@@ -581,14 +578,14 @@ describe('createUseModel', () => {
       expect(container.querySelector('#value')?.textContent).toEqual('1')
     })
 
-    test('should throw error if changed state in a selector', () => {
+    test('should warn if changed state in a selector', () => {
       const App = () => {
         const [_state] = useTestModel(
           'count',
           countModel,
           (stateAndViews: any) => {
-            stateAndViews.value = 1
-            return stateAndViews.value
+            stateAndViews.count = 1
+            return stateAndViews.count
           }
         )
         return null
@@ -597,7 +594,7 @@ describe('createUseModel', () => {
         render(<App />)
       }).toThrow()
       expect(
-        'Attempting to change state "value". State are readonly in "views"'
+        'Attempting to change state "count". State are readonly in "views"'
       ).toHaveBeenWarned()
     })
   })

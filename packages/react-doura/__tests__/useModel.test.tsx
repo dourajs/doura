@@ -1,15 +1,15 @@
 import React from 'react'
 import { render, act } from '@testing-library/react'
-import { defineModel, nextTick } from 'doura'
-import { useModel, useRootModel, DouraRoot } from '../src/index'
-import { countModel } from './models/index'
+import { doura, defineModel, nextTick } from 'doura'
+import { DouraRoot, useModel, useStaticModel } from '../src/useModel'
+import { countModel } from './models'
 
 beforeEach(() => {
   jest.useFakeTimers()
 })
 
-describe('useModel', () => {
-  test('model name could be not defined', async () => {
+describe('useModel (without name)', () => {
+  test('should work', async () => {
     const count = defineModel({
       state: {
         value: 1,
@@ -49,9 +49,9 @@ describe('useModel', () => {
   })
 
   describe('should always be isolation', () => {
-    test('should isolation with useRootModel', async () => {
+    test('should isolation with named model', async () => {
       const App = () => {
-        const counter = useRootModel('count', countModel)
+        const counter = useModel('count', countModel)
         const loacalCounter = useModel(countModel)
 
         return (
@@ -207,5 +207,381 @@ describe('useModel', () => {
       expect(container.querySelector('#v')?.innerHTML).toEqual('1')
       expect(container.querySelector('#t')?.innerHTML).toEqual('2')
     })
+  })
+})
+
+describe('useModel (with name)', () => {
+  describe('DouraRoot', () => {
+    test('DouraRoot should worked without props douraStore', async () => {
+      const App = () => {
+        const counter = useModel('count', countModel)
+        return (
+          <>
+            <div id="value">{counter.value}</div>
+            <button id="button" type="button" onClick={() => counter.add()}>
+              add
+            </button>
+          </>
+        )
+      }
+
+      const { container } = render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
+      )
+
+      expect(container.querySelector('#value')?.innerHTML).toEqual('1')
+      await act(async () => {
+        container
+          .querySelector('#button')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+      expect(container.querySelector('#value')?.innerHTML).toEqual('2')
+    })
+
+    test('DouraRoot props douraStore could overwrite default douraStore', () => {
+      const App = () => {
+        const counter = useModel('count', countModel)
+        return (
+          <>
+            <div id="value">{counter.value}</div>
+          </>
+        )
+      }
+
+      const douraStore = doura({
+        initialState: {
+          count: {
+            value: 2,
+          },
+        },
+      })
+
+      const { container } = render(
+        <DouraRoot store={douraStore}>
+          <App />
+        </DouraRoot>
+      )
+
+      expect(container.querySelector('#value')?.innerHTML).toEqual('2')
+    })
+  })
+
+  test('name should not be empty', async () => {
+    const countModel = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
+        },
+      },
+    })
+
+    const App = () => {
+      const counter = useModel('', countModel)
+      return <div id="value">{counter.value}</div>
+    }
+
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
+      )
+    }).toThrow()
+  })
+
+  test('should throw if DouraRoot has not been found', async () => {
+    const countModel = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
+        },
+      },
+    })
+
+    const App = () => {
+      const counter = useModel('count', countModel)
+
+      return (
+        <>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    expect(() => {
+      render(<App />)
+    }).toThrow()
+  })
+
+  test('should return same ref', async () => {
+    let ref1: any = null
+    let ref2: any = null
+    const App = () => {
+      const counter = useModel('count', countModel)
+      ref1 = counter
+      return (
+        <>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add(1)}>
+            add
+          </button>
+          <SubApp></SubApp>
+        </>
+      )
+    }
+    function SubApp() {
+      const counter = useModel('count', countModel)
+      ref2 = counter
+      return <></>
+    }
+
+    const { container } = render(
+      <DouraRoot>
+        <App />
+      </DouraRoot>
+    )
+
+    expect(container.querySelector('#value')?.innerHTML).toEqual('1')
+
+    expect(ref1).toBe(ref2)
+    await act(async () => {
+      container
+        .querySelector('#button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+
+    expect(container.querySelector('#value')?.innerHTML).toEqual('2')
+    expect(ref1).toBe(ref2)
+  })
+
+  // OPTIMIZE: return same ref for same selector
+  test('should not return same ref (with selector)', async () => {
+    let ref1: any = null
+    let ref2: any = null
+    const selector = (s: any, a: any) => {
+      return { value: s.value, ...a }
+    }
+    const App = () => {
+      const counter = useModel('count', countModel, selector)
+      ref1 = counter
+      return (
+        <>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add(1)}>
+            add
+          </button>
+          <SubApp></SubApp>
+        </>
+      )
+    }
+    function SubApp() {
+      const counter = useModel('count', countModel, selector)
+      ref2 = counter
+      return <></>
+    }
+
+    const { container } = render(
+      <DouraRoot>
+        <App />
+      </DouraRoot>
+    )
+
+    expect(container.querySelector('#value')?.innerHTML).toEqual('1')
+
+    expect(ref1).not.toBe(ref2)
+    await act(async () => {
+      container
+        .querySelector('#button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+
+    expect(container.querySelector('#value')?.innerHTML).toEqual('2')
+    expect(ref1).not.toBe(ref2)
+  })
+
+  test("should keep data's state with component unmount or not", async () => {
+    const SubApp = () => {
+      const counter = useModel('count', countModel)
+
+      return (
+        <>
+          <div id="state">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    const App = () => {
+      const [toggle, setToggle] = React.useState(true)
+      return (
+        <>
+          <button id="toggle" type="button" onClick={() => setToggle(!toggle)}>
+            add
+          </button>
+          {toggle ? <SubApp /> : null}
+        </>
+      )
+    }
+
+    const { container } = render(
+      <DouraRoot>
+        <App />
+      </DouraRoot>
+    )
+
+    expect(container.querySelector('#state')?.innerHTML).toEqual('1')
+    await act(async () => {
+      container
+        .querySelector('#button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#state')?.innerHTML).toEqual('2')
+    await act(async () => {
+      container
+        .querySelector('#toggle')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#state')?.innerHTML).toEqual(undefined)
+    await act(async () => {
+      container
+        .querySelector('#toggle')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#state')?.innerHTML).toEqual('2')
+  })
+})
+
+describe('useStaticModel', () => {
+  test('name should not be empty', async () => {
+    const count = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
+        },
+      },
+    })
+
+    const App1 = () => {
+      const counter = useStaticModel(undefined as any, count)
+      return <div id="value">{counter.value}</div>
+    }
+    const App2 = () => {
+      const counter = useStaticModel('', count)
+      return <div id="value">{counter.value}</div>
+    }
+
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App1 />
+        </DouraRoot>
+      )
+    }).toThrow()
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App2 />
+        </DouraRoot>
+      )
+    }).toThrow()
+  })
+
+  test('should throw if DouraRoot has not been found', async () => {
+    const count = defineModel({
+      state: {
+        value: 1,
+      },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
+        },
+      },
+    })
+
+    const App = () => {
+      const counter = useStaticModel('count', count)
+
+      return (
+        <>
+          <div id="value">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    expect(() => {
+      render(<App />)
+    }).toThrow()
+  })
+
+  test('should state keep same ref in one component', async () => {
+    let stateRef: any
+    let stateRef1: any
+
+    const StaticApp = () => {
+      const counter = useStaticModel('count', countModel)
+      const [_, setValue] = React.useState(false)
+
+      if (!stateRef) {
+        stateRef = counter
+      }
+
+      stateRef1 = counter
+
+      return (
+        <>
+          <div id="state">{counter.value}</div>
+          <button
+            id="add"
+            type="button"
+            onClick={() => {
+              counter.add()
+              setValue(true)
+            }}
+          >
+            add
+          </button>
+        </>
+      )
+    }
+
+    const { container } = render(
+      <DouraRoot>
+        <StaticApp />
+      </DouraRoot>
+    )
+
+    await act(async () => {
+      container
+        .querySelector('#add')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+
+    expect(stateRef === stateRef1).toBeTruthy()
   })
 })

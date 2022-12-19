@@ -53,11 +53,11 @@ Now we can use the React Doura hooks to let React components interact with the D
 
 ```tsx title="componnets/Counter.tsx"
 import React from 'react'
-import { useRootModel } from 'react-doura'
+import { useModel } from 'react-doura'
 import { countModel } from './models/count'
 
 export function Counter() {
-  const { count, inc } = useRootModel('count', countModel)
+  const { count, inc } = useModel('count', countModel)
 
   return (
     <div>

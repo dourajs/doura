@@ -1,6 +1,6 @@
 {
   "name": "dourajs",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "private": true,
   "description": "The root package for doura",
   "keywords": [
@@ -15,7 +15,9 @@
     "preinstall": "npx only-allow pnpm",
     "build": "node scripts/build.js",
     "clean": "pnpm -r --parallel exec rm -rf node_modules dist && pnpm exec rm -rf node_modules",
-    "test": "jest",
+    "test": "run-s \"test-unit {@}\" \"test-dts {@}\"",
+    "test-unit": "jest",
+    "test-dts": "tsc -p ./test-dts/tsconfig.json",
     "release": "node scripts/release.js",
     "prepare": "husky install",
     "doc": "pnpm --filter \"doura-docs\" run start",
