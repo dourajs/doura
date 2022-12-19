@@ -174,14 +174,14 @@ const modelInstance = store.getModel('counter', counterModel)
 console.log(modelInstance.count) // 100
 ```
 
-## `Store`
+## `ModelInstance`
 
 Get model state, call actions and views.
 
 ### Example
 
 ```ts
-const modelMgr = doura()
+const store = doura()
 const model = defineModel({
   state: { value: 0 },
   actions: {
@@ -194,8 +194,8 @@ const model = defineModel({
   },
 })
 
-const store = modelMgr.getModel('test', model)
-store.$state // { value: 0 }
-store.actionOne() // undefined
-store.viewOne // undefined
+const modelInstance = store.getModel('test', model)
+modelInstance.$state // { value: 0 }
+modelInstance.actionOne() // undefined
+modelInstance.viewOne // undefined
 ```

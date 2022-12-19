@@ -49,7 +49,7 @@ const App = () => {
 }
 ```
 
-`selectors` can choose which property needed, and it's depends. 
+Use selecotr to pick exact what we want
 
 ### Selectors Type
 
@@ -113,56 +113,93 @@ const App = () => {
 }
 ```
 
-  Provider: DouraRoot,
-  useSharedModel: useRootModel,
-  useStaticModel: useRootStaticModel,
-
 ## DouraRoot
 
 Provider context for `useRootModel` and `useRootStaticModel`.
 
-```tsx
-
-```
-
-## dynamic
-
-Use `dynamic()` to lazy loading external libraries with `import()` and React components.
-Deferred loading helps improve the initial loading performance by decreasing the amount of JavaScript necessary to render the page. Components or libraries are only imported and included in the JavaScript bundle when they're used.
-
-### Type
-
 ```ts
-type Loader<P> = Promise<React.ComponentType<P>>
-
-interface DynamicOptions {
-  loading?: ({ error, isLoading, pastDelay }: {
-      error?: Error | null;
-      isLoading?: boolean;
-      pastDelay?: boolean;
-      timedOut?: boolean;
-  }) => JSX.Element | null;
-  loader?: Loader<P>;
-  ssr?: boolean;
-}
-
-function dynamic<Props = {}>(
-  loader: () => Loader<Props>
-  options?: DynamicOptions<Props>
-): React.ComponentType<Props>;
+declare const DouraRoot: (
+  props: PropsWithChildren<{
+    store?: Doura
+  }>
+) => JSX.Element
 ```
 
 ### Example
 
 ```tsx
-import dynamic from '@shuvi/runtime'
-import { Suspense } from 'react'
+<DouraRoot store={doura()}>
+  <App />
+</DouraRoot>
+```
 
-const DynamicHeader = dynamic(() => import('../components/header'), {
-  loading: () => <div>Loading...</div>,
-})
+## useRootModel
 
-export default function Home() {
-  return <DynamicHeader />
+Get global state by anywhere.
+
+```ts
+declare interface UseNamedModel {
+  <IModel extends AnyModel>(
+    name: string,
+    model: IModel,
+    depends?: any[]
+  ): ModelAPI<IModel>
+  <IModel extends AnyModel, S extends Selector<IModel>>(
+    name: string,
+    model: IModel,
+    selectors: S,
+    depends?: any[]
+  ): ReturnType<S>
 }
+```
+
+### Example
+
+```tsx
+const App = () => {
+  const counter = useRootModel(
+    'count',
+    countModel,
+    (s, actions) => {
+      fn()
+      return { count: s.count, add: actions.add }
+    },
+    []
+  )
+
+  return (
+    <button id="count" onClick={() => counter.add()}>
+      {counter.count}
+    </button>
+  )
+}
+```
+## useRootStaticModel
+
+Apis is same as `useRootModel`. 
+
+:::info
+State change will not trigger render.
+:::
+
+## createContainer
+
+Create a group api for share states.
+
+```ts
+declare const createContainer: (options?: DouraOptions) => {
+    Provider: (props: PropsWithChildren<{
+        store?: Doura;
+    }>) => JSX.Element;
+    useSharedModel: UseNamedModel;
+    useStaticModel: UseNamedStaticModel;
+};
+```
+
+```ts
+const {
+  Provider, // context as same as DouraRoot
+  useSharedModel, // as same as useRootModel
+  useStaticModel, // as same as useRootStaticModel
+} = createContainer()
 ```

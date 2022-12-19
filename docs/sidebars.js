@@ -118,16 +118,9 @@ const sidebars = {
       items: [
         {
           type: 'doc',
-          id: 'api/types/shuvi-runtime',
+          id: 'api/plugins/index',
           customProps: {
-            headers: getTocFromId('api/types/shuvi-runtime'),
-          },
-        },
-        {
-          type: 'doc',
-          id: 'api/types/shuvi-runtime-app',
-          customProps: {
-            headers: getTocFromId('api/types/shuvi-runtime-app'),
+            headers: getTocFromId('api/plugins/index'),
           },
         },
       ],
