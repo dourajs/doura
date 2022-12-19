@@ -61,14 +61,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
 
 export const PublicInstanceProxyHandlers: ProxyHandler<ProxyContext> = {
   get: ({ _: instance }, key: string) => {
-    const {
-      actions,
-      views,
-      accessCache,
-      accessContext,
-      ctx,
-      stateValue: state,
-    } = instance
+    const { actions, views, accessCache, ctx, stateValue: state } = instance
 
     if (key[0] !== '$') {
       const n = accessCache[key]
@@ -79,9 +72,6 @@ export const PublicInstanceProxyHandlers: ProxyHandler<ProxyContext> = {
           case AccessTypes.VIEW:
             return views[key]
           case AccessTypes.ACTION:
-            if (accessContext === AccessContext.VIEW) {
-              return
-            }
             return actions[key]
           case AccessTypes.CONTEXT:
             return ctx[key]
@@ -122,17 +112,17 @@ export const PublicInstanceProxyHandlers: ProxyHandler<ProxyContext> = {
       accessContext,
       stateRef: { value: state },
     } = instance
-    if (accessContext === AccessContext.VIEW) {
-      if (__DEV__) {
-        warn(
-          `Attempting to change state "${key}". State are readonly in "views".`,
-          instance
-        )
-      }
-      return false
-    }
-
     if (hasOwn(state, key)) {
+      if (accessContext === AccessContext.VIEW) {
+        if (__DEV__) {
+          warn(
+            `Attempting to change state "${key}". State are readonly in "views".`,
+            instance
+          )
+        }
+        return false
+      }
+
       state[key] = value
       return true
     } else if (hasOwn(actions, key)) {

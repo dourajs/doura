@@ -255,5 +255,31 @@ describe('model', () => {
       expect(viewGetter).toHaveBeenCalledTimes(2)
       expect(viewGetter).toHaveBeenCalledTimes(2)
     })
+
+    it('should access actions from the first parameter', () => {
+      const viewGetter = jest.fn(function (this: any) {
+        return { a: this.a, add: this.add }
+      })
+      const model = createModel({
+        state: {
+          a: 1,
+        },
+        actions: {
+          add(n: number = 1) {
+            this.a += n
+          },
+        },
+      })
+
+      const res = model.createView(viewGetter)
+
+      expect(viewGetter).toHaveBeenCalledTimes(0)
+      expect(res.value.a).toEqual(1)
+      expect(viewGetter).toHaveBeenCalledTimes(1)
+      res.value.add()
+      expect(res.value.a).toEqual(2)
+      expect(viewGetter).toHaveBeenCalledTimes(2)
+      expect(viewGetter).toHaveBeenCalledTimes(2)
+    })
   })
 })
