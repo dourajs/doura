@@ -1,6 +1,6 @@
 import { ModelPublicInstance } from './modelPublicInstance'
 import { warn } from '../warning'
-import { EmptyObject, AnyObject } from '../types'
+import { AnyObject } from '../types'
 import { invariant, isPlainObject } from '../utils'
 
 export type StateObject = {
@@ -100,7 +100,7 @@ export type ModelActions<Model> = Model extends ModelOptions<
   any,
   any
 >
-  ? Actions<A> & EmptyObject
+  ? Actions<A>
   : never
 
 export type ModelViews<Model> = Model extends ModelOptions<
@@ -109,7 +109,7 @@ export type ModelViews<Model> = Model extends ModelOptions<
   infer V,
   any
 >
-  ? Views<V> & EmptyObject
+  ? Views<V>
   : never
 
 /**

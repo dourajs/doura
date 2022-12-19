@@ -34,15 +34,18 @@ const count = defineModel({
 })
 
 type CountSelector = Selector<typeof count>
-const countSelector: CountSelector = function (stateAndViews) {
+const countSelector: CountSelector = function (api, actions) {
   return {
-    v: stateAndViews.value,
-    n: stateAndViews.viewNumber,
-    s: stateAndViews.viewString,
-    custom: stateAndViews.viewString,
+    v: api.value,
+    n: api.viewNumber,
+    s: api.viewString,
+    custom: api.viewString,
+    addValue: api.addValue,
+    setString: actions.setString,
   }
 }
 
-const count$State: CountSelector = function (stateAndViews) {
-  return stateAndViews.$state
+const count$State: CountSelector = function (api) {
+  // @ts-expect-error
+  return api.$state
 }

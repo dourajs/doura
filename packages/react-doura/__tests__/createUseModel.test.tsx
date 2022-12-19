@@ -580,14 +580,14 @@ describe('createUseModel', () => {
       expect(container.querySelector('#value')?.textContent).toEqual('1')
     })
 
-    test('should throw error if changed state in a selector', () => {
+    test('should warn if changed state in a selector', () => {
       const App = () => {
         const [_state] = useTestModel(
           'count',
           countModel,
           (stateAndViews: any) => {
-            stateAndViews.value = 1
-            return stateAndViews.value
+            stateAndViews.count = 1
+            return stateAndViews.count
           }
         )
         return null
@@ -596,7 +596,7 @@ describe('createUseModel', () => {
         render(<App />)
       }).toThrow()
       expect(
-        'Attempting to change state "value". State are readonly in "views"'
+        'Attempting to change state "count". State are readonly in "views"'
       ).toHaveBeenWarned()
     })
   })
