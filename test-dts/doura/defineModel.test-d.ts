@@ -1,4 +1,5 @@
-import { defineModel, expectType } from './index'
+import { defineModel } from 'doura'
+import { expectType } from '../helper'
 
 // object model
 const countModel = defineModel({
@@ -37,7 +38,7 @@ const countModelFn = defineModel(() => {
 })
 
 // use
-const fooModel = defineModel(({ use }) => {
+export const fooModel = defineModel(({ use }) => {
   // local model
   const count = use(countModel)
   const count1 = use(countModelFn)

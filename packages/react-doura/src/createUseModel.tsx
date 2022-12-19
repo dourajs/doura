@@ -103,7 +103,7 @@ function useModelInstance<IModel extends AnyModel>(
   }
 }
 
-export const createUseNamedModel =
+export const createUseModel =
   (doura: Doura, batchManager: ReturnType<typeof createBatchManager>) =>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
@@ -127,31 +127,8 @@ export const createUseNamedModel =
     }
   }
 
-export const createUseModel =
-  (doura: Doura, batchManager: ReturnType<typeof createBatchManager>) =>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
-    selector?: S,
-    depends?: any[]
-  ) => {
-    const hasSelector = useRef(selector)
-    const { modelInstance, subscribe } = useModelInstance(
-      'useModel', // name donen't matter here, use "@" for simplicity
-      model,
-      doura,
-      batchManager
-    )
-
-    // todo: warn when hasSelector changes
-    if (hasSelector.current) {
-      return useModelWithSelector(modelInstance, subscribe, selector!, depends)
-    } else {
-      return useModel(modelInstance, subscribe)
-    }
-  }
-
-export const createUseNamedStaticModel =
-  (doura: Doura, _batchManager: ReturnType<typeof createBatchManager>) =>
+export const createUseStaticModel =
+  (doura: Doura) =>
   <IModel extends AnyModel>(name: string, model: IModel) => {
     const modelInstance = useMemo(
       () => doura.getModel(name, model),

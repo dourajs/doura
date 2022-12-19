@@ -9,17 +9,14 @@ import {
   nextTick,
 } from 'doura'
 import { createBatchManager } from '../src/batchManager'
-import { UseNamedModel, UseNamedStaticModel } from '../src/types'
-import {
-  createUseNamedModel,
-  createUseNamedStaticModel,
-} from '../src/createUseModel'
+import { UseNamedModel, UseStaticModel } from '../src/types'
+import { createUseModel, createUseStaticModel } from '../src/createUseModel'
 import { countModel } from './models/index'
 
 let douraStore: ReturnType<typeof doura>
 let batchManager: ReturnType<typeof createBatchManager>
 let useTestModel: UseNamedModel
-let useTestStaticModel: UseNamedStaticModel
+let useTestStaticModel: UseStaticModel
 
 beforeEach(() => {
   process.env.NODE_ENV === 'development'
@@ -33,7 +30,7 @@ beforeEach(() => {
     depends?: any[]
   ) => {
     return useMemo(
-      () => createUseNamedModel(douraStore, batchManager),
+      () => createUseModel(douraStore, batchManager),
       [douraStore, batchManager]
     )(name, model, selector, depends)
   }
@@ -42,7 +39,7 @@ beforeEach(() => {
     model: IModel
   ) => {
     return useMemo(
-      () => createUseNamedStaticModel(douraStore, batchManager),
+      () => createUseStaticModel(douraStore),
       [douraStore, batchManager]
     )(name, model)
   }

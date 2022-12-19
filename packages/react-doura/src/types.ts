@@ -1,6 +1,6 @@
 import { AnyModel, Selector, ModelAPI } from 'doura'
 
-export interface UseModel {
+export interface UseAnonymousModel {
   <IModel extends AnyModel>(model: IModel, depends?: any[]): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     model: IModel,
@@ -23,6 +23,12 @@ export interface UseNamedModel {
   ): ReturnType<S>
 }
 
-export interface UseNamedStaticModel {
+export interface UseModel extends UseAnonymousModel, UseNamedModel {}
+
+export interface useAnonymousStaticModel {
+  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
+}
+
+export interface UseStaticModel {
   <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
 }

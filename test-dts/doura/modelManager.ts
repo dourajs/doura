@@ -1,18 +1,20 @@
 import {
   defineModel,
   doura,
-  expectType,
   ModelManager,
   ModelPublicInstance,
   State,
-} from './index'
+} from 'doura'
+import { expectType } from '../helper'
 
 const store = doura()
 
 expectType<ModelManager>(store)
 
 const model = defineModel({
-  state: 0,
+  state: {
+    value: 0,
+  },
 })
 
 expectType<ModelPublicInstance<typeof model>>(store.getModel('test', model))

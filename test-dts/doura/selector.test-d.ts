@@ -1,4 +1,4 @@
-import { defineModel, Selector } from './'
+import { defineModel, Selector } from 'doura'
 
 type customType = 'custom' | 'custom0'
 
@@ -34,7 +34,7 @@ const count = defineModel({
 })
 
 type CountSelector = Selector<typeof count>
-const countSelector: CountSelector = function (api, actions) {
+export const countSelector: CountSelector = function (api, actions) {
   return {
     v: api.value,
     n: api.viewNumber,
@@ -45,7 +45,7 @@ const countSelector: CountSelector = function (api, actions) {
   }
 }
 
-const count$State: CountSelector = function (api) {
+export const count$State: CountSelector = function (api) {
   // @ts-expect-error
   return api.$state
 }

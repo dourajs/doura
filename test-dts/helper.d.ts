@@ -1,5 +1,3 @@
-export * from '../src'
-
 export function describe(_name: string, _fn: () => void): void
 export function expectType<T>(value: T): void
 export function expectError<T>(value: T): void

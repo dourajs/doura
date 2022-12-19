@@ -6,14 +6,16 @@ import React, {
   useMemo,
   useState,
 } from 'react'
-import { Doura, AnyModel, DouraOptions, Selector, doura, devtool } from 'doura'
-import {
-  createUseNamedModel,
-  createUseNamedStaticModel,
-} from './createUseModel'
+import { Doura, AnyModel, DouraOptions, Selector, doura } from 'doura'
+import { createUseModel, createUseStaticModel } from './createUseModel'
 import { createBatchManager } from './batchManager'
-import { UseNamedModel, UseNamedStaticModel } from './types'
-import { invariant } from './utils'
+import { UseNamedModel, UseStaticModel } from './types'
+
+function checkName(name: any) {
+  if (!name) {
+    throw new Error(`[react-doura]: "name" is required and can not be empty.`)
+  }
+}
 
 const createContainer = function (options?: DouraOptions) {
   const Context = createContext<{
@@ -53,6 +55,17 @@ const createContainer = function (options?: DouraOptions) {
     return <Context.Provider value={contextValue}>{children}</Context.Provider>
   }
 
+  const useDouraContext = () => {
+    const context = useContext(Context)
+
+    if (__DEV__ && !context) {
+      throw new Error(
+        `[react-doura]: could not find react-doura context value; please ensure the component is wrapped in a <Provider>.`
+      )
+    }
+    return context
+  }
+
   const useSharedModel: UseNamedModel = <
     IModel extends AnyModel,
     S extends Selector<IModel>
@@ -62,40 +75,27 @@ const createContainer = function (options?: DouraOptions) {
     selector?: S,
     depends?: any[]
   ) => {
-    const context = useContext(Context)
+    if (__DEV__) {
+      checkName(name)
+    }
 
-    invariant(name, 'name is required.')
-    invariant(
-      context,
-      'You should wrap your Component in createContainer().Provider.'
-    )
-
-    const { store, batchManager } = context
-
+    const { store, batchManager } = useDouraContext()
     return useMemo(
-      () => createUseNamedModel(store, batchManager),
+      () => createUseModel(store, batchManager),
       [store, batchManager]
     )(name, model, selector, depends)
   }
 
-  const useStaticModel: UseNamedStaticModel = <IModel extends AnyModel>(
+  const useStaticModel: UseStaticModel = <IModel extends AnyModel>(
     name: string,
     model: IModel
   ) => {
-    const context = useContext(Context)
+    if (__DEV__) {
+      checkName(name)
+    }
 
-    invariant(name, 'name is required.')
-    invariant(
-      context,
-      'You should wrap your Component in createContainer().Provider.'
-    )
-
-    const { store, batchManager } = context
-
-    return useMemo(
-      () => createUseNamedStaticModel(store, batchManager),
-      [store, batchManager]
-    )(name, model)
+    const { store } = useDouraContext()
+    return useMemo(() => createUseStaticModel(store), [store])(name, model)
   }
 
   return {
@@ -105,14 +105,6 @@ const createContainer = function (options?: DouraOptions) {
   }
 }
 
-const {
-  Provider: DouraRoot,
-  useSharedModel: useRootModel,
-  useStaticModel: useRootStaticModel,
-} = createContainer({
-  plugins: __DEV__ ? [[devtool]] : [],
-})
+export type { Doura, Selector } from 'doura'
 
-export type { Doura }
-
-export { DouraRoot, useRootModel, useRootStaticModel, createContainer }
+export { createContainer }
