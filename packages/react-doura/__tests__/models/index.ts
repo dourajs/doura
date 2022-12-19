@@ -1,4 +1,4 @@
-import { defineModel, ModelData } from 'doura'
+import { defineModel } from 'doura'
 
 export const sleep = (time: number) =>
   new Promise((resolve) => {
@@ -26,5 +26,3 @@ export const countModel = defineModel({
     },
   },
 })
-
-export type countSelectorParameters = ModelData<typeof countModel>
