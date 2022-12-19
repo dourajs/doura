@@ -1,6 +1,6 @@
 {
   "name": "doura-plugin-persist",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "index.js",
   "module": "dist/doura-plugin-persist.esm-bundler.js",
   "types": "dist/doura-plugin-persist.d.ts",
@@ -39,6 +39,6 @@
     "doura": "workspace:*"
   },
   "peerDependencies": {
-    "doura": "0.0.4"
+    "doura": "0.0.5"
   }
 }
