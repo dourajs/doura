@@ -1,7 +1,7 @@
 import { AnyModel, Selector, ModelAPI } from 'doura'
 
 export interface UseAnonymousModel {
-  <IModel extends AnyModel>(model: IModel, depends?: any[]): ModelAPI<IModel>
+  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     model: IModel,
     selectors: S,
@@ -10,11 +10,7 @@ export interface UseAnonymousModel {
 }
 
 export interface UseNamedModel {
-  <IModel extends AnyModel>(
-    name: string,
-    model: IModel,
-    depends?: any[]
-  ): ModelAPI<IModel>
+  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
     model: IModel,

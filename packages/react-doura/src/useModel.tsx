@@ -40,18 +40,13 @@ const useAnonymousModel: UseAnonymousModel = <
   )(ANONYMOUS_MODEL_NAME, model, selector, depends)
 }
 
-const useModel: UseModel = (
-  name: any,
-  model: any,
-  selector?: any,
-  depends?: any
-) => {
+const useModel = ((name: any, model: any, selector?: any, depends?: any) => {
   if (typeof name === 'string') {
     return useRootModel(name, model, selector, depends)
   }
 
   return useAnonymousModel(name, model, selector)
-}
+}) as UseModel
 
 const useStaticModel: UseStaticModel = (name, model) => {
   return useRootStaticModel(name, model)
