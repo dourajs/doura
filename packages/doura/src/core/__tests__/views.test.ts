@@ -1,4 +1,4 @@
-import { defineModel, modelManager } from '../index'
+import { defineModel, modelManager, use } from '../index'
 import { nextTick } from '../scheduler'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -473,7 +473,7 @@ describe('defineModel/views', () => {
         },
       })
       let calltime = 0
-      const model = defineModel(({ use }) => {
+      const model = defineModel(() => {
         const a = use(modelA)
 
         return {
@@ -512,7 +512,7 @@ describe('defineModel/views', () => {
           },
         },
       })
-      const model = defineModel(({ use }) => {
+      const model = defineModel(() => {
         const a = use('a', modelA)
         return {
           state: {},

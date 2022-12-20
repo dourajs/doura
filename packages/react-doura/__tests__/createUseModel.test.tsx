@@ -8,6 +8,7 @@ import {
   ModelAPI,
   ModelActions,
   nextTick,
+  use,
 } from 'doura'
 import { createBatchManager } from '../src/batchManager'
 import { UseNamedModel, UseStaticModel } from '../src/types'
@@ -133,7 +134,7 @@ describe('createUseModel', () => {
     })
 
     test('should rerender when depends state changed', async () => {
-      const newModel = defineModel(({ use }) => {
+      const newModel = defineModel(() => {
         const count = use(countModel)
 
         return {

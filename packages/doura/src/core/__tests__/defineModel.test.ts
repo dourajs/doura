@@ -1,4 +1,4 @@
-import { defineModel, modelManager } from '../index'
+import { defineModel, modelManager, use } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
 beforeEach(() => {
@@ -47,7 +47,7 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel(({ use }) => {
+      const model = defineModel(() => {
         const one = use('one', depOne)
         const two = use('two', depTwo)
 
@@ -93,7 +93,7 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel(({ use }) => {
+      const model = defineModel(() => {
         const count = use('count', countModel)
         return {
           state: { value: 0 },
@@ -139,5 +139,9 @@ describe('defineModel', () => {
       })
       expect(store.all).toBe(v)
     })
+  })
+
+  it('should throw when calling use() outside of a function model', () => {
+    expect(() => use({ state: {} })).toThrow(/Invalid use\(\) call/)
   })
 })

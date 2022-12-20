@@ -1,4 +1,3 @@
-import { ModelPublicInstance } from './modelPublicInstance'
 import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject } from '../utils'
@@ -56,20 +55,12 @@ export type ObjectModel<
   views?: V & ThisType<ViewThis<S, V>>
 } & ThisType<ModelThis<S, A, V>>
 
-export interface ModelOptionContext {
-  use<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
-  use<IModel extends AnyModel>(
-    name: string,
-    model: IModel
-  ): ModelPublicInstance<IModel>
-}
-
 export interface FunctionModel<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions
 > {
-  (context: ModelOptionContext): ObjectModel<S, A, V>
+  (): ObjectModel<S, A, V>
 }
 
 export type ModelOptions<

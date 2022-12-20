@@ -1,4 +1,4 @@
-import { defineModel, modelManager, Plugin } from '../index'
+import { defineModel, modelManager, Plugin, use } from '../index'
 import { nextTick } from '../scheduler'
 
 describe('modelManager', () => {
@@ -133,7 +133,7 @@ describe('modelManager', () => {
     fisrt.$subscribe(() => {
       dependCount++
     })
-    const secondModel = defineModel(({ use }) => {
+    const secondModel = defineModel(() => {
       void use('first', firstModel)
       return {
         state: { value: 0 },
@@ -179,7 +179,7 @@ describe('modelManager', () => {
           },
         },
       })
-      const modelB = defineModel(({ use }) => {
+      const modelB = defineModel(() => {
         const a = use(modelA)
         return {
           state: { value: 0 },
