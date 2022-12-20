@@ -1,0 +1,41 @@
+.card {
+  --ifm-link-color: var(--ifm-color-emphasis-800);
+  --ifm-link-hover-color: var(--ifm-color-emphasis-700);
+  --ifm-link-hover-decoration: none;
+
+  background-color: var(--ifm-card-background-color);
+  border-radius: var(--ifm-card-border-radius);
+  box-shadow: 0 1.5px 3px 0 rgb(0 0 0 / 15%);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  transition: all var(--ifm-transition-fast) ease;
+  transition-property: border, box-shadow;
+  padding: 1.8rem;
+  height: 100%;
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 3px 6px 0 rgb(0 0 0 / 20%);
+}
+
+[data-theme="dark"] .card {
+  --shadow-color: rgba(255, 255, 255, 0.1);
+}
+
+.card a:hover {
+  text-decoration: unset;
+}
+
+.cardTitle {
+  color: var(--ifm-heading-color);
+  font-size: 1.25rem;
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.cardDescription {
+  font-size: 1rem;
+}

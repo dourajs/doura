@@ -5,7 +5,8 @@ import {
   doura,
   AnyModel,
   Selector,
-  ModelData,
+  ModelAPI,
+  ModelActions,
   nextTick,
 } from 'doura'
 import { createBatchManager } from '../src/batchManager'
@@ -306,8 +307,8 @@ describe('createUseModel', () => {
       test('global selector', async () => {
         const fn = jest.fn()
         const countSelector = (
-          s: ModelData<typeof countModel>,
-          actions: any
+          s: ModelAPI<typeof countModel>,
+          actions: ModelActions<typeof countModel>
         ) => {
           fn()
           return { count: s.count, add: actions.add }
