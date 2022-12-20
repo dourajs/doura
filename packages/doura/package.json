@@ -1,6 +1,6 @@
 {
   "name": "doura",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Reactive and intuitive state management",
   "main": "index.js",
   "module": "dist/doura.esm-bundler.js",
