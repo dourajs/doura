@@ -116,9 +116,11 @@ const countModel = defineModel({
 
 ### `defineModel` By Function
 
-Defined model, and defined it's depends.
+Composing other models by using function.
 
 ```ts
+import { use } from 'doura';
+
 const countModel = defineModel({
   state: { count: 1 },
   actions: {
@@ -133,7 +135,7 @@ const countModel = defineModel({
   },
 })
 
-const model = defineModel(({ use }) => {
+const model = defineModel(() => {
   const count = use('count', countModel)
   return {
     state: { value: 0 },

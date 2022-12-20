@@ -2,7 +2,6 @@ import {
   State,
   AnyModel,
   AnyFunctionModel,
-  ModelOptionContext,
   AnyObjectModel,
 } from './modelOptions'
 import { createModelInstnace, ModelInternal, UnSubscribe } from './model'
@@ -10,11 +9,6 @@ import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
 import { emptyObject } from '../utils'
-
-interface UseContext {
-  add(model: ModelInternal): any
-  setInitiator(model: ModelInternal): void
-}
 
 export type ModelManagerOptions = {
   initialState?: Record<string, any>
@@ -71,7 +65,23 @@ const createMapHelper = (): MapHelper => {
   return self
 }
 
-class ModelManagerImpl implements ModelManager {
+export interface ModelContext {
+  manager: ModelManagerInternal
+  model: ModelProxy
+}
+
+export interface ModelProxy {
+  addChild(child: ModelInternal): any
+  setModel(model: ModelInternal): void
+}
+
+export let currentModelContext: ModelContext | null = null
+
+export function setCurrentModelContext(ctx: ModelContext | null) {
+  currentModelContext = ctx
+}
+
+class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models: MapHelper
@@ -97,16 +107,44 @@ class ModelManagerImpl implements ModelManager {
     name: string,
     model: IModel
   ): ModelPublicInstance<IModel> {
-    const instance = this._getNamedModel(name, model)
-
+    const instance = this.getModelInstance({ name, model })
     return instance.proxy as ModelPublicInstance<IModel>
   }
 
   getDetachedModel<IModel extends AnyModel>(
     model: IModel
   ): ModelPublicInstance<IModel> {
-    const instance = this._getDetachedModel(model)
+    const instance = this.getModelInstance({ model })
     return instance.proxy as ModelPublicInstance<IModel>
+  }
+
+  getModelInstance({ name, model }: { name?: string; model: AnyModel }) {
+    const cachedInstace = name && this._models.get(name)
+    if (cachedInstace) {
+      return cachedInstace
+    }
+
+    let instance: ModelInternal
+    if (typeof model === 'function') {
+      let preCtx = currentModelContext
+      const modelProxy = this._createModelProxy()
+      try {
+        setCurrentModelContext({
+          manager: this,
+          model: modelProxy,
+        })
+        instance = this._initModel({ name, model: model() })
+      } finally {
+        setCurrentModelContext(preCtx)
+      }
+      modelProxy.setModel(instance)
+    } else if (typeof model === 'object') {
+      instance = this._initModel({ name, model })
+    } else {
+      throw new Error('invalid model')
+    }
+
+    return instance
   }
 
   getState() {
@@ -133,102 +171,34 @@ class ModelManagerImpl implements ModelManager {
     this._initialState = emptyObject
   }
 
-  private _getNamedModel(name: string, model: AnyModel) {
-    let cacheStore = this._models.get(name)
-    if (cacheStore) {
-      return cacheStore
-    }
-
-    if (typeof model === 'function') {
-      const useContext = this._createUseContext()
-      const modelContext: ModelOptionContext = {
-        use: this._use.bind(this, useContext) as any,
-      }
-      model = model(modelContext)
-      const instance = this._initModel(name, model)
-      useContext.setInitiator(instance)
-      return instance
-    }
-
-    return this._initModel(name, model)
-  }
-
-  private _createUseContext(): UseContext {
-    let models: ModelInternal[] = []
-    let initiator: ModelInternal | undefined
-
-    let useHandler: UseContext = {
-      add(m) {
-        if (initiator) {
-          initiator.depend(m)
-        } else {
-          models.push(m)
-        }
+  private _createModelProxy(): ModelProxy {
+    const children: ModelInternal[] = []
+    const modelProxy: ModelProxy = {
+      addChild(m) {
+        children.push(m)
       },
-      setInitiator(m) {
-        if (initiator) {
-          return
+      setModel(model) {
+        for (const child of children) {
+          model.depend(child)
         }
-
-        initiator = m
-        for (const m of models) {
-          initiator.depend(m)
-        }
-        models.length = 0
+        children.length = 0
       },
     }
 
-    return useHandler
+    return modelProxy
   }
 
-  private _getDetachedModel(model: AnyModel) {
-    let instance: ModelInternal
-    if (typeof model === 'function') {
-      const factory = model
-      const useContext = this._createUseContext()
-      const modelContext: ModelOptionContext = {
-        use: this._use.bind(this, useContext) as any,
-      }
-      instance = createModelInstnace(factory(modelContext))
-      useContext.setInitiator(instance)
-    } else if (typeof model === 'object') {
-      instance = createModelInstnace(model)
-    } else {
-      throw new Error('invalid model')
-    }
-    return instance
-  }
-
-  private _use(
-    context: UseContext,
-    model: AnyFunctionModel
-  ): ModelPublicInstance<any>
-  private _use(
-    context: UseContext,
-    name: string,
-    model: AnyModel
-  ): ModelPublicInstance<any>
-  private _use(p1: UseContext, p2: any, p3?: any): any {
-    let instance: ModelInternal
-
-    const parentUseContext = p1
-    if (typeof p2 === 'string') {
-      const name = p2
-      const model = p3
-      instance = this._getNamedModel(name, model)
-    } else {
-      const model = p2
-      instance = this._getDetachedModel(model)
+  private _initModel({
+    name,
+    model,
+  }: {
+    name?: string
+    model: AnyObjectModel
+  }): ModelInternal {
+    if (!name) {
+      return createModelInstnace(model)
     }
 
-    if (parentUseContext) {
-      parentUseContext.add(instance)
-    }
-
-    return instance.proxy
-  }
-
-  private _initModel(name: string, model: AnyObjectModel): ModelInternal {
     this._hooks.map((hook) => hook.onModel?.(name, model, { doura: this }))
 
     const modelInstance = createModelInstnace(model, {
@@ -258,5 +228,5 @@ export function modelManager({
   initialState,
   plugins,
 }: ModelManagerOptions = {}): ModelManager {
-  return new ModelManagerImpl(initialState, plugins)
+  return new ModelManagerInternal(initialState, plugins)
 }

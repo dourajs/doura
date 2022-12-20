@@ -25,7 +25,7 @@ export type {
   Plugin,
 } from './core'
 
-export { defineModel, nextTick } from './core'
+export { defineModel, nextTick, use } from './core'
 
 export { Doura, DouraOptions, doura } from './doura'
 

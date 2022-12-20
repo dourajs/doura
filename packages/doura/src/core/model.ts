@@ -312,7 +312,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   depend(dep: ModelInternal<any>) {
-    // collection beDepends, a depends b, when b update, call a need trigger listener
+    // emit change when dependencies change.
     this._depListenersHandlers.push(
       dep.subscribe((event) => {
         this._triggerListener({
