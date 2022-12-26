@@ -1,5 +1,5 @@
-import { defineModel } from 'doura'
-import React from 'react'
+///<reference types="webpack-env" />
+import { defineModel, acceptHMRUpdate } from 'doura'
 
 export const inputModel = defineModel({
   state: {
@@ -14,3 +14,9 @@ export const inputModel = defineModel({
     },
   },
 })
+
+// for model hmr
+if (module.hot) {
+  module.hot.accept()
+  module.hot.dispose(acceptHMRUpdate(inputModel))
+}

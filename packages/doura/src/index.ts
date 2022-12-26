@@ -29,4 +29,6 @@ export { defineModel, nextTick, use } from './core'
 
 export { Doura, DouraOptions, doura } from './doura'
 
+export { acceptHMRUpdate } from './hmr'
+
 export { default as devtool } from './devtool'
