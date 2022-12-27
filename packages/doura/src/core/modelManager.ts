@@ -8,7 +8,8 @@ import { createModelInstnace, ModelInternal, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
-import { emptyObject } from '../utils'
+import { emptyObject, isArray } from '../utils'
+import { CLEAR_CACHE, HmrModel } from '../hmr'
 
 export type ModelManagerOptions = {
   initialState?: Record<string, any>
@@ -208,6 +209,15 @@ class ModelManagerInternal implements ModelManager {
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)
+    // for hmr clear model cache
+    if (__DEV__) {
+      if (!isArray((model as HmrModel)[CLEAR_CACHE])) {
+        ;(model as HmrModel)[CLEAR_CACHE] = []
+      }
+      ;(model as HmrModel)[CLEAR_CACHE].push(() => {
+        this._models.set(name, null as any)
+      })
+    }
     this._hooks.map((hook) => {
       hook.onModelInstance?.(modelInstance.proxy, { doura: this })
     })

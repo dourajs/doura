@@ -1,4 +1,6 @@
-import { defineModel } from 'doura'
+///<reference types="webpack-env" />
+
+import { defineModel, acceptHMRUpdate } from 'doura'
 
 interface Todo {
   id: number
@@ -10,7 +12,7 @@ export const todoModel = defineModel({
   state: {
     todos: [] as Todo[],
     filter: 'all',
-    nextId: 0,
+    nextId: 213,
   },
   views: {
     unfinishedTodos() {
@@ -47,3 +49,9 @@ export const todoModel = defineModel({
     },
   },
 })
+
+// for model hmr
+if (module.hot) {
+  module.hot.accept()
+  module.hot.dispose(acceptHMRUpdate(todoModel))
+}
