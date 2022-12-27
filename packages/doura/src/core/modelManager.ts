@@ -1,4 +1,3 @@
-///<reference types="webpack-env" />
 import {
   State,
   AnyModel,
@@ -210,7 +209,8 @@ class ModelManagerInternal implements ModelManager {
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)
-    if (module.hot) {
+    // for hmr clear model cache
+    if (__DEV__) {
       if (!isArray((model as HmrModel)[CLEAR_CACHE])) {
         ;(model as HmrModel)[CLEAR_CACHE] = []
       }

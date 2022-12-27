@@ -35,6 +35,9 @@ export function acceptHMRUpdate(initialUseModel: AnyModel) {
       return
     }
 
-    clearCacheFuns.forEach((fn) => fn())
+    while (clearCacheFuns.length) {
+      const fn = clearCacheFuns.pop()!
+      fn()
+    }
   }
 }

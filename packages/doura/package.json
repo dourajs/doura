@@ -45,7 +45,6 @@
     "access": "public"
   },
   "devDependencies": {
-    "@types/webpack-env": "^1.18.0",
     "lodash": "^4.17.4"
   }
 }
