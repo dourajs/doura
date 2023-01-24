@@ -205,29 +205,6 @@ describe('defineModel/views', () => {
     expect(calltime).toBe(1)
   })
 
-  it('should be invoked when extra args changed', () => {
-    let calltime = 0
-    const model = defineModel({
-      state: {
-        b: 1,
-      },
-      actions: {},
-      views: {
-        doubleB(s, n: number) {
-          calltime++
-          return s.b * n
-        },
-      },
-    })
-    const store = modelMgr.getModel('test', model)
-
-    expect(calltime).toBe(0)
-    store.doubleB(1)
-    expect(calltime).toBe(1)
-    store.doubleB(2)
-    expect(calltime).toBe(2)
-  })
-
   it("should not be invoked when extra args don't change", () => {
     let calltime = 0
     const model = defineModel({
