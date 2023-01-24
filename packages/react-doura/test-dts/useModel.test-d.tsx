@@ -32,7 +32,7 @@ const count = defineModel({
       return this.s + ''
     },
     viewExtra(s, n: number) {
-      return this.value * n
+      return s.value * n
     },
   },
 })
