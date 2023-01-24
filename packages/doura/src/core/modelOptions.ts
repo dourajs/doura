@@ -14,7 +14,7 @@ export type Params = any
 
 export type ViewOptions<State = any> = Record<
   string,
-  ((s: State) => any) | (() => any)
+  ((s: State, ...args: any[]) => any) | (() => any)
 >
 
 export type Actions<A> = A extends ActionOptions
@@ -23,9 +23,23 @@ export type Actions<A> = A extends ActionOptions
     }
   : {}
 
+// export type Views<ViewOptions> = {
+//   [K in keyof ViewOptions]: ViewOptions[K] extends (...args: infer Args) => any
+//     ? Args extends [] | [s: any]
+//       ? ReturnType<ViewOptions[K]>
+//       : Args extends [s: any, ...extArgs: infer ExtArgs]
+//       ? (...args: ExtArgs) => ReturnType<ViewOptions[K]>
+//       : '555'
+//     : never
+// }
+
 export type Views<ViewOptions> = {
-  [K in keyof ViewOptions]: ViewOptions[K] extends (...args: any) => any
-    ? ReturnType<ViewOptions[K]>
+  [K in keyof ViewOptions]: ViewOptions[K] extends (...args: infer Args) => any
+    ? Args extends [] | [s: any]
+      ? ReturnType<ViewOptions[K]>
+      : Args extends [s: any, ...extArgs: infer ExtArgs]
+      ? (...args: ExtArgs) => ReturnType<ViewOptions[K]>
+      : '555'
     : never
 }
 

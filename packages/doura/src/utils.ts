@@ -3,6 +3,7 @@ import { AnyObject, Objectish } from './types'
 export const NOOP = () => {}
 
 export const emptyObject = Object.create(null)
+export const emptyArray = [] as const
 
 export const assign = Object.assign
 

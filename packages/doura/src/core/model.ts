@@ -1,4 +1,4 @@
-import { isPlainObject, hasOwn, isObject, def } from '../utils'
+import { isPlainObject, hasOwn, isObject, def, emptyArray } from '../utils'
 import { warn } from '../warning'
 import {
   view as reactiveView,
@@ -126,6 +126,12 @@ export type ModelData<Model extends AnyModel> = ModelState<Model> &
 export type ModelAPI<IModel extends AnyModel> = ModelData<IModel> &
   ModelActions<IModel>
 
+type ViewExts = View & {
+  __pre: any
+  __snapshot: any
+  __externalArgs?: any[]
+}
+
 function patchObj(base: Record<string, any>, patch: Record<string, any>) {
   const keys = Object.keys(patch)
   if (!keys.length) {
@@ -144,6 +150,11 @@ function patchObj(base: Record<string, any>, patch: Record<string, any>) {
 export interface ModelInternalOptions {
   name?: string
   initState?: State
+}
+
+function markViewShouldRun(view: View) {
+  view.mightChange = true
+  view.dirty = true
 }
 
 export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
@@ -329,8 +340,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       view = reactiveView(() => {
         const oldCtx = this.accessContext
         this.accessContext = AccessContext.VIEW
+        const externalArgs = (view as ViewExts).__externalArgs
         try {
-          let value = viewFn.call(this.proxy, this.proxy)
+          let value = viewFn.call(
+            this.proxy,
+            this.proxy,
+            ...(externalArgs ? (externalArgs as []) : emptyArray)
+          )
           if (__DEV__) {
             if (isObject(value)) {
               if (value === this.proxy) {
@@ -499,6 +515,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       for (const viewName of Object.keys(views)) {
         this.accessCache[viewName] = AccessTypes.VIEW
         const viewFn = views[viewName]
+        const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
 
         const self = this
@@ -506,17 +523,41 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
           configurable: true,
           enumerable: true,
           get() {
-            const viewWithState = view as View & { __pre: any; __snapshot: any }
-            let value = view.value
-            if (view.mightChange) {
-              view.mightChange = false
-              viewWithState.__snapshot = snapshot(value, self.stateRef.value)
-            } else if (viewWithState.__pre !== value) {
-              viewWithState.__snapshot = snapshot(value, self.stateRef.value)
-            }
-            viewWithState.__pre = value
+            const viewWithState = view as ViewExts
+            const getViewResult = () => {
+              let value = view.value
+              if (view.mightChange) {
+                view.mightChange = false
+                viewWithState.__snapshot = snapshot(value, self.stateRef.value)
+              } else if (viewWithState.__pre !== value) {
+                viewWithState.__snapshot = snapshot(value, self.stateRef.value)
+              }
+              viewWithState.__pre = value
 
-            return viewWithState.__snapshot
+              return viewWithState.__snapshot
+            }
+
+            if (hasExternalArgs) {
+              return function (...args: any[]) {
+                const oldArgs = viewWithState.__externalArgs
+                if (!oldArgs) {
+                  markViewShouldRun(view)
+                } else if (oldArgs.length !== args.length) {
+                  markViewShouldRun(view)
+                } else {
+                  for (let i = 0; i < oldArgs.length; i++) {
+                    if (oldArgs[i] !== args[i]) {
+                      markViewShouldRun(view)
+                      break
+                    }
+                  }
+                }
+                viewWithState.__externalArgs = args
+                return getViewResult()
+              }
+            } else {
+              return getViewResult()
+            }
           },
           set() {
             if (__DEV__) {
