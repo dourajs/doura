@@ -46,7 +46,7 @@ describe('defineModel/views', () => {
     const store = modelMgr.getModel('test', count)
 
     expect(typeof store.double).toBe('function')
-    expect(typeof store.double(2)).toBe(2)
+    expect(store.double(2)).toBe(2)
   })
 
   it('should warn when changing state in a view', () => {
