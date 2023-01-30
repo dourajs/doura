@@ -153,7 +153,6 @@ export interface ModelInternalOptions {
 }
 
 function markViewShouldRun(view: View) {
-  view.mightChange = true
   view.dirty = true
 }
 
@@ -517,47 +516,45 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const viewFn = views[viewName]
         const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
+        const viewWithState = view as ViewExts
+        const getViewResult = () => {
+          let value = view.value
+          if (view.mightChange) {
+            view.mightChange = false
+            viewWithState.__snapshot = snapshot(value, this.stateRef.value)
+          } else if (viewWithState.__pre !== value) {
+            viewWithState.__snapshot = snapshot(value, this.stateRef.value)
+          }
+          viewWithState.__pre = value
 
-        const self = this
+          return viewWithState.__snapshot
+        }
+        const getViewWithArgsResult = hasExternalArgs
+          ? (...args: any[]) => {
+              const oldArgs = viewWithState.__externalArgs
+              if (!oldArgs) {
+                markViewShouldRun(view)
+              } else if (oldArgs.length !== args.length) {
+                markViewShouldRun(view)
+              } else {
+                for (let i = 0; i < oldArgs.length; i++) {
+                  if (oldArgs[i] !== args[i]) {
+                    markViewShouldRun(view)
+                    break
+                  }
+                }
+              }
+              viewWithState.__externalArgs = args
+              return getViewResult()
+            }
+          : false
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
           get() {
-            const viewWithState = view as ViewExts
-            const getViewResult = () => {
-              let value = view.value
-              if (view.mightChange) {
-                view.mightChange = false
-                viewWithState.__snapshot = snapshot(value, self.stateRef.value)
-              } else if (viewWithState.__pre !== value) {
-                viewWithState.__snapshot = snapshot(value, self.stateRef.value)
-              }
-              viewWithState.__pre = value
-
-              return viewWithState.__snapshot
-            }
-
-            if (hasExternalArgs) {
-              return function (...args: any[]) {
-                const oldArgs = viewWithState.__externalArgs
-                if (!oldArgs) {
-                  markViewShouldRun(view)
-                } else if (oldArgs.length !== args.length) {
-                  markViewShouldRun(view)
-                } else {
-                  for (let i = 0; i < oldArgs.length; i++) {
-                    if (oldArgs[i] !== args[i]) {
-                      markViewShouldRun(view)
-                      break
-                    }
-                  }
-                }
-                viewWithState.__externalArgs = args
-                return getViewResult()
-              }
-            } else {
-              return getViewResult()
-            }
+            return getViewWithArgsResult
+              ? getViewWithArgsResult
+              : getViewResult()
           },
           set() {
             if (__DEV__) {
