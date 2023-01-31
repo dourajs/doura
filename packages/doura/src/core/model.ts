@@ -529,32 +529,31 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
           return viewWithState.__snapshot
         }
-        const getViewWithArgsResult = hasExternalArgs
-          ? (...args: any[]) => {
-              const oldArgs = viewWithState.__externalArgs
-              if (!oldArgs) {
-                markViewShouldRun(view)
-              } else if (oldArgs.length !== args.length) {
-                markViewShouldRun(view)
-              } else {
-                for (let i = 0; i < oldArgs.length; i++) {
-                  if (oldArgs[i] !== args[i]) {
-                    markViewShouldRun(view)
-                    break
+        const getResult = hasExternalArgs
+          ? () =>
+              (...args: any[]) => {
+                const oldArgs = viewWithState.__externalArgs
+                if (!oldArgs) {
+                  markViewShouldRun(view)
+                } else if (oldArgs.length !== args.length) {
+                  markViewShouldRun(view)
+                } else {
+                  for (let i = 0; i < oldArgs.length; i++) {
+                    if (oldArgs[i] !== args[i]) {
+                      markViewShouldRun(view)
+                      break
+                    }
                   }
                 }
+                viewWithState.__externalArgs = args
+                return getViewResult()
               }
-              viewWithState.__externalArgs = args
-              return getViewResult()
-            }
-          : false
+          : getViewResult
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
           get() {
-            return getViewWithArgsResult
-              ? getViewWithArgsResult
-              : getViewResult()
+            return getResult()
           },
           set() {
             if (__DEV__) {
