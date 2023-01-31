@@ -1,11 +1,5 @@
 /.git
-CHANGELOG.md
-package.json
-packages/*/lib
+**/node_modules
+**/__tests__
 packages/*/dist
-packages/*/esm
-packages/*/node_modules
-packages/*/CHANGELOG.md
-docs/*/node_modules
-docs/*/build
-docs/*/.docusaurus
+docs
