@@ -32,6 +32,23 @@ describe('defineModel/views', () => {
     expect(store.double).toBe(2)
   })
 
+  it('should receive external params', () => {
+    const count = defineModel({
+      state: {
+        count: 1,
+      },
+      views: {
+        double(s, a: number) {
+          return s.count * a
+        },
+      },
+    })
+    const store = modelMgr.getModel('test', count)
+
+    expect(typeof store.double).toBe('function')
+    expect(store.double(2)).toBe(2)
+  })
+
   it('should warn when changing state in a view', () => {
     let initState = {
       a: 0,
@@ -185,6 +202,29 @@ describe('defineModel/views', () => {
     expect(calltime).toBe(1)
     store.changeA()
     store.doubleB
+    expect(calltime).toBe(1)
+  })
+
+  it("should not be invoked when extra args don't change", () => {
+    let calltime = 0
+    const model = defineModel({
+      state: {
+        b: 1,
+      },
+      actions: {},
+      views: {
+        doubleB(s, n: number) {
+          calltime++
+          return s.b * n
+        },
+      },
+    })
+    const store = modelMgr.getModel('test', model)
+
+    expect(calltime).toBe(0)
+    store.doubleB(1)
+    expect(calltime).toBe(1)
+    store.doubleB(1)
     expect(calltime).toBe(1)
   })
 

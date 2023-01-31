@@ -31,6 +31,9 @@ const count = defineModel({
     viewString() {
       return this.s + ''
     },
+    viewExtra(s, n: number) {
+      return s.value * n
+    },
   },
 })
 
@@ -42,6 +45,7 @@ const countSelector: Selector<typeof count> = function (
     v: stateAndViews.value,
     n: stateAndViews.viewNumber,
     s: stateAndViews.viewString,
+    e: stateAndViews.viewExtra(1),
     custom: stateAndViews.viewString,
     ...actions,
   }
@@ -52,6 +56,7 @@ function Test() {
   expectType<number>(model.n)
   expectType<number>(model.v)
   expectType<string>(model.s)
+  expectType<string>(model.e)
   expectType<string>(model.custom)
   expectType<void>(model.addValue())
   expectType<void>(model.setString('custom'))

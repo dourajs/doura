@@ -6,6 +6,7 @@ import { Dep } from './dep'
 export interface View<T = any> {
   dep?: Dep
   mightChange: boolean
+  dirty: boolean
   readonly value: T
   readonly effect: ReactiveEffect<T>
 }
@@ -25,16 +26,16 @@ export class ViewImpl<T> {
 
   public mightChange: boolean = false
 
+  public dirty = true
+
   private _value!: T
 
   private _cacheable: boolean
 
-  private _dirty = true
-
   constructor(getter: ViewGetter<T>, { disableCache = false }: ViewOptions) {
     this.effect = new ReactiveEffect(getter, () => {
-      if (!this._dirty) {
-        this._dirty = true
+      if (!this.dirty) {
+        this.dirty = true
         triggerView(this)
       }
     })
@@ -46,8 +47,8 @@ export class ViewImpl<T> {
     // the view may get wrapped by other proxies e.g. readonly()
     const self = toBase(this)
     trackView(self)
-    if (self._dirty || !self._cacheable) {
-      self._dirty = false
+    if (self.dirty || !self._cacheable) {
+      self.dirty = false
       self._value = self.effect.run()!
     }
     return self._value
