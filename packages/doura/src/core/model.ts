@@ -552,9 +552,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
-          get() {
-            return getResult()
-          },
+          get: getResult,
           set() {
             if (__DEV__) {
               warn(`cannot change view property '${String(viewName)}'`)
