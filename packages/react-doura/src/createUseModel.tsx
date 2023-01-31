@@ -60,13 +60,12 @@ function useModelWithSelector<
   const selectorRef = useRef<undefined | ModelView>(undefined)
 
   const view = useMemo(() => {
-    let preMv: ModelView | undefined = selectorRef.current
-    let mv: ModelView
+    const preMv: ModelView | undefined = selectorRef.current
     if (preMv) {
       preMv.destory()
     }
 
-    mv = selectorRef.current = model.$createView(selector)
+    const mv = (selectorRef.current = model.$createView(selector))
 
     return mv
   }, [model, ...(depends ? depends : [selector])])

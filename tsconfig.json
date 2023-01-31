@@ -14,5 +14,10 @@
     "packages/*/src",
     "packages/**/__tests__",
     "test-dts"
-  ]
+  ],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  }
 }
