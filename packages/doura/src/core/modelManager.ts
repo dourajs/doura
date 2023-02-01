@@ -126,7 +126,7 @@ class ModelManagerInternal implements ModelManager {
 
     let instance: ModelInternal
     if (typeof model === 'function') {
-      let preCtx = currentModelContext
+      const preCtx = currentModelContext
       const modelProxy = this._createModelProxy()
       try {
         setCurrentModelContext({

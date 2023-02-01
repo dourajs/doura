@@ -1,6 +1,6 @@
 import { warn } from '../warning'
 import { AnyObject } from '../types'
-import { invariant, isPlainObject } from '../utils'
+import { invariant, isPlainObject, hasOwn } from '../utils'
 
 export type StateObject = {
   [x: string]: any
@@ -71,6 +71,7 @@ export type ModelOptions<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   P extends Params
 > = ObjectModel<S, A, V> | FunctionModel<S, A, V>
 
@@ -107,18 +108,7 @@ export type ModelViews<Model> = Model extends ModelOptions<
   ? Views<V>
   : never
 
-/**
- * Checks if a parameter is a valid function but only when it's defined.
- * Otherwise, always returns true.
- */
-export const ifDefinedIsFunction = <T>(func: T): boolean =>
-  !func || typeof func === 'function'
-
-function validateProperty(
-  model: AnyObjectModel,
-  prop: keyof AnyObjectModel,
-  type: string
-) {
+function validateObject(model: AnyObjectModel, prop: keyof AnyObjectModel) {
   const target = model[prop] as any
   if (target) {
     invariant(isPlainObject(target), `model.${prop} should be object!`)
@@ -147,13 +137,14 @@ function checkConflictedKey(
 }
 
 export const validateModelOptions = (model: AnyObjectModel): void => {
-  invariant(model.hasOwnProperty('state'), 'state is required')
+  invariant(hasOwn(model, 'state'), 'state is required')
   invariant(
     typeof model.state !== 'bigint' && typeof model.state !== 'symbol',
     'state can not be BigInt or Symbol'
   )
-  validateProperty(model, 'actions', 'object')
-  validateProperty(model, 'views', 'object')
+
+  validateObject(model, 'actions')
+  validateObject(model, 'views')
 
   const keys = new Map<string, string>()
   checkConflictedKey('state', model, keys)
