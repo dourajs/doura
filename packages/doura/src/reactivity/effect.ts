@@ -99,7 +99,7 @@ export class ReactiveEffect<T = any> {
       return this.fn()
     }
     let parent: ReactiveEffect | undefined = activeEffect
-    let lastShouldTrack = shouldTrack
+    const lastShouldTrack = shouldTrack
     while (parent) {
       if (parent === this) {
         return
@@ -275,7 +275,7 @@ export function trackView(view: View<any>) {
   }
 }
 
-export function triggerView(view: View<any>, newVal?: any) {
+export function triggerView(view: View<any>) {
   view = toBase(view)
   if (view.dep) {
     triggerEffects(view.dep)
@@ -307,7 +307,7 @@ export function trigger(
   type: TriggerOpTypes,
   key?: unknown,
   newValue?: unknown,
-  oldValue?: unknown
+  _oldValue?: unknown
 ) {
   const depsMap = targetMap.get(state)
   const target = state.base

@@ -36,7 +36,7 @@ const createBatchManager = () => {
     model: ModelPublicInstance<AnyModel>,
     fn: () => void
   ) {
-    let modelsFnSet = modelBindRender.get(model)
+    const modelsFnSet = modelBindRender.get(model)
     if (modelsFnSet) {
       modelsFnSet.delete(fn)
       if (modelsFnSet.size === 0 && douraUnSub.has(model)) {

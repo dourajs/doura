@@ -1,5 +1,7 @@
 /.git
 **/node_modules
-**/__tests__
 packages/*/dist
+benchmark
 docs
+test-dts
+**/__tests__

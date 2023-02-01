@@ -87,8 +87,8 @@ function createArrayInstrumentations() {
   ;(['push', 'pop', 'shift', 'unshift', 'splice'] as const).forEach((key) => {
     instrumentations[key] = function (this: unknown[], ...args: unknown[]) {
       pauseTracking()
-      let state = toState(this) as ObjectDraftState
-      let target = latest(state)
+      const state = toState(this) as ObjectDraftState
+      const target = latest(state)
       const res = target[key].apply(this, args)
       resetTracking()
       return res

@@ -341,7 +341,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         this.accessContext = AccessContext.VIEW
         const externalArgs = (view as ViewExts).__externalArgs
         try {
-          let value = viewFn.call(
+          const value = viewFn.call(
             this.proxy,
             this.proxy,
             ...(externalArgs ? (externalArgs as []) : emptyArray)
@@ -518,7 +518,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const view = this.createView(viewFn)
         const viewWithState = view as ViewExts
         const getViewResult = () => {
-          let value = view.value
+          const value = view.value
           if (view.mightChange) {
             view.mightChange = false
             viewWithState.__snapshot = snapshot(value, this.stateRef.value)

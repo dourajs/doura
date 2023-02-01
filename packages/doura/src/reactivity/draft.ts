@@ -113,7 +113,7 @@ export function draft<T extends Objectish>(
     proxyHandlers = mutableCollectionHandlers
   } else if (targetType === TargetType.ARRAY) {
     // in order to pass the check of "obj instanceof Array"
-    proxyTarget = new Array() as any as DraftState
+    proxyTarget = [] as any as DraftState
   }
 
   if (proxyTarget !== state) {
@@ -192,7 +192,7 @@ export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
   return new Proxy(shallowCopy(obj), handler)
 }
 
-export function snapshot<T extends any>(value: T, draft: Drafted): T {
+export function snapshot<T>(value: T, draft: Drafted): T {
   if (!isObject(value)) {
     return value
   }

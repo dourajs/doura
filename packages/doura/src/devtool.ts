@@ -2,7 +2,7 @@ import { invariant } from './utils'
 import type { Plugin } from './core'
 import { Doura } from './doura'
 
-function applyState(newState: any, doura: Doura) {
+function applyState(_newState: any, _doura: Doura) {
   // todo
 }
 
@@ -18,7 +18,7 @@ const reduxDevTools: Plugin = function () {
   const unsubscribeSet = new Set<() => void>()
   let devTools: any
   return {
-    onInit({ initialState }, { doura }) {
+    onInit(_ctx, { doura }) {
       ;(window as any).__doura = doura
       if (
         typeof window !== 'undefined' &&
@@ -79,7 +79,7 @@ const reduxDevTools: Plugin = function () {
       }
     },
     onModelInstance(instance, { doura }) {
-      instance.$subscribe(({ type, target, model, ...args }) => {
+      instance.$subscribe(({ type, model, ...args }) => {
         const state = doura.getState()
         delete state._
         devTools.send(
