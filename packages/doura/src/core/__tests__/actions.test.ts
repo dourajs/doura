@@ -362,8 +362,9 @@ describe('defineModel/actions', () => {
       store.replace(newState1)
       expect(store.$state).toEqual(newState1)
 
-      store.replace(2)
-      expect(store.$state).toEqual(2)
+      const newState2: any[] = []
+      store.replace(newState2)
+      expect(store.$state).toEqual(newState2)
     })
 
     it('should error when assign Symbol or BigInt to this.$state', () => {

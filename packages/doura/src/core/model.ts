@@ -29,7 +29,6 @@ import {
 } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { AnyObject } from '../types'
-import { Drafted } from '../reactivity/common'
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -263,7 +262,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
     this.dispatch({
       type: ActionType.PATCH,
-      payload: snapshot(this.stateRef.value, this.stateRef.value),
       args: {
         patch: obj,
       },
@@ -271,6 +269,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   replace(newState: AnyObject) {
+    if (!isObject(newState)) {
+      warn(
+        `replace argument should be an object, but receive a ${Object.prototype.toString.call(
+          newState
+        )}`
+      )
+      return
+    }
+
     this._watchStateChange = false
     this.stateRef.value = newState
     this._watchStateChange = true
@@ -395,9 +402,10 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   reducer(state: ModelState<AnyModel>, action: Action) {
     switch (action.type) {
-      case ActionType.REPLACE:
       case ActionType.MODIFY:
       case ActionType.PATCH:
+        return snapshot(this.stateRef.value, this.stateRef.value)
+      case ActionType.REPLACE:
         return action.payload
       default:
         return state
@@ -468,13 +476,12 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   private _update() {
-    if (this._destroyed || !isModified(this.stateRef as any as Drafted)) {
+    if (this._destroyed || !isModified(this.stateRef.value)) {
       return
     }
 
     this.dispatch({
       type: ActionType.MODIFY,
-      payload: snapshot(this.stateRef.value, this.stateRef as any as Drafted),
     })
   }
 
