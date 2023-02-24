@@ -129,7 +129,7 @@ describe('useModel (without name)', () => {
   })
 
   describe('selector', () => {
-    test('should work', async () => {
+    it('should work', async () => {
       const App = () => {
         const counter = useModel(
           countModel,
@@ -172,7 +172,58 @@ describe('useModel (without name)', () => {
       expect(container.querySelector('#t')?.innerHTML).toEqual('4')
     })
 
-    test('should not work when return api directly', async () => {
+    it('should render only sub props changed', async () => {
+      const model = defineModel({
+        state: {
+          anObject: {
+            value: 1,
+          },
+        },
+        actions: {
+          add() {
+            this.anObject.value += 1
+          },
+        },
+      })
+      const App = () => {
+        const m = useModel(
+          model,
+          (state, actions) => {
+            return {
+              anObject: state.anObject,
+              ...actions,
+            }
+          },
+          []
+        )
+
+        return (
+          <>
+            <div id="v">{m.anObject.value}</div>
+            <button id="button" type="button" onClick={() => m.add()}>
+              add
+            </button>
+          </>
+        )
+      }
+
+      const { container } = render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
+      )
+
+      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
+      await act(async () => {
+        container
+          .querySelector('#button')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+      expect(container.querySelector('#v')?.innerHTML).toEqual('2')
+    })
+
+    it('should not work when return api directly', async () => {
       const App = () => {
         const counter = useModel(countModel, (s) => s, [])
 
