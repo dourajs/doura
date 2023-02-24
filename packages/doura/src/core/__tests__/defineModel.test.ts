@@ -1,3 +1,4 @@
+import { isDraft } from '../../reactivity'
 import { defineModel, modelManager, use } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -17,7 +18,6 @@ afterAll(() => {
 describe('defineModel', () => {
   it('should return the model', () => {
     const model = {
-      name: 'a',
       state: {},
       reducers: {},
     }
@@ -25,6 +25,20 @@ describe('defineModel', () => {
     const modelA = defineModel(model)
 
     expect(model).toBe(modelA)
+  })
+
+  it("should return snapshot of the model's state", () => {
+    const model = {
+      state: {
+        foo: {},
+      },
+    }
+
+    const modelA = defineModel(model)
+
+    const storeA = modelMgr.getModel('one', modelA)
+
+    expect(isDraft(storeA.foo)).toBeFalsy()
   })
 
   describe('composing models', () => {

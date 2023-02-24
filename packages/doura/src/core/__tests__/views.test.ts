@@ -1,5 +1,6 @@
 import { defineModel, modelManager, use } from '../index'
 import { nextTick } from '../scheduler'
+import { isDraft } from '../../reactivity'
 
 let modelMgr: ReturnType<typeof modelManager>
 beforeEach(() => {
@@ -738,5 +739,19 @@ describe('defineModel/views', () => {
       expect(arrayStore.double).toEqual([0, 2])
       expect(numberOfCalls).toBe(2)
     })
+  })
+})
+
+describe('createView', () => {
+  it('should not return a draft', () => {
+    const model = defineModel({
+      state: {
+        a: {},
+      },
+    })
+    const store = modelMgr.getModel('test', model)
+
+    const view = store.$createView((s) => s.a)
+    expect(isDraft(view())).toBeFalsy()
   })
 })

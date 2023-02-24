@@ -24,6 +24,7 @@ import {
 } from './modelOptions'
 import {
   ModelPublicInstance,
+  InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
@@ -126,7 +127,8 @@ export type ModelData<Model extends AnyModel> = ModelState<Model> &
 export type ModelAPI<IModel extends AnyModel> = ModelData<IModel> &
   ModelActions<IModel>
 
-type ViewExts = View & {
+type ViewExt = View & {
+  getSnapshot(): any
   __pre: any
   __snapshot: any
   __externalArgs?: any[]
@@ -164,14 +166,19 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   accessCache: Record<string, AccessTypes>
 
   /**
-   * proxy for public this
+   * proxy for this in the context of views and actions
    */
   proxy: ModelPublicInstance<IModel>
+
+  /**
+   * proxy this public api
+   */
+  publicInst: ModelPublicInstance<IModel>
 
   // props
   actions: ModelActions<IModel>
   views: Views<ModelViews<IModel>>
-  viewInstances: View[] = []
+  viewInstances: ViewExt[] = []
   accessContext: AccessContext
 
   stateRef: {
@@ -221,6 +228,10 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     def(this.ctx, '_', this)
     this.accessCache = Object.create(null)
     this.proxy = new Proxy(
+      this.ctx,
+      InternalInstanceProxyHandlers
+    ) as ModelPublicInstance<IModel>
+    this.publicInst = new Proxy(
       this.ctx,
       PublicInstanceProxyHandlers
     ) as ModelPublicInstance<IModel>
@@ -333,13 +344,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     )
   }
 
-  createView(viewFn: (s: ModelState<IModel>) => any) {
-    let view: View
+  createView(viewFn: (s: ModelState<IModel>) => any): ViewExt {
+    let view!: ViewExt
     this.effectScope.run(() => {
       view = reactiveView(() => {
         const oldCtx = this.accessContext
         this.accessContext = AccessContext.VIEW
-        const externalArgs = (view as ViewExts).__externalArgs
+        const externalArgs = (view as ViewExt).__externalArgs
         try {
           const value = viewFn.call(
             this.proxy,
@@ -363,10 +374,22 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         } finally {
           this.accessContext = oldCtx
         }
-      })
+      }) as ViewExt
     })
 
-    this.viewInstances.push(view!)
+    view.getSnapshot = () => {
+      const value = view.value
+      if (view.mightChange) {
+        view.mightChange = false
+        view.__snapshot = snapshot(value, this.stateRef.value)
+      } else if (view.__pre !== value) {
+        view.__snapshot = snapshot(value, this.stateRef.value)
+      }
+      view.__pre = value
+      return view.__snapshot
+    }
+    this.viewInstances.push(view)
+
     return view!
   }
 
@@ -516,19 +539,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const viewFn = views[viewName]
         const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
-        const viewWithState = view as ViewExts
-        const getViewResult = () => {
-          const value = view.value
-          if (view.mightChange) {
-            view.mightChange = false
-            viewWithState.__snapshot = snapshot(value, this.stateRef.value)
-          } else if (viewWithState.__pre !== value) {
-            viewWithState.__snapshot = snapshot(value, this.stateRef.value)
-          }
-          viewWithState.__pre = value
+        const viewWithState = view as ViewExt
 
-          return viewWithState.__snapshot
-        }
         const getResult = hasExternalArgs
           ? () =>
               (...args: any[]) => {
@@ -546,9 +558,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
                   }
                 }
                 viewWithState.__externalArgs = args
-                return getViewResult()
+                return view.getSnapshot()
               }
-          : getViewResult
+          : view.getSnapshot
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
