@@ -4,4 +4,5 @@ packages/*/dist
 benchmark
 docs
 test-dts
+commitlint.config.js
 **/__tests__
