@@ -53,6 +53,8 @@ export const fooModel = defineModel(() => {
     actions: {
       accessDepend() {
         expectType<number>(count.count)
+        // @ts-expect-error
+        count.noExist
         expectType<number>(count.double)
         expectType<void>(count.inc())
 
