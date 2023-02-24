@@ -108,14 +108,14 @@ class ModelManagerInternal implements ModelManager {
     model: IModel
   ): ModelPublicInstance<IModel> {
     const instance = this.getModelInstance({ name, model })
-    return instance.proxy as ModelPublicInstance<IModel>
+    return instance.publicInst as ModelPublicInstance<IModel>
   }
 
   getDetachedModel<IModel extends AnyModel>(
     model: IModel
   ): ModelPublicInstance<IModel> {
     const instance = this.getModelInstance({ model })
-    return instance.proxy as ModelPublicInstance<IModel>
+    return instance.publicInst as ModelPublicInstance<IModel>
   }
 
   getModelInstance({ name, model }: { name?: string; model: AnyModel }) {
@@ -209,7 +209,7 @@ class ModelManagerInternal implements ModelManager {
 
     this._models.set(name, modelInstance)
     this._hooks.map((hook) => {
-      hook.onModelInstance?.(modelInstance.proxy, { doura: this })
+      hook.onModelInstance?.(modelInstance.publicInst, { doura: this })
     })
 
     return modelInstance

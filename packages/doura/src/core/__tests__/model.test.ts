@@ -229,7 +229,7 @@ describe('model', () => {
     })
   })
 
-  describe('createView', () => {
+  describe('createView()', () => {
     it('should work', () => {
       const viewGetter = jest.fn(function (this: any) {
         return this.a

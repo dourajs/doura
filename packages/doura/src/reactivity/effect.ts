@@ -109,7 +109,6 @@ export class ReactiveEffect<T = any> {
     try {
       this.parent = activeEffect
       activeEffect = this
-      // console.log('enter effect', this)
       shouldTrack = true
 
       trackOpBit = 1 << ++effectTrackDepth
@@ -128,7 +127,6 @@ export class ReactiveEffect<T = any> {
 
       trackOpBit = 1 << --effectTrackDepth
 
-      // console.log('exit effect', this)
       activeEffect = this.parent
       shouldTrack = lastShouldTrack
       this.parent = undefined

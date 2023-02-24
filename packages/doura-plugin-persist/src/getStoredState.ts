@@ -18,7 +18,7 @@ export default function getStoredState(
         return state
       } catch (err) {
         if (process.env.NODE_ENV === 'development')
-          console.log(
+          console.error(
             `persist/getStoredState: Error restoring data ${serialized}`,
             err
           )

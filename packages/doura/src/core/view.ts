@@ -22,9 +22,7 @@ export function createView<IModel extends AnyObjectModel, TReturn>(
     return selector(this, this.$actions)
   })
 
-  const res = function () {
-    return view.value
-  } as ModelView<Selector<IModel, TReturn>>
+  const res = view.getSnapshot as ModelView<Selector<IModel, TReturn>>
   res.destory = function () {
     view.effect.stop()
     const index = instance.effectScope.effects.indexOf(view.effect)

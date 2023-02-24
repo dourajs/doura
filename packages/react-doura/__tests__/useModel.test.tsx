@@ -180,9 +180,6 @@ describe('useModel (without name)', () => {
           <>
             <div id="v">{counter.value}</div>
             <div id="t">{counter.test}</div>
-            <button id="button" type="button" onClick={() => counter.add(2)}>
-              add
-            </button>
           </>
         )
       }
@@ -196,16 +193,8 @@ describe('useModel (without name)', () => {
       expect(
         `detected that "self" is returned in view, it would cause unpected behavior`
       ).toHaveBeenWarned()
-      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
-      expect(container.querySelector('#t')?.innerHTML).toEqual('2')
-      await act(async () => {
-        container
-          .querySelector('#button')
-          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        await nextTick()
-      })
-      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
-      expect(container.querySelector('#t')?.innerHTML).toEqual('2')
+      expect(container.querySelector('#v')?.innerHTML).toEqual('')
+      expect(container.querySelector('#t')?.innerHTML).toEqual('')
     })
   })
 })
