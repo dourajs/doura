@@ -80,12 +80,9 @@ export function invariant(condition: any, message?: string): asserts condition {
 
 const slice = Array.prototype.slice
 
-export function shallowCopy(base: any) {
-  if (isMap(base)) return new Map(base)
-  if (isSet(base)) return new Set(base)
-  if (Array.isArray(base)) return slice.call(base)
+function strictCopy(base: any) {
   const descriptors = Object.getOwnPropertyDescriptors(base)
-  let keys = Reflect.ownKeys(descriptors)
+  const keys = ownKeys(descriptors)
   for (let i = 0; i < keys.length; i++) {
     const key: any = keys[i]
     const desc = descriptors[key]
@@ -105,6 +102,40 @@ export function shallowCopy(base: any) {
       }
   }
   return Object.create(Object.getPrototypeOf(base), descriptors)
+}
+
+const isEnumerable = Object.prototype.propertyIsEnumerable
+
+// For best performance with shallow copies,
+// don't use `Object.create(Object.getPrototypeOf(obj), Object.getOwnPropertyDescriptors(obj));` by default.
+function quickCopyObj(base: any) {
+  const copy: Record<string | symbol, any> = {}
+  const keys = ownKeys(base)
+  for (let i = 0; i < keys.length; i++) {
+    const key: any = keys[i]
+    const target = base[key]
+    if (isEnumerable.call(base, key)) {
+      copy![key] = target
+    } else {
+      Object.defineProperty(copy, key, {
+        configurable: true,
+        writable: true,
+        enumerable: false,
+        value: target,
+      })
+    }
+  }
+  return copy
+}
+
+export function shallowCopy(base: any) {
+  if (Array.isArray(base)) return slice.call(base)
+  if (isMap(base)) return new Map(base)
+  if (isSet(base)) return new Set(base)
+  if (Object.getPrototypeOf(base) === Object.prototype) {
+    return quickCopyObj(base)
+  }
+  return strictCopy(base)
 }
 
 export const ownKeys: (target: object) => PropertyKey[] =
