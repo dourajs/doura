@@ -5,6 +5,7 @@ import { Suite } from 'benchmark'
 import { parse } from 'json2csv'
 import { draft, snapshot } from '../packages/doura'
 import { create } from 'mutative'
+import produce from 'immer'
 
 const result = [
   {
@@ -12,6 +13,9 @@ const result = [
   },
   {
     Name: 'Mutative',
+  },
+  {
+    Name: 'Immer',
   },
   {
     Name: 'Doura',
@@ -74,6 +78,21 @@ suite
     'Mutative',
     function () {
       void create(baseState, (draft) => {
+        draft.arr.push(i)
+        draft.map[i] = i
+      })
+    },
+    {
+      onStart: () => {
+        i = Math.random()
+        baseState = getData()
+      },
+    }
+  )
+  .add(
+    'Immer',
+    function () {
+      void produce(baseState, (draft: any) => {
         draft.arr.push(i)
         draft.map[i] = i
       })
