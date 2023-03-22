@@ -32,6 +32,7 @@ importers:
       execa: ^4.0.2
       fs-extra: 10.1.0
       husky: ^7.0.2
+      immer: 9.0.19
       jest: 28.1.1
       json2csv: 6.0.0-alpha.2
       lint-staged: ^11.1.2
@@ -72,6 +73,7 @@ importers:
       execa: 4.1.0
       fs-extra: 10.1.0
       husky: 7.0.4
+      immer: 9.0.19
       jest: 28.1.1_ueay6ggeznldu5fg5aptl3yb2i
       json2csv: 6.0.0-alpha.2
       lint-staged: 11.2.6
@@ -15345,7 +15347,7 @@ packages:
     resolution: {integrity: sha512-z8H8/diyk76B7q5wg+Ud0+CqzcAF3mBBI/bA5ne5zrRUUIvNkJY//D3BqyH571KuAC4Nr7Rw7CjWX4r0y9DvNg==}
     engines: {node: '>=0.8.0'}
     os: [darwin]
-    deprecated: fsevents 1 will break on node v14+ and could be using insecure binaries. Upgrade to fsevents 2.
+    deprecated: Way too old
     requiresBuild: true
     dependencies:
       nan: 2.17.0
@@ -16439,6 +16441,10 @@ packages:
   /immer/9.0.16:
     resolution: {integrity: sha512-qenGE7CstVm1NrHQbMh8YaSzTZTFNP3zPqr3YU0S0UY441j4bJTg4A2Hh5KAhwgaiU6ZZ1Ar6y/2f4TblnMReQ==}
     dev: false
+
+  /immer/9.0.19:
+    resolution: {integrity: sha512-eY+Y0qcsB4TZKwgQzLaE/lqYMlKhv5J9dyd2RhhtGhNo2njPXDqU9XPfcNfa3MIDsdtZt5KlkIsirlo4dHsWdQ==}
+    dev: true
 
   /import-cwd/2.1.0:
     resolution: {integrity: sha1-qmzzbnInYShcs3HsZRn1PiQ1sKk=}
