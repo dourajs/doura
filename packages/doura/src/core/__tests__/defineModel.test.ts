@@ -158,4 +158,51 @@ describe('defineModel', () => {
   it('should throw when calling use() outside of a function model', () => {
     expect(() => use({ state: {} })).toThrow(/Invalid use\(\) call/)
   })
+
+  it('should not trigger updates in nested action', async () => {
+    const stateA = {
+      value: 0,
+    }
+    const stateB = {
+      anArr: [] as number[],
+    }
+    const mA = defineModel({
+      state: stateA,
+      actions: {
+        async update(v: number) {
+          this.value = v
+        },
+      },
+    })
+    const mB = defineModel(() => {
+      const a = use('a', mA)
+      return {
+        state: stateB,
+        views: {
+          double() {
+            return this.anArr.map((n) => n * 2)
+          },
+        },
+        actions: {
+          change(n: number) {
+            this.anArr.push(n)
+            a.update(n)
+          },
+        },
+      }
+    })
+
+    const a = modelMgr.getModel('a', mA)
+    const b = modelMgr.getModel('b', mB)
+    b.$subscribe(() => {
+      void b.double
+    })
+    b.change(1)
+    expect(a.$rawState).toEqual({
+      value: 1,
+    })
+    expect(b.$rawState).toEqual({
+      anArr: [1],
+    })
+  })
 })

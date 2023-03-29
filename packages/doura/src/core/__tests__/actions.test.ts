@@ -165,17 +165,16 @@ describe('defineModel/actions', () => {
     expect(store.$state).toEqual({ value: 4 })
   })
 
-  it('should batch update and only triggered once (async action)', async () => {
+  it("should not trigger change event if state doesn't change", async () => {
     const fn = jest.fn()
     const count = defineModel({
       state: { value: 0 },
       actions: {
-        async inc() {
-          this.value += 1
-          this.value += 1
-          await timeout(10)
-          this.value += 1
-          this.value += 1
+        inc() {
+          this.value++
+        },
+        doNothing() {
+          // do nothing
         },
       },
     })
@@ -186,10 +185,11 @@ describe('defineModel/actions', () => {
     expect(fn).toHaveBeenCalledTimes(1)
     await nextTick()
     expect(fn).toHaveBeenCalledTimes(1)
-    expect(store.$state).toEqual({ value: 2 })
-    await timeout(10)
-    expect(fn).toHaveBeenCalledTimes(2)
-    expect(store.$state).toEqual({ value: 4 })
+    store.doNothing()
+    expect(fn).toHaveBeenCalledTimes(1)
+    await nextTick()
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(store.$state).toEqual({ value: 1 })
   })
 
   it('should return original object if it has not been modified', async () => {

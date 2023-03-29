@@ -106,7 +106,7 @@ function queueFlush() {
 
 export function invalidateJob(job: SchedulerJob) {
   const i = queue.indexOf(job)
-  if (i > flushIndex) {
+  if (i >= flushIndex) {
     queue.splice(i, 1)
   }
 }
