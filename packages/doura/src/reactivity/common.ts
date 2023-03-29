@@ -85,6 +85,13 @@ export function latest<T extends DraftState>(
   return state.copy || (state.base as any)
 }
 
+export function markUnchanged(draft: Drafted): void {
+  const state = draft[ReactiveFlags.STATE]
+  if (state) {
+    state.modified = false
+  }
+}
+
 export function markChanged(state: DraftState) {
   if (!state.modified) {
     state.modified = true

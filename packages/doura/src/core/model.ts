@@ -11,6 +11,7 @@ import {
   pauseTracking,
   resetTracking,
   isModified,
+  markUnchanged,
 } from '../reactivity'
 import {
   Views,
@@ -27,7 +28,7 @@ import {
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
-import { queueJob, SchedulerJob } from './scheduler'
+import { queueJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
 
 export enum ActionType {
@@ -204,6 +205,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.subscribe = this.subscribe.bind(this)
     this.isolate = this.isolate.bind(this)
     this.getApi = this.getApi.bind(this)
+    this._update = this._update.bind(this)
 
     this.options = model
     this.name = name || ''
@@ -212,10 +214,10 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.stateRef = draft({
       value: this._initState,
     })
-    const update: SchedulerJob = this._update.bind(this)
+    ;(this._update as any).__name = name
     this._draftListenerHandler = watch(this.stateRef, () => {
       if (this._watchStateChange) {
-        queueJob(update)
+        queueJob(this._update)
       }
     })
     this._setState(this._initState)
@@ -476,13 +478,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   private _update() {
-    if (this._destroyed || !isModified(this.stateRef.value)) {
+    if (this._destroyed || !isModified(this.stateRef as any)) {
       return
     }
 
     this.dispatch({
       type: ActionType.MODIFY,
     })
+    markUnchanged(this.stateRef as any)
   }
 
   private _triggerListener(event: ModelChangeEvent) {
@@ -528,7 +531,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
             } finally {
               // flush changes to model synchronously right after an action.
               // this prevent issues like https://github.com/pmndrs/valtio/issues/270
-              --this._actionDepth === 0 && this._update()
+
+              if (--this._actionDepth === 0) {
+                invalidateJob(this._update)
+                this._update()
+              }
             }
 
             return res

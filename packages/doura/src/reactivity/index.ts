@@ -1,4 +1,4 @@
-export { toState, toBase, isDraft, isModified } from './common'
+export { toState, toBase, isDraft, isModified, markUnchanged } from './common'
 export { View, view, ViewGetter } from './view'
 export { draft, snapshot, watch } from './draft'
 export { ReactiveEffect, pauseTracking, resetTracking } from './effect'

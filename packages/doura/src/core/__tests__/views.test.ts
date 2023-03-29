@@ -50,6 +50,27 @@ describe('defineModel/views', () => {
     expect(store.double(2)).toBe(2)
   })
 
+  // fixme: this test is not working
+  it.skip('should receive external params', () => {
+    const count = defineModel({
+      state: {
+        count: 1,
+      },
+      views: {
+        double(s, a: number) {
+          return {}
+        },
+      },
+    })
+    const store = modelMgr.getModel('test', count)
+
+    expect(typeof store.double).toBe('function')
+    let a = store.double(2)
+    let b = store.double(3)
+    expect(store.double(2)).toBe(a)
+    expect(store.double(3)).toBe(b)
+  })
+
   it('should warn when changing state in a view', () => {
     let initState = {
       a: 0,
