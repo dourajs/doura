@@ -79,6 +79,9 @@ describe('createUseModel', () => {
     expect(container.querySelector('#v')?.innerHTML).toEqual('1')
     expect(container.querySelector('#t')?.innerHTML).toEqual('2')
     expect(container.querySelector('#e')?.innerHTML).toEqual('3')
+    expect(
+      'The testExtra in the views is using additional parameters.'
+    ).toHaveBeenWarned()
   })
 
   describe('should rerender when state changed', () => {
