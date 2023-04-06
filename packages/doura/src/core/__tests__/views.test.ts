@@ -48,6 +48,9 @@ describe('defineModel/views', () => {
 
     expect(typeof store.double).toBe('function')
     expect(store.double(2)).toBe(2)
+    expect(
+      'The double in the views is using additional parameters.'
+    ).toHaveBeenWarned()
   })
 
   // fixme: this test is not working
@@ -69,6 +72,9 @@ describe('defineModel/views', () => {
     let b = store.double(3)
     expect(store.double(2)).toBe(a)
     expect(store.double(3)).toBe(b)
+    expect(
+      'The double in the views is using additional parameters.'
+    ).toHaveBeenWarned()
   })
 
   it('should warn when changing state in a view', () => {
@@ -248,6 +254,9 @@ describe('defineModel/views', () => {
     expect(calltime).toBe(1)
     store.doubleB(1)
     expect(calltime).toBe(1)
+    expect(
+      'The doubleB in the views is using additional parameters.'
+    ).toHaveBeenWarned()
   })
 
   it("should not be invoked when deps don't change (complex)", () => {
