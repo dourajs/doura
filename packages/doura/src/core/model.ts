@@ -554,9 +554,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
         const viewWithState = view as ViewExt
-        if (hasExternalArgs) {
+        if (hasExternalArgs && __DEV__) {
           warn(
-            `The ${viewName} in the view is using additional parameters. This feature will no longer be supported in the future, please make changes as soon as possible.`
+            `The ${viewName} in the views is using additional parameters. This feature will no longer be supported in the future, please make changes as soon as possible.`
           )
         }
         const getResult = hasExternalArgs
