@@ -35,7 +35,7 @@ export function DocCardList({title, sections }) {
               return matchedHeaders.length
                 ? {
                     label: item.label,
-                    link: item.href,
+                    href: item.href,
                     customProps: { headers: matchedHeaders },
                   }
                 : null;
