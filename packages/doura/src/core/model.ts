@@ -198,6 +198,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
   private _destroyed: boolean = false
+  private _draftToSnapshot: Map<any, any> = new Map()
 
   constructor(model: IModel, { name, initState }: ModelInternalOptions) {
     this.patch = this.patch.bind(this)
@@ -406,7 +407,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     switch (action.type) {
       case ActionType.MODIFY:
       case ActionType.PATCH:
-        return snapshot(this.stateRef.value, this.stateRef.value)
+        return snapshot(
+          this.stateRef.value,
+          this.stateRef.value,
+          this._draftToSnapshot
+        )
       case ActionType.REPLACE:
         return action.payload
       default:
@@ -456,6 +461,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // reset props
     this._destroyed = true
     this._api = null
+    this._draftToSnapshot.clear()
 
     this._currentState = null
     this.stateRef = {
