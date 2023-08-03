@@ -230,6 +230,36 @@ describe('defineModel/actions', () => {
     expect(store.$rawState.anArr).toBe(state.anArr)
   })
 
+  it('should return original object if it has not been modified (cross multiple actions)', async () => {
+    const count = defineModel({
+      state: {
+        step: 1,
+        anArr: [{ key: 1 }],
+      },
+      actions: {
+        changeStep() {
+          this.step = this.step + 1
+        },
+        changeArr() {
+          this.anArr[0].key = 2
+        },
+      },
+    })
+
+    const store = modelMgr.getModel('count', count)
+    // change arr first
+    store.changeArr()
+    expect(store.$rawState).toEqual({
+      step: 1,
+      anArr: [{ key: 2 }],
+    })
+    const arr = store.anArr
+    // change another prop but not arr
+    store.changeStep()
+    // arr should keep the same reference
+    expect(store.anArr).toBe(arr)
+  })
+
   it('should return a new object if the original one get modified', async () => {
     const state = {
       anObj: {
