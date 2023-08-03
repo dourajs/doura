@@ -787,7 +787,7 @@ describe(`reactivity/snapshot`, () => {
     Object.defineProperty(newData, 'x', {
       enumerable: true,
       get() {
-        throw new Error('visited!')
+        throw new Error('visited x!')
       },
     })
 
@@ -795,7 +795,7 @@ describe(`reactivity/snapshot`, () => {
       aProp: 'hi' as any,
       anObject: {
         get nested() {
-          throw new Error('visited!')
+          throw new Error('visited nested!')
         },
         coffee: false,
       },

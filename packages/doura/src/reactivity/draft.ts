@@ -176,7 +176,7 @@ export function takeSnapshotFromDraft(
       updateDraftState(state, value)
       snapshots_.delete(state.proxy)
     } else {
-      value = state.base
+      value = createSnapshotProxy(state.base, draftSnapshot)
     }
     copies.set(state, value)
     for (const c of state.children) {
@@ -194,7 +194,7 @@ export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
     return new Proxy(draftSnapshot.copies.get(state), handler)
   }
 
-  return new Proxy(shallowCopy(obj), handler)
+  return new Proxy(obj, handler)
 }
 
 export function snapshot<T>(
