@@ -198,6 +198,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
   private _destroyed: boolean = false
+  private _lastDraftToSnapshot: Map<any, any> = new Map()
 
   constructor(model: IModel, { name, initState }: ModelInternalOptions) {
     this.patch = this.patch.bind(this)
@@ -361,7 +362,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         this.accessContext = AccessContext.VIEW
         const externalArgs = (view as ViewExt).__externalArgs
         try {
-          const value = viewFn.call(
+          let value = viewFn.call(
             this.proxy,
             this.proxy,
             ...(externalArgs ? (externalArgs as []) : emptyArray)
@@ -372,10 +373,12 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
                 warn(
                   `detected that "self" is returned in view, it would cause unpected behavior`
                 )
+                value = this.getApi()
               } else if (value === this.proxy.$state) {
                 warn(
                   `detected that "$state" is returned in view, it would cause unpected behavior`
                 )
+                value = this._currentState
               }
             }
           }
@@ -405,8 +408,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   reducer(state: ModelState<AnyModel>, action: Action) {
     switch (action.type) {
       case ActionType.MODIFY:
-      case ActionType.PATCH:
-        return snapshot(this.stateRef.value, this.stateRef.value)
+      case ActionType.PATCH: {
+        const draftToSnapshot = new Map(this._lastDraftToSnapshot)
+        this._lastDraftToSnapshot = draftToSnapshot
+        return snapshot(
+          this.stateRef.value,
+          this.stateRef.value,
+          this._lastDraftToSnapshot
+        )
+      }
       case ActionType.REPLACE:
         return action.payload
       default:
@@ -456,6 +466,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // reset props
     this._destroyed = true
     this._api = null
+    this._lastDraftToSnapshot.clear()
 
     this._currentState = null
     this.stateRef = {

@@ -5,12 +5,12 @@ import { DraftState } from './draft'
 
 export type DraftSnapshot = {
   copies: Map<DraftState, any>
-  proxies: Map<any, any>
+  snapshots: Map<any, any>
 }
 
 export function snapshotHandler(
   target: any,
-  { copies, proxies }: DraftSnapshot
+  { copies, snapshots }: DraftSnapshot
 ) {
   const getHandlers = (target: any) => {
     switch (getTargetType(target)) {
@@ -33,10 +33,10 @@ export function snapshotHandler(
     }
 
     if (isDraft(value)) {
-      let proxy = proxies.get(value)
+      let proxy = snapshots.get(value)
       if (!proxy) {
         const target = copies.get(value[ReactiveFlags.STATE])
-        proxies.set(value, (proxy = new Proxy(target, getHandlers(target))))
+        snapshots.set(value, (proxy = new Proxy(target, getHandlers(target))))
       }
 
       return proxy

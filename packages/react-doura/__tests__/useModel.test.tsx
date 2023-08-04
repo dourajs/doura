@@ -244,8 +244,8 @@ describe('useModel (without name)', () => {
       expect(
         `detected that "self" is returned in view, it would cause unpected behavior`
       ).toHaveBeenWarned()
-      expect(container.querySelector('#v')?.innerHTML).toEqual('')
-      expect(container.querySelector('#t')?.innerHTML).toEqual('')
+      expect(container.querySelector('#v')?.innerHTML).toEqual('1')
+      expect(container.querySelector('#t')?.innerHTML).toEqual('2')
     })
   })
 })
