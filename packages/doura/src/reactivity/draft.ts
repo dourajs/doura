@@ -30,7 +30,7 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   parent?: DraftState
   // The base object.
   base: T
-  // The base proxy.
+  // The base proxy, draft itself.
   proxy: T
   // The base copy with any updated values.
   copy: T | null
@@ -157,12 +157,16 @@ export function watch(draft: any, cb: () => void): () => void {
   }
 }
 
-export function takeSnapshotFromDraft(draft: Drafted): DraftSnapshot {
+export function takeSnapshotFromDraft(
+  draft: Drafted,
+  snapshots?: Map<any, any>
+): DraftSnapshot {
   const copies = new Map()
   const draftSnapshot: DraftSnapshot = {
     copies,
-    proxies: new Map(),
+    snapshots: snapshots || new Map(),
   }
+  const snapshots_ = draftSnapshot.snapshots
   const queue = [draft[ReactiveFlags.STATE]]
   while (queue.length) {
     const state = queue.pop()!
@@ -170,8 +174,9 @@ export function takeSnapshotFromDraft(draft: Drafted): DraftSnapshot {
     if (state.modified) {
       value = shallowCopy(state.copy)
       updateDraftState(state, value)
+      snapshots_.delete(state.proxy)
     } else {
-      value = state.base
+      value = createSnapshotProxy(state.base, draftSnapshot)
     }
     copies.set(state, value)
     for (const c of state.children) {
@@ -189,15 +194,19 @@ export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
     return new Proxy(draftSnapshot.copies.get(state), handler)
   }
 
-  return new Proxy(shallowCopy(obj), handler)
+  return new Proxy(obj, handler)
 }
 
-export function snapshot<T>(value: T, draft: Drafted): T {
+export function snapshot<T>(
+  value: T,
+  draft: Drafted,
+  snapshots?: Map<any, any>
+): T {
   if (!isObject(value)) {
     return value
   }
 
-  const draftSnapshot = takeSnapshotFromDraft(draft)
+  const draftSnapshot = takeSnapshotFromDraft(draft, snapshots)
   return createSnapshotProxy(value, draftSnapshot)
 }
 
