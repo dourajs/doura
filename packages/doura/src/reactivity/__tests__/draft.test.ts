@@ -1,5 +1,5 @@
 import { draft, snapshot } from '../draft'
-import { isModified } from '../common'
+import { isModified, markRaw } from '../common'
 import { each } from '../../utils'
 
 const produce = <T extends any = any>(value: T, cb: (v: T) => void) => {
@@ -746,6 +746,14 @@ describe(`reactivity/draft`, () => {
       expect(nextState[0].a).toBe(2)
       expect(nextState[0].b.c.a).toBe(2)
     })
+  })
+
+  it('should skip objects that have been returned by markRaw', () => {
+    const obj = {
+      foo: 1,
+    }
+    const dObj = draft(markRaw(obj))
+    expect(dObj).toBe(obj)
   })
 })
 
