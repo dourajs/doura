@@ -1,6 +1,6 @@
 {
   "name": "doura-plugin-log",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "main": "index.js",
   "module": "dist/doura-plugin-log.esm-bundler.js",
   "types": "dist/doura-plugin-log.d.ts",
@@ -39,6 +39,6 @@
     "doura": "workspace:*"
   },
   "peerDependencies": {
-    "doura": "0.0.12"
+    "doura": "0.0.13"
   }
 }
