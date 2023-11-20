@@ -4,7 +4,7 @@ import {
   AnyFunctionModel,
   AnyObjectModel,
 } from './modelOptions'
-import { createModelInstnace, ModelInternal, UnSubscribe } from './model'
+import { createModelInstance, ModelInternal, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
@@ -196,12 +196,12 @@ class ModelManagerInternal implements ModelManager {
     model: AnyObjectModel
   }): ModelInternal {
     if (!name) {
-      return createModelInstnace(model)
+      return createModelInstance(model)
     }
 
     this._hooks.map((hook) => hook.onModel?.(name, model, { doura: this }))
 
-    const modelInstance = createModelInstnace(model, {
+    const modelInstance = createModelInstance(model, {
       name,
       initState: this._getInitialState(name),
     })
