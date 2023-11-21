@@ -606,7 +606,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 }
 
-export function createModelInstnace<IModel extends AnyObjectModel>(
+export function createModelInstance<IModel extends AnyObjectModel>(
   modelOptions: IModel,
   options: ModelInternalOptions = {}
 ) {
