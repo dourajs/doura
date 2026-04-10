@@ -192,17 +192,18 @@ export function takeSnapshotFromDraft(
     snapshots: snapshots || new Map(),
   }
   const snapshots_ = draftSnapshot.snapshots
+  // Only traverse modified states. markChanged() bubbles up from leaf to
+  // root, so an unmodified state cannot have modified descendants.
+  // Unmodified drafts are resolved lazily by snapshotHandler's toSnapshot.
   const queue = [draft[ReactiveFlags.STATE]]
   while (queue.length) {
     const state = queue.pop()!
-    let value: any
-    if (state.modified) {
-      value = shallowCopy(state.copy)
-      updateDraftState(state, value)
-      snapshots_.delete(state.proxy)
-    } else {
-      value = createSnapshotProxy(state.base, draftSnapshot)
+    if (!state.modified) {
+      continue
     }
+    const value = shallowCopy(state.copy)
+    updateDraftState(state, value)
+    snapshots_.delete(state.proxy)
     copies.set(state, value)
     for (const [c] of state.children) {
       queue.push(c)
@@ -213,12 +214,15 @@ export function takeSnapshotFromDraft(
 }
 
 export function createSnapshotProxy(obj: any, draftSnapshot: DraftSnapshot) {
-  const handler = snapshotHandler(obj, draftSnapshot)
   if (isDraft(obj)) {
     const state: DraftState = obj[ReactiveFlags.STATE]
-    return new Proxy(draftSnapshot.copies.get(state), handler)
+    // Use copies entry for modified states, fall back to base for unmodified
+    const target = draftSnapshot.copies.get(state) || state.base
+    const handler = snapshotHandler(target, draftSnapshot)
+    return new Proxy(target, handler)
   }
 
+  const handler = snapshotHandler(obj, draftSnapshot)
   return new Proxy(obj, handler)
 }
 

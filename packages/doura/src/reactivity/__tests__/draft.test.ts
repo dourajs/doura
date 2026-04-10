@@ -850,6 +850,50 @@ describe(`reactivity/snapshot`, () => {
     expect(value.anObject.nested.yummie).toEqual(false)
   })
 
+  it('should correctly resolve unmodified nested drafts in snapshot', () => {
+    const state = {
+      modified: { value: 1 },
+      unmodified: { value: 2, deep: { x: 10 } },
+    }
+
+    const drafted = draft(state)
+    // Access both branches to create child drafts
+    void drafted.modified.value
+    void drafted.unmodified.deep.x
+
+    // Only modify one branch
+    drafted.modified.value = 99
+
+    const snap = snapshot({ ...drafted }, drafted)
+
+    // Modified branch should reflect the change
+    expect(snap.modified.value).toBe(99)
+
+    // Unmodified branch should still be accessible and correct
+    expect(snap.unmodified.value).toBe(2)
+    expect(snap.unmodified.deep.x).toBe(10)
+  })
+
+  it('should produce immutable snapshot for unmodified drafts resolved lazily', () => {
+    const state = {
+      a: { value: 1 },
+      b: { value: 2 },
+    }
+
+    const drafted = draft(state)
+    void drafted.a.value
+    void drafted.b.value
+    drafted.a.value = 10
+
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.a.value).toBe(10)
+    expect(snap.b.value).toBe(2)
+
+    // Mutate draft after snapshot — snapshot should NOT change
+    drafted.b.value = 999
+    expect(snap.b.value).toBe(2)
+  })
+
   it("should not visit objects which aren't modified", () => {
     const newData: any = {}
     Object.defineProperty(newData, 'x', {

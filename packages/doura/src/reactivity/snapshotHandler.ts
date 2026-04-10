@@ -35,8 +35,14 @@ export function snapshotHandler(
     if (isDraft(value)) {
       let proxy = snapshots.get(value)
       if (!proxy) {
-        const target = copies.get(value[ReactiveFlags.STATE])
-        snapshots.set(value, (proxy = new Proxy(target, getHandlers(target))))
+        // Use copies entry for modified states, fall back to base for
+        // unmodified states (lazily resolved — not pre-populated by BFS)
+        const state = value[ReactiveFlags.STATE]
+        const resolved = copies.get(state) || state.base
+        snapshots.set(
+          value,
+          (proxy = new Proxy(resolved, getHandlers(resolved)))
+        )
       }
 
       return proxy
