@@ -112,7 +112,9 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
     state.copy!.set(key, value)
     // Track new child draft so finalization can resolve it
     if (value && isDraft(value as any)) {
-      addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
+      const childState = (value as any)[ReactiveFlags.STATE] as DraftState
+      addChildRef(state, childState)
+      childState.key = key
     }
   }
 

@@ -204,6 +204,10 @@ function createSetter() {
       }
       if (newChildState) {
         addChildRef(state, newChildState)
+        // Update stored key so key-based finalization resolves the
+        // new position directly, avoiding a full needsScan in the
+        // common rename case (move + delete).
+        newChildState.key = prop
       }
     }
 
