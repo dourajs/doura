@@ -192,157 +192,212 @@ describe('defineModel/actions', () => {
     expect(store.$state).toEqual({ value: 1 })
   })
 
-  it('should return original object if it has not been modified', async () => {
-    const state = {
-      anObj: {
-        a: 'a',
-        aNestObj: {
-          b: 'b',
+  describe('structural sharing', () => {
+    it('unmodified subtrees keep same reference after action', () => {
+      const state = {
+        anObj: { a: 'a', aNestObj: { b: 'b' } },
+        anArr: [1],
+        c: 0,
+      }
+      const model = defineModel({
+        state,
+        actions: {
+          changeC() {
+            this.c = 1
+          },
         },
-      },
-      anArr: [1],
-      c: 0,
-    }
-    const count = defineModel({
-      state: state,
-      actions: {
-        async change() {
-          this.c = 1
-        },
-      },
+      })
+
+      const store = modelMgr.getModel('test', model)
+      store.changeC()
+      expect(store.$rawState.anObj).toBe(state.anObj)
+      expect(store.$rawState.anObj.aNestObj).toBe(state.anObj.aNestObj)
+      expect(store.$rawState.anArr).toBe(state.anArr)
     })
 
-    const store = modelMgr.getModel('count', count)
-    store.change()
-    await nextTick()
-    expect(store.$rawState).toEqual({
-      anObj: {
-        a: 'a',
-        aNestObj: {
-          b: 'b',
+    it('modified subtrees get new references', () => {
+      const state = {
+        anObj: { a: 'a', aNestObj: { b: 'b' } },
+        anArr: [1],
+      }
+      const model = defineModel({
+        state,
+        actions: {
+          change() {
+            this.anObj.aNestObj.b = 'bb'
+            this.anArr.push(2)
+          },
         },
-      },
-      anArr: [1],
-      c: 1,
-    })
-    expect(store.$rawState.anObj).toBe(state.anObj)
-    expect(store.$rawState.anObj.aNestObj).toBe(state.anObj.aNestObj)
-    expect(store.$rawState.anArr).toBe(state.anArr)
-  })
+      })
 
-  it('should return original object if it has not been modified (cross multiple actions)', async () => {
-    const count = defineModel({
-      state: {
-        step: 1,
-        anArr: [{ key: 1 }],
-      },
-      actions: {
-        changeStep() {
-          this.step = this.step + 1
-        },
-        changeArr() {
-          this.anArr[0].key = 2
-        },
-      },
+      const store = modelMgr.getModel('test', model)
+      store.change()
+      // modified path: root → anObj → aNestObj all get new references
+      expect(store.$rawState.anObj).not.toBe(state.anObj)
+      expect(store.$rawState.anObj.aNestObj).not.toBe(state.anObj.aNestObj)
+      expect(store.$rawState.anArr).not.toBe(state.anArr)
     })
 
-    const store = modelMgr.getModel('count', count)
-    // change arr first
-    store.changeArr()
-    const arr = store.anArr
-    // change another prop but not arr
-    store.changeStep()
-    // arr should keep the same reference
-    expect(store.anArr).toBe(arr)
-  })
+    it('unmodified subtrees keep same reference across multiple actions', () => {
+      const model = defineModel({
+        state: {
+          step: 1,
+          anArr: [{ key: 1 }],
+        },
+        actions: {
+          changeStep() {
+            this.step += 1
+          },
+          changeArr() {
+            this.anArr[0].key = 2
+          },
+        },
+      })
 
-  it('should not affect old snapshots (modified)', async () => {
-    const count = defineModel({
-      state: {
-        step: 1,
-        anArr: [{ key: 1 }],
-      },
-      actions: {
-        changeStep() {
-          this.step = this.step + 1
-        },
-        changeArr() {
-          this.anArr[0].key += 1
-        },
-      },
+      const store = modelMgr.getModel('test', model)
+      store.changeArr()
+      const arr = store.anArr
+      // change another prop but not arr
+      store.changeStep()
+      expect(store.anArr).toBe(arr)
     })
 
-    const store = modelMgr.getModel('count', count)
-    // change arr first
-    store.changeArr()
-    let snapshot = store.$rawState
-    let arr = snapshot.anArr
-    expect(snapshot.anArr).toBe(arr)
-    // change arr again
-    store.changeArr()
-    // arr of snapshot should keep the same reference
-    expect(snapshot.anArr).toBe(arr)
-  })
+    it('modified subtree gets new reference, sibling keeps same reference', () => {
+      const model = defineModel({
+        state: {
+          a: { value: 1 },
+          b: { value: 2 },
+        },
+        actions: {
+          changeA() {
+            this.a.value += 1
+          },
+        },
+      })
 
-  it('should not affect old snapshots (not modified)', async () => {
-    const count = defineModel({
-      state: {
-        step: 1,
-        anArr: [{ key: 1 }],
-      },
-      actions: {
-        changeStep() {
-          this.step = this.step + 1
-        },
-        changeArr() {
-          this.anArr[0].key += 1
-        },
-      },
+      const store = modelMgr.getModel('test', model)
+      const oldA = store.a
+      const oldB = store.b
+
+      store.changeA()
+      expect(store.a).not.toBe(oldA)
+      expect(store.b).toBe(oldB)
     })
 
-    const store = modelMgr.getModel('count', count)
-    store.changeStep()
-    let snapshot1 = store.$rawState
-    store.changeStep()
-    let snapshot2 = store.$rawState
-    expect(snapshot2.anArr).toBe(snapshot1.anArr)
-  })
+    it('reference changes on modify then stabilizes on subsequent read-only actions', () => {
+      const model = defineModel({
+        state: {
+          data: { value: 1 },
+          count: 0,
+        },
+        actions: {
+          changeData() {
+            this.data.value += 1
+          },
+          changeCount() {
+            this.count += 1
+          },
+        },
+      })
 
-  it('should return a new object if the original one get modified', async () => {
-    const state = {
-      anObj: {
-        a: 'a',
-        aNestObj: {
-          b: 'b',
-        },
-      },
-      anArr: [1],
-    }
-    const count = defineModel({
-      state: state,
-      actions: {
-        async change() {
-          this.anObj.aNestObj.b = 'bb'
-          this.anArr.push(2)
-        },
-      },
+      const store = modelMgr.getModel('test', model)
+
+      // modify data
+      store.changeData()
+      const dataAfterChange = store.data
+
+      // subsequent actions don't touch data — reference should stay stable
+      store.changeCount()
+      expect(store.data).toBe(dataAfterChange)
+      store.changeCount()
+      expect(store.data).toBe(dataAfterChange)
     })
 
-    const store = modelMgr.getModel('count', count)
-    store.change()
-    await nextTick()
-    expect(store.$rawState).toEqual({
-      anObj: {
-        a: 'a',
-        aNestObj: {
-          b: 'bb',
+    it('deeply nested modification only changes references on the modified path', () => {
+      const model = defineModel({
+        state: {
+          branch1: { nested: { deep: { value: 1 } } },
+          branch2: { nested: { deep: { value: 2 } } },
         },
-      },
-      anArr: [1, 2],
+        actions: {
+          changeBranch1() {
+            this.branch1.nested.deep.value = 99
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+      const oldBranch1 = store.branch1
+      const oldBranch1Nested = store.branch1.nested
+      const oldBranch1Deep = store.branch1.nested.deep
+      const oldBranch2 = store.branch2
+
+      store.changeBranch1()
+
+      // modified path: all references change
+      expect(store.branch1).not.toBe(oldBranch1)
+      expect(store.branch1.nested).not.toBe(oldBranch1Nested)
+      expect(store.branch1.nested.deep).not.toBe(oldBranch1Deep)
+      expect(store.branch1.nested.deep.value).toBe(99)
+
+      // sibling branch: reference unchanged
+      expect(store.branch2).toBe(oldBranch2)
     })
-    expect(store.$rawState.anObj).not.toBe(state.anObj)
-    expect(store.$rawState.anObj.aNestObj).not.toBe(state.anObj.aNestObj)
-    expect(store.$rawState.anArr).not.toBe(state.anArr)
+
+    it('old snapshot is immutable — not affected by new actions', () => {
+      const model = defineModel({
+        state: {
+          step: 1,
+          anArr: [{ key: 1 }],
+        },
+        actions: {
+          changeArr() {
+            this.anArr[0].key += 1
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+      store.changeArr()
+      const snapshot1 = store.$rawState
+      const arr1 = snapshot1.anArr
+
+      store.changeArr()
+      const snapshot2 = store.$rawState
+
+      // old snapshot not affected
+      expect(snapshot1.anArr).toBe(arr1)
+      expect(snapshot1.anArr[0].key).toBe(2)
+      // new snapshot has new value
+      expect(snapshot2.anArr[0].key).toBe(3)
+      // different references
+      expect(snapshot2.anArr).not.toBe(snapshot1.anArr)
+    })
+
+    it('unmodified subtrees share reference between consecutive snapshots', () => {
+      const model = defineModel({
+        state: {
+          step: 1,
+          anArr: [{ key: 1 }],
+        },
+        actions: {
+          changeStep() {
+            this.step += 1
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+      store.changeStep()
+      const snapshot1 = store.$rawState
+      store.changeStep()
+      const snapshot2 = store.$rawState
+
+      // step changed — snapshots are different objects
+      expect(snapshot2).not.toBe(snapshot1)
+      // anArr not changed — shared between snapshots
+      expect(snapshot2.anArr).toBe(snapshot1.anArr)
+    })
   })
 
   it('should access views by `this`', () => {

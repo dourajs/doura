@@ -90,6 +90,37 @@ function benchSamePaths(cycles: number) {
   return { times, childCounts }
 }
 
+// ===== Scenario 3: wide state, modify 1 item =====
+// Measures lazy snapshot: only modified path is traversed, not the entire tree
+function benchWideState(width: number, cycles: number) {
+  const state: any = {}
+  for (let i = 0; i < width; i++) {
+    state[`item${i}`] = { data: { value: i } }
+  }
+  const rootDraft = draft({ value: state })
+
+  // Access all items to create child drafts (simulates list render)
+  for (let i = 0; i < width; i++) {
+    void rootDraft.value[`item${i}`].data.value
+  }
+  // First snapshot to baseline
+  snapshot(rootDraft.value, rootDraft.value)
+  markUnchanged(rootDraft)
+
+  const times: number[] = []
+  for (let c = 0; c < cycles; c++) {
+    // Modify only 1 item out of `width`
+    rootDraft.value.item0.data.value = c
+
+    const start = performance.now()
+    snapshot(rootDraft.value, rootDraft.value)
+    times.push(performance.now() - start)
+    markUnchanged(rootDraft)
+  }
+
+  return times
+}
+
 // --- Run ---
 const CYCLES = 500
 const SAMPLE = 10
@@ -136,3 +167,19 @@ console.log(
       : '✅  Stable'
   }`
 )
+console.log()
+
+for (const width of [100, 1000]) {
+  console.log(`=== Scenario 3: ${width} items, modify 1 per cycle ===`)
+  console.log(`${CYCLES} cycles\n`)
+  const r3 = benchWideState(width, CYCLES)
+  const r3Avg = avg(r3)
+  console.log(`  Snapshot avg: ${r3Avg.toFixed(4)} ms`)
+  console.log(
+    `  If O(tree): ~${(r3Avg * 1000).toFixed(0)} µs for ${width} items (${(
+      (r3Avg * 1000) /
+      width
+    ).toFixed(2)} µs/item)`
+  )
+  console.log(`  If O(modified path): should be constant regardless of width\n`)
+}
