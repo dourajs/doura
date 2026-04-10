@@ -5,7 +5,7 @@ import { Suite } from 'benchmark'
 import { parse } from 'json2csv'
 import { draft, snapshot } from '../packages/doura'
 import { create } from 'mutative'
-import produce from 'immer'
+import { produce } from 'immer'
 
 const result = [
   {
