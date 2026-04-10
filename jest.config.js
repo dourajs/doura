@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 module.exports = {
   testEnvironment: 'jsdom',
   preset: 'ts-jest/presets/js-with-ts',
@@ -35,5 +36,6 @@ module.exports = {
     '^react-doura$': '<rootDir>/packages/react-doura/src',
   },
   rootDir: __dirname,
+  modulePathIgnorePatterns: ['<rootDir>/.claude/'],
   testMatch: ['<rootDir>/packages/**/__tests__/**/*.test.[jt]s?(x)'],
 }
