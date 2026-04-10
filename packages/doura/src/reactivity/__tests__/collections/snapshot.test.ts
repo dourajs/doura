@@ -99,7 +99,21 @@ describe('reactivity/collections', () => {
       expect(true).toBe(true)
     })
 
-    test('Map snapshot should resolve draft proxies to plain values', () => {
+    // Eager finalization (fast path) steals copies from modified draft states
+    // and returns them directly without snapshot Proxy wrapping. If child
+    // draft proxies are not resolved to plain values, they leak into the
+    // result with three consequences:
+    //   1. Mutability leak — draft proxy set traps are still active,
+    //      allowing accidental mutation of internal draft state
+    //   2. Memory leak — draft proxy holds the entire DraftState tree
+    //      (root/parent/children/copy), preventing GC
+    //   3. Structural sharing breaks — each produce creates new draft
+    //      proxies, so referential equality checks always fail
+    // The slow path (snapshot Proxy) avoids this by wrapping children
+    // through toSnapshot(), which creates read-only snapshot proxies
+    // with no set trap and no draft state reference.
+
+    test('Map: eager finalization should not leak draft proxies into result', () => {
       const base = new Map<string, { value: number }>([
         ['a', { value: 1 }],
         ['b', { value: 2 }],
@@ -107,17 +121,20 @@ describe('reactivity/collections', () => {
       const result = produce(base, (draft) => {
         draft.get('a')!.value = 10
       })
-      // The result should be a plain Map with plain objects, not draft proxies
       const aVal = result.get('a')!
       expect(aVal.value).toBe(10)
       expect(aVal).toEqual({ value: 10 })
-      // Must not be a draft proxy (no residual proxy references)
+      // Must not be a draft proxy — isDraft checks for ReactiveFlags.STATE
+      // which only exists on draft proxies, not on snapshot proxies or plain objects
       expect(isDraft(aVal)).toBe(false)
-      // 'b' was not accessed — should be the original object (structural sharing)
+      // Unaccessed entry retains original reference (structural sharing)
       expect(result.get('b')).toBe(base.get('b'))
     })
 
-    test('Map snapshot with undefined key should resolve correctly', () => {
+    test('Map: eager finalization resolves undefined key correctly (not confused with NO_KEY sentinel)', () => {
+      // undefined is a valid Map key. The draft() function uses a NO_KEY
+      // symbol sentinel to distinguish "no key argument" from "key is
+      // undefined". This test ensures the sentinel logic is correct.
       const base = new Map<any, { value: number }>([
         [undefined, { value: 1 }],
         ['b', { value: 2 }],
@@ -131,7 +148,7 @@ describe('reactivity/collections', () => {
       expect(result.get('b')).toBe(base.get('b'))
     })
 
-    test('Set snapshot should resolve draft proxies to plain values', () => {
+    test('Set: eager finalization should not leak draft proxies into result', () => {
       const obj1 = { value: 1 }
       const obj2 = { value: 2 }
       const base = new Set([obj1, obj2])
@@ -142,7 +159,7 @@ describe('reactivity/collections', () => {
       const values = Array.from(result)
       expect(values[0]).toEqual({ value: 10 })
       expect(isDraft(values[0])).toBe(false)
-      // Second element was not accessed — should be the original
+      // Unaccessed element retains original reference (structural sharing)
       expect(values[1]).toBe(obj2)
     })
 
