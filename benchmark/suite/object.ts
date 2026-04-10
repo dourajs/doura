@@ -81,10 +81,10 @@ const run = (size: number) => {
 }
 
 ;[
-  ...Array(3)
+  ...Array(1)
     .fill(1)
     .map((_, i) => (1 + i * 4) * 10 ** 3),
-  ...Array(3)
+  ...Array(1)
     .fill(1)
     .map((_, i) => (1 + i * 4) * 10 ** 4),
 ]
