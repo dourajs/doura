@@ -14,6 +14,7 @@ import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
 export type PatchPath = (string | number)[]
 
+/** @deprecated kept for backward compatibility - use state.proxy directly */
 export const draftMap = new WeakMap<any, any>()
 
 export const enum DraftType {
@@ -38,10 +39,13 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   modified: boolean
   // Ture after being disposed
   disposed: boolean
-  // listener
-  listeners: Array<() => void>
-  // child drafts reachable from this state's copy, with reference counts.
-  children: Map<DraftState, number>
+  // listener (lazy: only allocated when watch() is called)
+  listeners: Array<() => void> | null
+  // Child draft states reachable from this state's copy.
+  // Simple array for fast push — stale entries (from overwritten properties)
+  // are harmless because BFS skips them via the modified=false check.
+  // (lazy: only allocated when first child is added)
+  children: DraftState[] | null
 }
 
 export interface ObjectDraftState extends DraftStateBase<AnyObject> {
@@ -72,16 +76,19 @@ export function disposeDraft(draft: Drafted) {
  */
 export function resetDraftChildren(draft: Drafted) {
   const root: DraftState = draft[ReactiveFlags.STATE]
+  if (!root.children) return
   // BFS: clear all children but keep root's own copy intact
   // (root copy holds the just-assigned new value)
-  const queue: DraftState[] = [...root.children.keys()]
-  root.children = new Map()
+  const queue: DraftState[] = root.children.slice()
+  root.children = null
   while (queue.length) {
     const s = queue.pop()!
-    for (const [c] of s.children) {
-      queue.push(c)
+    if (s.children) {
+      for (let i = 0; i < s.children.length; i++) {
+        queue.push(s.children[i])
+      }
+      s.children = null
     }
-    s.children = new Map()
     s.copy = null
   }
 }
@@ -116,8 +123,8 @@ export function draft<T extends Objectish>(
     copy: null,
     modified: false,
     disposed: false,
-    listeners: [],
-    children: new Map(),
+    listeners: null,
+    children: null,
   }
   let proxyTarget: DraftState = state
   let proxyHandlers: ProxyHandler<any> = mutableHandlers
@@ -139,29 +146,19 @@ export function draft<T extends Objectish>(
   }
 
   if (proxyTarget !== state) {
-    Object.keys(state).forEach((key) => {
-      Object.defineProperty(proxyTarget, key, {
-        configurable: true,
-        enumerable: true,
-        writable: true,
-        value: (state as any)[key],
-      })
-    })
+    // Object.assign is significantly faster than Object.defineProperty loop
+    // (same approach as Mutative)
+    Object.assign(proxyTarget, state)
   }
 
   const proxy = new Proxy(proxyTarget, proxyHandlers)
   proxyTarget.proxy = proxy
   if (parent) {
     proxyTarget.root = parent.root
-    parent.children.set(
-      proxyTarget,
-      (parent.children.get(proxyTarget) || 0) + 1
-    )
+    addChildRef(parent, proxyTarget)
   } else {
     proxyTarget.root = proxyTarget
   }
-
-  draftMap.set(proxyTarget, proxy)
 
   return proxyTarget.proxy as any
 }
@@ -172,12 +169,18 @@ export function watch(draft: any, cb: () => void): () => void {
     return NOOP
   }
 
+  if (!state.listeners) {
+    state.listeners = []
+  }
   state.listeners.push(cb)
 
   return () => {
-    const index = state.listeners.indexOf(cb)
-    if (index >= 0) {
-      state.listeners.splice(index, 1)
+    const listeners = state.listeners
+    if (listeners) {
+      const index = listeners.indexOf(cb)
+      if (index >= 0) {
+        listeners.splice(index, 1)
+      }
     }
   }
 }
@@ -201,12 +204,28 @@ export function takeSnapshotFromDraft(
     if (!state.modified) {
       continue
     }
-    const value = shallowCopy(state.copy)
-    updateDraftState(state, value)
+    // Steal the copy directly instead of shallow-copying it again.
+    // The copy is already a shallow clone of base (created by prepareCopy).
+    // We hand it to the snapshot and reset the draft: set base to the
+    // stolen copy so future mutations start from the correct state,
+    // and null out copy so the next mutation triggers a fresh prepareCopy.
+    // This is the same "steal the copy" approach Immer and Mutative use.
+    //
+    // When copy is null, this state was marked modified via markChanged
+    // bubble-up from a child, but prepareCopy was never called because
+    // the state itself was never directly written. In this case, base
+    // already reflects the current state (children are draft proxies
+    // reachable from base), so we create the snapshot copy from base.
+    const value = state.copy ? state.copy : shallowCopy(state.base)
+    state.base = value as any
+    state.copy = null
+    state.modified = false
     snapshots_.delete(state.proxy)
     copies.set(state, value)
-    for (const [c] of state.children) {
-      queue.push(c)
+    if (state.children) {
+      for (let i = 0; i < state.children.length; i++) {
+        queue.push(state.children[i])
+      }
     }
   }
 
@@ -240,21 +259,22 @@ export function snapshot<T>(
 }
 
 export function addChildRef(parent: DraftState, child: DraftState) {
-  parent.children.set(child, (parent.children.get(child) || 0) + 1)
+  if (!parent.children) {
+    parent.children = []
+  }
+  parent.children.push(child)
 }
 
 export function removeChildRef(parent: DraftState, child: DraftState) {
-  const count = parent.children.get(child)
-  if (count !== undefined) {
-    if (count <= 1) {
-      parent.children.delete(child)
-    } else {
-      parent.children.set(child, count - 1)
-    }
+  if (!parent.children) return
+  // Array duplicates serve as the refcount: each addChildRef pushes one
+  // entry, each removeChildRef removes one. indexOf + splice is O(n)
+  // but removal is rare (only on delete/overwrite of draft-valued props).
+  const idx = parent.children.indexOf(child)
+  if (idx !== -1) {
+    parent.children.splice(idx, 1)
   }
 }
 
-function updateDraftState(state: DraftState, base: AnyObject) {
-  state.modified = false
-  state.base = base
-}
+// updateDraftState is no longer needed - takeSnapshotFromDraft steals the copy
+// directly instead of making a new shallow copy.

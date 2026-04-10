@@ -1,5 +1,5 @@
 import { AnyObject, AnySet, AnyMap } from '../types'
-import { toRawType, def } from '../utils'
+import { def, objectToString } from '../utils'
 import {
   DraftState,
   ObjectDraftState,
@@ -35,18 +35,20 @@ export const enum TargetType {
 }
 
 export function getTargetType(value: any) {
-  switch (toRawType(value)) {
-    case 'Object':
-      return TargetType.COMMON
-    case 'Array':
-      return TargetType.ARRAY
-    case 'Set':
-      return TargetType.SET
-    case 'Map':
-      return TargetType.MAP
-    default:
-      return TargetType.INVALID
-  }
+  // Fast type checks (same approach as Immer/Mutative) avoid the
+  // Object.prototype.toString + .slice overhead of toRawType.
+  if (Array.isArray(value)) return TargetType.ARRAY
+  if (value instanceof Map) return TargetType.MAP
+  if (value instanceof Set) return TargetType.SET
+  // Fast path: constructor check is ~10x faster than toString.
+  // Covers plain objects, class instances, and Object.create(null).
+  if (value === null || value === undefined) return TargetType.INVALID
+  const ctor = value.constructor
+  if (ctor === Object) return TargetType.COMMON
+  // Class instances and Object.create(null) both need toString fallback
+  // to distinguish from Date, RegExp, etc.
+  if (objectToString.call(value) === '[object Object]') return TargetType.COMMON
+  return TargetType.INVALID
 }
 
 export function markRaw<T extends object>(

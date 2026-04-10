@@ -85,12 +85,12 @@ const run = (size: number) => {
 }
 
 ;[
-  ...Array(9)
+  ...Array(3)
     .fill(1)
-    .map((_, i) => (i + 1) * 10 ** 3),
-  ...Array(9)
+    .map((_, i) => (1 + i * 4) * 10 ** 3),
+  ...Array(3)
     .fill(1)
-    .map((_, i) => (i + 1) * 10 ** 4),
+    .map((_, i) => (1 + i * 4) * 10 ** 4),
 ]
   .sort((a, b) => a - b)
   .forEach((value) => run(value))

@@ -2,19 +2,11 @@ import {
   ObjectDraftState,
   DraftState,
   draft,
-  draftMap,
   addChildRef,
   removeChildRef,
 } from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
-import {
-  ReactiveFlags,
-  toBase,
-  toState,
-  latest,
-  markChanged,
-  isDraft,
-} from './common'
+import { ReactiveFlags, toBase, toState, latest, markChanged } from './common'
 import {
   track,
   trackDraft,
@@ -113,10 +105,7 @@ function createGetter(): ProxyGetter {
     const target = latest(state)
     if (prop === ReactiveFlags.IS_REACTIVE) {
       return true
-    } else if (
-      prop === ReactiveFlags.STATE &&
-      receiver === draftMap.get(state)
-    ) {
+    } else if (prop === ReactiveFlags.STATE && receiver === state.proxy) {
       return state
     }
 
@@ -143,7 +132,9 @@ function createGetter(): ProxyGetter {
       return value
     }
 
-    if (!isDraft(value)) {
+    // Fast inline isDraft: we already know value is a non-null object
+    // (checked by isObject above), so skip the null guard.
+    if (!value[ReactiveFlags.STATE]) {
       prepareCopy(state)
       value = state.copy![prop as any] = draft(value, state)
     }
@@ -164,7 +155,9 @@ function createSetter() {
     receiver: object
   ): boolean {
     const target = latest(state)
-    const current = peek(target, prop)
+    // Inline peek: target is already latest(state), a plain object
+    // (not a proxy), so direct property access is sufficient.
+    const current = target[prop]
 
     const hadKey =
       isArray(target) && isIntegerKey(prop)
@@ -198,23 +191,28 @@ function createSetter() {
     )
       return true
 
-    // Maintain children refcount: decrement old, increment new
+    // Maintain children tracking: remove old draft child, add new one.
+    // Only needed when old/new values are objects (drafts).
     const oldCopyValue = state.copy![prop]
-    const oldChildState: DraftState | undefined =
-      oldCopyValue && oldCopyValue[ReactiveFlags.STATE]
-    const newChildState: DraftState | undefined =
-      value && (value as any)[ReactiveFlags.STATE]
-    if (oldChildState) {
-      removeChildRef(state, oldChildState)
-    }
-    if (newChildState) {
-      addChildRef(state, newChildState)
+    if (isObject(oldCopyValue) || isObject(value)) {
+      const oldChildState: DraftState | undefined =
+        oldCopyValue && oldCopyValue[ReactiveFlags.STATE]
+      const newChildState: DraftState | undefined =
+        value && (value as any)[ReactiveFlags.STATE]
+      if (oldChildState) {
+        removeChildRef(state, oldChildState)
+      }
+      if (newChildState) {
+        addChildRef(state, newChildState)
+      }
     }
 
     state.copy![prop] = value
 
-    // don't trigger if target is something up in the prototype chain of original
-    if (state === toState(receiver)) {
+    // don't trigger if target is something up in the prototype chain of original.
+    // Use direct proxy identity check instead of toState(receiver) to avoid
+    // re-entering the get trap.
+    if (receiver === state.proxy) {
       if (!hadKey) {
         trigger(state, TriggerOpTypes.ADD, prop, value)
       } else if (!is(value, current)) {

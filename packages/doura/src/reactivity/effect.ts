@@ -307,7 +307,14 @@ export function trigger(
   newValue?: unknown,
   _oldValue?: unknown
 ) {
+  const listeners = state.root?.listeners
   const depsMap = targetMap.get(state)
+
+  // Fast path: no deps tracked and no listeners registered
+  if (!depsMap && (!listeners || !listeners.length)) {
+    return
+  }
+
   const target = state.base
   let deps: (Dep | undefined)[] = []
   if (depsMap) {
@@ -372,7 +379,6 @@ export function trigger(
   }
 
   // trigger draft listeners
-  const listeners = state.root?.listeners
   if (listeners && listeners.length) {
     listeners.forEach((listener) => listener())
   }
