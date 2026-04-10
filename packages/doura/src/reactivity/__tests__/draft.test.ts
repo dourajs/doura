@@ -435,8 +435,8 @@ describe(`reactivity/draft`, () => {
         d.a.z = true
         expect(d.b.z).toBeUndefined()
       })
-      // res.b is a proxy
-      expect(res.b).not.toBe(obj)
+      // res.b is the original object (structural sharing, same as Immer/Mutative)
+      expect(res.b).toBe(obj)
       expect(res.a).not.toBe(res.b)
       expect(res.a.z).toBeTruthy()
     })

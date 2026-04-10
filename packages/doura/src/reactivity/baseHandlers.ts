@@ -136,7 +136,7 @@ function createGetter(): ProxyGetter {
     // (checked by isObject above), so skip the null guard.
     if (!value[ReactiveFlags.STATE]) {
       prepareCopy(state)
-      value = state.copy![prop as any] = draft(value, state)
+      value = state.copy![prop as any] = draft(value, state, prop)
     }
 
     trackDraft(value)
