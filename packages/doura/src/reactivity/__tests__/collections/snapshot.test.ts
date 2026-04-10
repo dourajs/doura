@@ -1,5 +1,5 @@
 import { draft, snapshot } from '../../draft'
-import { toBase, isModified } from '../../common'
+import { toBase, isModified, isDraft } from '../../common'
 
 describe('reactivity/collections', () => {
   describe('snapshot', () => {
@@ -97,6 +97,53 @@ describe('reactivity/collections', () => {
       })
 
       expect(true).toBe(true)
+    })
+
+    test('Map snapshot should resolve draft proxies to plain values', () => {
+      const base = new Map<string, { value: number }>([
+        ['a', { value: 1 }],
+        ['b', { value: 2 }],
+      ])
+      const result = produce(base, (draft) => {
+        draft.get('a')!.value = 10
+      })
+      // The result should be a plain Map with plain objects, not draft proxies
+      const aVal = result.get('a')!
+      expect(aVal.value).toBe(10)
+      expect(aVal).toEqual({ value: 10 })
+      // Must not be a draft proxy (no residual proxy references)
+      expect(isDraft(aVal)).toBe(false)
+      // 'b' was not accessed — should be the original object (structural sharing)
+      expect(result.get('b')).toBe(base.get('b'))
+    })
+
+    test('Map snapshot with undefined key should resolve correctly', () => {
+      const base = new Map<any, { value: number }>([
+        [undefined, { value: 1 }],
+        ['b', { value: 2 }],
+      ])
+      const result = produce(base, (draft) => {
+        draft.get(undefined)!.value = 10
+      })
+      const val = result.get(undefined)!
+      expect(val.value).toBe(10)
+      expect(isDraft(val)).toBe(false)
+      expect(result.get('b')).toBe(base.get('b'))
+    })
+
+    test('Set snapshot should resolve draft proxies to plain values', () => {
+      const obj1 = { value: 1 }
+      const obj2 = { value: 2 }
+      const base = new Set([obj1, obj2])
+      const result = produce(base, (draft) => {
+        const first = draft.values().next().value
+        first.value = 10
+      })
+      const values = Array.from(result)
+      expect(values[0]).toEqual({ value: 10 })
+      expect(isDraft(values[0])).toBe(false)
+      // Second element was not accessed — should be the original
+      expect(values[1]).toBe(obj2)
     })
 
     test('nested map ', () => {
