@@ -17,69 +17,71 @@ const run = (size: number) => {
       .fill(1)
       .map((_, key) => ({ value: key }))
 
-  // Run each library in a separate Suite to prevent V8 inline cache
-  // pollution between different Proxy handler objects, which causes
-  // whichever library runs first to appear faster.
-  const results: { name: string; hz: number; stats: any }[] = []
+  const suite = new Suite()
 
-  const libs = [
-    {
-      name: 'Mutative',
-      fn: (baseState: any, i: number) => {
-        create(baseState, (draft) => {
+  let i: number
+  let baseState: { value: number }[]
+
+  suite
+    .add(
+      'Mutative',
+      () => {
+        const state = create(baseState, (draft) => {
           for (let index = 0; index < size * MODIFY_FACTOR; index++) {
             draft[index].value = i
           }
         })
       },
-    },
-    {
-      name: 'Immer',
-      fn: (baseState: any, i: number) => {
-        produce(baseState, (draft: any) => {
-          for (let index = 0; index < size * MODIFY_FACTOR; index++) {
-            draft[index].value = i
-          }
-        })
-      },
-    },
-    {
-      name: 'Doura',
-      fn: (baseState: any, i: number) => {
-        douraProduce(baseState, (draft: any) => {
-          for (let index = 0; index < size * MODIFY_FACTOR; index++) {
-            draft[index].value = i
-          }
-        })
-      },
-    },
-  ]
-
-  for (const lib of libs) {
-    let i: number
-    let baseState: { value: number }[]
-
-    const suite = new Suite()
-    suite
-      .add(lib.name, () => lib.fn(baseState, i), {
+      {
         onStart: () => {
           i = Math.random()
           baseState = getData(size)
         },
-      })
-      .on('cycle', (event: any) => {
-        console.log(String(event.target))
-        results.push({
-          name: event.target.name,
-          hz: event.target.hz,
-          stats: event.target.stats,
+      }
+    )
+    .add(
+      'Immer',
+      () => {
+        const state = produce(baseState, (draft: any) => {
+          for (let index = 0; index < size * MODIFY_FACTOR; index++) {
+            draft[index].value = i
+          }
         })
-      })
-      .run({ async: false })
-  }
-
-  const fastest = results.reduce((a, b) => (a.hz > b.hz ? a : b))
-  console.log(`Size ${size}: The fastest method is ${fastest.name}`)
+      },
+      {
+        onStart: () => {
+          i = Math.random()
+          baseState = getData(size)
+        },
+      }
+    )
+    .add(
+      'Doura',
+      () => {
+        const state = douraProduce(baseState, (draft: any) => {
+          for (let index = 0; index < size * MODIFY_FACTOR; index++) {
+            draft[index].value = i
+          }
+        })
+      },
+      {
+        onStart: () => {
+          i = Math.random()
+          baseState = getData(size)
+        },
+      }
+    )
+    .on('cycle', (event: any) => {
+      console.log(String(event.target))
+    })
+    .on('complete', function (this: any) {
+      console.log(
+        `Size ${size}: The fastest method is ${this.filter('fastest').map(
+          'name'
+        )}`
+      )
+    })
+    .run({ async: false })
 }
 
 ;[
