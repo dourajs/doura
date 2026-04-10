@@ -233,13 +233,17 @@ function resolveDraftRefs(state: DraftState, copy: any) {
     return
   }
 
-  // Map: replace draft proxy values with resolved base values
+  // Map: replace draft proxy values with resolved base values.
+  // Only children (created via lazy drafting) need resolution.
   if (copy instanceof Map) {
-    copy.forEach((val: any, key: any) => {
-      if (val !== null && typeof val === 'object' && val[ReactiveFlags.STATE]) {
-        copy.set(key, (val[ReactiveFlags.STATE] as DraftState).base)
+    const ch = state.children!
+    for (let j = 0; j < ch.length; j++) {
+      const child = ch[j]
+      const key = child.key
+      if (key !== undefined && copy.get(key) === child.proxy) {
+        copy.set(key, child.base)
       }
-    })
+    }
     return
   }
 
