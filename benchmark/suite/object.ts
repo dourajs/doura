@@ -1,92 +1,38 @@
 // @ts-nocheck
-import { Suite } from 'benchmark'
-import { produce } from 'immer'
-import { create } from 'mutative'
-import { draft, snapshot } from '../../packages/doura'
+import { runBenchmark } from './runner'
 
-const douraProduce = (value: any, cb: (v: any) => void) => {
-  const obj = draft(value as any)
-  cb(obj)
-  return snapshot(obj, obj)
-}
-
-const run = (size: number) => {
-  const getData = (size: number) =>
-    Array(size)
+runBenchmark({
+  getData: `(size) => Array(size).fill(1).reduce((acc, _, key) => Object.assign(acc, { ['key' + key]: key }), {})`,
+  sizes: [
+    ...Array(1)
       .fill(1)
-      .reduce(
-        (acc, _, key) => Object.assign(acc, { [`key${key}`]: key }),
-        {} as Record<string, number>
-      )
-
-  const suite = new Suite()
-
-  let i: number
-  let baseState: Record<string, number>
-
-  suite
-    .add(
-      'Mutative',
-      () => {
-        const state = create(baseState, (draft) => {
-          draft.key0 = i
-        })
-      },
-      {
-        onStart: () => {
-          i = Math.random()
-          baseState = getData(size)
-        },
-      }
-    )
-    .add(
-      'Immer',
-      () => {
-        const state = produce(baseState, (draft: any) => {
-          draft.key0 = i
-        })
-      },
-      {
-        onStart: () => {
-          i = Math.random()
-          baseState = getData(size)
-        },
-      }
-    )
-    .add(
-      'Doura',
-      () => {
-        const state = douraProduce(baseState, (draft: any) => {
-          draft.key0 = i
-        })
-      },
-      {
-        onStart: () => {
-          i = Math.random()
-          baseState = getData(size)
-        },
-      }
-    )
-    .on('cycle', (event: any) => {
-      console.log(String(event.target))
-    })
-    .on('complete', function (this: any) {
-      console.log(
-        `Size ${size}: The fastest method is ${this.filter('fastest').map(
-          'name'
-        )}`
-      )
-    })
-    .run({ async: false })
-}
-
-;[
-  ...Array(1)
-    .fill(1)
-    .map((_, i) => (1 + i * 4) * 10 ** 3),
-  ...Array(1)
-    .fill(1)
-    .map((_, i) => (1 + i * 4) * 10 ** 4),
-]
-  .sort((a, b) => a - b)
-  .forEach((value) => run(value))
+      .map((_, i) => (1 + i * 4) * 10 ** 3),
+    ...Array(1)
+      .fill(1)
+      .map((_, i) => (1 + i * 4) * 10 ** 4),
+  ].sort((a, b) => a - b),
+  libs: [
+    {
+      name: 'Mutative',
+      setup: `const { create } = require('mutative');`,
+      fn: `create(baseState, (draft) => { draft.key0 = i });`,
+    },
+    {
+      name: 'Immer',
+      setup: `const { produce } = require('immer');`,
+      fn: `produce(baseState, (draft) => { draft.key0 = i });`,
+    },
+    {
+      name: 'Doura',
+      setup: `
+        const { draft, snapshot } = require('./packages/doura');
+        const douraProduce = (value, cb) => {
+          const obj = draft(value);
+          cb(obj);
+          return snapshot(obj, obj);
+        };
+      `,
+      fn: `douraProduce(baseState, (draft) => { draft.key0 = i });`,
+    },
+  ],
+})
