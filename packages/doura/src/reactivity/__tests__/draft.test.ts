@@ -1,5 +1,5 @@
 import { draft, snapshot } from '../draft'
-import { isModified, markRaw, markStrict } from '../common'
+import { isModified, isDraft, markRaw, markStrict } from '../common'
 import { each } from '../../utils'
 
 const produce = <T extends any = any>(value: T, cb: (v: T) => void) => {
@@ -486,6 +486,7 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState).toEqual({ foo: {} })
+      expect(isDraft(nextState.foo)).toBe(false)
     })
 
     // Very similar to the test before, but the reused object has one
@@ -500,6 +501,19 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState).toEqual({ foo: { a: true, c: true } })
+    })
+
+    it('can move array element to a different index (needsScan fallback)', () => {
+      const baseState = [{ value: 1 }, { value: 2 }, { value: 3 }]
+      const nextState = produce(baseState, (s) => {
+        const item = s[0]
+        item.value = 10
+        s[2] = item
+        s[0] = null as any
+      })
+      expect(nextState[0]).toBe(null)
+      expect(nextState[2]).toEqual({ value: 10 })
+      expect(isDraft(nextState[2])).toBe(false)
     })
 
     it('can nest a draft in a new object', () => {
