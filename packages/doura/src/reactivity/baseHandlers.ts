@@ -208,6 +208,10 @@ function createSetter() {
         // new position directly, avoiding a full needsScan in the
         // common rename case (move + delete).
         newChildState.key = prop
+      } else if (isObject(value)) {
+        // Assigning a draftable non-draft object (e.g. { bar: draftProxy }).
+        // Flag the root so eager finalization knows to run handleValue.
+        state.root.hasDraftableAssignment = true
       }
     }
 

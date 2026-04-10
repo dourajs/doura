@@ -182,6 +182,17 @@ describe('reactivity/collections', () => {
       expect(isDraft(result.get('b')!)).toBe(false)
     })
 
+    test('Map: draft nested in new plain object assigned via set()', () => {
+      const base = new Map<string, any>([['a', { value: 1 }]])
+      const result = produce(base, (draft) => {
+        const a = draft.get('a')!
+        a.value = 10
+        draft.set('wrapped', { inner: a })
+      })
+      expect(result.get('wrapped').inner).toEqual({ value: 10 })
+      expect(isDraft(result.get('wrapped').inner)).toBe(false)
+    })
+
     test('Set: eager finalization should not leak draft proxies into result', () => {
       const obj1 = { value: 1 }
       const obj2 = { value: 2 }
