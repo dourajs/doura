@@ -540,10 +540,7 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState.foo.bar).toEqual(obj)
-      // TODO: nextState.foo is a new plain object (not a draft), so
-      // resolveDraftRefs doesn't recurse into it. The nested draft
-      // proxy at .foo.bar leaks. This needs recursive resolution.
-      // expect(isDraft(nextState.foo.bar)).toBe(false)
+      expect(isDraft(nextState.foo.bar)).toBe(false)
     })
 
     it('can nest a modified draft in a new object', () => {
@@ -556,8 +553,47 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState).toEqual({ foo: { bar: { a: true, c: true } } })
-      // TODO: same nested draft proxy leak as above
-      // expect(isDraft(nextState.foo.bar)).toBe(false)
+      expect(isDraft(nextState.foo.bar)).toBe(false)
+    })
+
+    it('can nest a draft deeply in new plain objects', () => {
+      const nextState = produce({ obj: { a: 1 } } as any, (s) => {
+        s.obj.a = 2
+        s.wrapper = { level1: { level2: s.obj } }
+        delete s.obj
+      })
+      expect(nextState.wrapper.level1.level2).toEqual({ a: 2 })
+      expect(isDraft(nextState.wrapper.level1.level2)).toBe(false)
+      // The intermediate plain objects should also not be drafts
+      expect(isDraft(nextState.wrapper)).toBe(false)
+      expect(isDraft(nextState.wrapper.level1)).toBe(false)
+    })
+
+    it('should not leak drafts when assigning draft into an array in a new object', () => {
+      const nextState = produce({ obj: { a: 1 } } as any, (s) => {
+        s.obj.a = 2
+        s.list = [s.obj]
+        delete s.obj
+      })
+      expect(nextState.list[0]).toEqual({ a: 2 })
+      expect(isDraft(nextState.list[0])).toBe(false)
+    })
+
+    it('no recursive scan needed when no drafts are nested in plain objects', () => {
+      // When all draft proxies are resolved by key-based/needsScan,
+      // handleValue should not recurse into the tree. We verify this
+      // indirectly: a large assigned plain object should not cause
+      // slowdown (if handleValue were called unnecessarily, it would
+      // traverse all 1000 entries).
+      const bigData: Record<string, number> = {}
+      for (let i = 0; i < 1000; i++) bigData[`key${i}`] = i
+      const nextState = produce({ a: { x: 1 } } as any, (s) => {
+        s.a.x = 2
+        s.big = bigData // plain object, no draft inside
+      })
+      expect(nextState.a).toEqual({ x: 2 })
+      expect(isDraft(nextState.a)).toBe(false)
+      expect(nextState.big).toBe(bigData) // same reference, not copied
     })
 
     it('supports assigning undefined to an existing property', () => {

@@ -115,6 +115,8 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
       const childState = (value as any)[ReactiveFlags.STATE] as DraftState
       addChildRef(state, childState)
       childState.key = key
+    } else if (isObject(value as any)) {
+      state.root.hasDraftableAssignment = true
     }
   }
 
