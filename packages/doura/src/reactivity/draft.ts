@@ -210,10 +210,40 @@ function stealAndReset(state: DraftState): any {
  * Resolve draft proxy references in a stolen copy.
  * Uses children's stored keys for O(1) lookup per child.
  * Falls back to a full scan when a child was moved or deleted.
+ * Handles plain objects, arrays, Sets, and Maps.
  */
 function resolveDraftRefs(state: DraftState, copy: any) {
   if (!state.children) return
 
+  // Set: copy still holds original refs; state.drafts maps original → draft.
+  // Replace originals that were drafted with their resolved base values.
+  if (copy instanceof Set) {
+    const setState = state as any
+    if (setState.drafts && setState.drafts.size > 0) {
+      const replacements: [any, any][] = []
+      setState.drafts.forEach((drafted: any, original: any) => {
+        const childState: DraftState = drafted[ReactiveFlags.STATE]
+        replacements.push([original, childState.base])
+      })
+      for (let j = 0; j < replacements.length; j++) {
+        copy.delete(replacements[j][0])
+        copy.add(replacements[j][1])
+      }
+    }
+    return
+  }
+
+  // Map: replace draft proxy values with resolved base values
+  if (copy instanceof Map) {
+    copy.forEach((val: any, key: any) => {
+      if (val !== null && typeof val === 'object' && val[ReactiveFlags.STATE]) {
+        copy.set(key, (val[ReactiveFlags.STATE] as DraftState).base)
+      }
+    })
+    return
+  }
+
+  // Object / Array
   const children = state.children
   let needsScan = false
 

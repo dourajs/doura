@@ -26,22 +26,38 @@ function prepareMapCopy(state: MapDraftState) {
   }
 }
 
+/**
+ * Lazy Set copy: creates a shallow copy of the Set (original refs)
+ * without drafting any elements. Drafts are created on-demand when
+ * elements are accessed via iteration. This avoids O(n) proxy creation
+ * when only a few elements are actually read.
+ */
 function prepareSetCopy(state: SetDraftState) {
   if (!state.copy) {
-    state.copy = new Set()
-    state.base.forEach((value: any) => {
-      if (isObject(value)) {
-        const drafted = draft(value, state)
-        trackDraft(drafted)
-        if (value !== drafted) {
-          state.drafts.set(value, drafted)
-        }
-        state.copy!.add(drafted)
-      } else {
-        state.copy!.add(value)
-      }
-    })
+    state.copy = new Set(state.base)
   }
+}
+
+/**
+ * Lazily draft a Set element: if the value is a draftable object and
+ * hasn't been drafted yet, create a draft and cache it in state.drafts.
+ * Does NOT modify state.copy (safe to call during iteration).
+ * The copy is reconciled during finalization.
+ */
+function ensureSetValueDrafted(state: SetDraftState, value: any): any {
+  if (!isObject(value)) return value
+  // Already a draft proxy (e.g. added via add())
+  if (isDraft(value)) return value
+  // Already drafted?
+  const existing = state.drafts.get(value)
+  if (existing) return existing
+  // Create draft lazily
+  const drafted = draft(value, state)
+  trackDraft(drafted)
+  if (value !== drafted) {
+    state.drafts.set(value, drafted)
+  }
+  return drafted
 }
 
 function prepareCopy(state: DraftState) {
@@ -109,7 +125,8 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
 function add(this: AnySet & Drafted, value: unknown) {
   const state = this[ReactiveFlags.STATE] as SetDraftState
   const target = latest(state)
-  const hadKey = target.has(value)
+  // Check both copy and drafts map (original may have been replaced by draft)
+  const hadKey = target.has(value) || state.drafts.has(value as any)
   if (!hadKey) {
     prepareSetCopy(state)
     markChanged(state)
@@ -141,7 +158,18 @@ function size(state: CollectionState) {
 function setKeys(state: SetDraftState) {
   track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
   prepareSetCopy(state)
-  return state.copy!.values()
+  // Return a lazy iterator that drafts elements on demand
+  const innerIterator = state.copy!.values()
+  return {
+    next() {
+      const { value, done } = innerIterator.next()
+      if (done) return { value, done }
+      return { value: ensureSetValueDrafted(state, value), done: false }
+    },
+    [Symbol.iterator]() {
+      return this
+    },
+  }
 }
 
 function mapKeys(state: MapDraftState) {
@@ -199,16 +227,17 @@ function clear(this: CollectionTypes & Drafted) {
 
 function setForEach(
   self: CollectionTypes,
-  state: CollectionState,
+  state: SetDraftState,
   callback: Function,
   thisArg?: unknown
 ) {
-  const iterator = (state.proxy as Set<any>).values()
-  let result = iterator.next()
-  while (!result.done) {
-    callback.call(thisArg, result.value, result.value, self)
-    result = iterator.next()
-  }
+  track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
+  prepareSetCopy(state)
+  // Iterate over copy and lazily draft each element
+  state.copy!.forEach((value: any) => {
+    const drafted = ensureSetValueDrafted(state, value)
+    callback.call(thisArg, drafted, drafted, self)
+  })
 }
 
 function mapForEach(
@@ -227,10 +256,7 @@ function mapForEach(
 }
 
 function createIterableMethod(method: string | symbol) {
-  return function (
-    this: CollectionTypes & Drafted,
-    ...args: unknown[]
-  ): Iterable & Iterator {
+  return function (this: CollectionTypes & Drafted): Iterable & Iterator {
     const state = this[ReactiveFlags.STATE] as CollectionState
     const targetIsMap = state.type === DraftType.Map
     const isPair =
@@ -262,7 +288,24 @@ function createIterableMethod(method: string | symbol) {
 
     track(state, TrackOpTypes.ITERATE, ITERATE_KEY)
     prepareSetCopy(state)
-    return (state.copy as any)[method](...args)
+    // Always iterate via values() so we get individual elements,
+    // not [value, value] pairs from entries(). We wrap the result
+    // into pairs when isPair is true.
+    const innerIterator = (state.copy as AnySet).values()
+    return {
+      next() {
+        const { value, done } = innerIterator.next()
+        if (done) return { value, done }
+        const drafted = ensureSetValueDrafted(state as SetDraftState, value)
+        return {
+          value: isPair ? [drafted, drafted] : drafted,
+          done: false,
+        }
+      },
+      [Symbol.iterator]() {
+        return this
+      },
+    }
   }
 }
 
