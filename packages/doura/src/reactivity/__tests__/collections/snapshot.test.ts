@@ -148,6 +148,25 @@ describe('reactivity/collections', () => {
       expect(result.get('b')).toBe(base.get('b'))
     })
 
+    test('Map: moved draft (delete + set to new key) should not leak draft proxy', () => {
+      // Tests the needsScan fallback: child.key='a' but the draft proxy
+      // is moved to key 'c', so key-based resolution misses it.
+      const base = new Map<string, { value: number }>([
+        ['a', { value: 1 }],
+        ['b', { value: 2 }],
+      ])
+      const result = produce(base, (draft) => {
+        const a = draft.get('a')!
+        a.value = 10
+        draft.delete('a')
+        draft.set('c', a)
+      })
+      expect(result.has('a')).toBe(false)
+      expect(result.get('c')!.value).toBe(10)
+      expect(isDraft(result.get('c')!)).toBe(false)
+      expect(result.get('b')).toBe(base.get('b'))
+    })
+
     test('Set: eager finalization should not leak draft proxies into result', () => {
       const obj1 = { value: 1 }
       const obj2 = { value: 2 }
@@ -161,6 +180,24 @@ describe('reactivity/collections', () => {
       expect(isDraft(values[0])).toBe(false)
       // Unaccessed element retains original reference (structural sharing)
       expect(values[1]).toBe(obj2)
+    })
+
+    test('Set: add() with a draft proxy should not leak it into result', () => {
+      // When a draft proxy from one Set element is added to another Set,
+      // finalization must resolve it. This requires Set add() to call
+      // addChildRef so the draft is tracked in the children list.
+      const base = {
+        set1: new Set([{ value: 1 }]),
+        set2: new Set<{ value: number }>(),
+      }
+      const result = produce(base, (draft) => {
+        const item = draft.set1.values().next().value
+        item.value = 10
+        draft.set2.add(item)
+      })
+      const set2Values = Array.from(result.set2)
+      expect(set2Values[0]).toEqual({ value: 10 })
+      expect(isDraft(set2Values[0])).toBe(false)
     })
 
     test('nested map ', () => {

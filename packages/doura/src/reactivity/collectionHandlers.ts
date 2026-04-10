@@ -5,6 +5,7 @@ import {
   DraftType,
   DraftState,
   removeChildRef,
+  addChildRef,
 } from './draft'
 import { ReactiveFlags, latest, markChanged, isDraft, Drafted } from './common'
 import {
@@ -109,6 +110,10 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
       }
     }
     state.copy!.set(key, value)
+    // Track new child draft so finalization can resolve it
+    if (value && isDraft(value as any)) {
+      addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
+    }
   }
 
   if (!hadKey) {
@@ -131,6 +136,10 @@ function add(this: AnySet & Drafted, value: unknown) {
     prepareSetCopy(state)
     markChanged(state)
     state.copy!.add(value)
+    // Track new child draft so finalization can resolve it
+    if (value && isDraft(value as any)) {
+      addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
+    }
     trigger(state, TriggerOpTypes.ADD, value, value)
   }
   return this

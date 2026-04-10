@@ -220,38 +220,66 @@ function stealAndReset(state: DraftState): any {
 function resolveDraftRefs(state: DraftState, copy: any) {
   if (!state.children) return
 
-  // Set: copy holds original refs; state.drafts maps original → draft.
-  // Rebuild the Set to preserve insertion order while replacing drafted
-  // originals with their resolved base values.
+  // Set: copy may contain original refs (lazy-drafted via state.drafts)
+  // and/or direct draft proxies (added via Set.add(draftProxy)).
+  // Rebuild the Set to preserve insertion order while resolving both.
   if (copy instanceof Set) {
     const setState = state as any
-    if (setState.drafts && setState.drafts.size > 0) {
-      const draftsMap: Map<any, any> = setState.drafts
-      const values = Array.from(copy)
-      copy.clear()
-      for (let j = 0; j < values.length; j++) {
-        const v = values[j]
+    const draftsMap: Map<any, any> | undefined =
+      setState.drafts?.size > 0 ? setState.drafts : undefined
+    const values = Array.from(copy)
+    let changed = false
+    for (let j = 0; j < values.length; j++) {
+      const v = values[j]
+      // Case 1: original value that was lazily drafted
+      if (draftsMap) {
         const drafted = draftsMap.get(v)
         if (drafted) {
-          copy.add((drafted[ReactiveFlags.STATE] as DraftState).base)
-        } else {
-          copy.add(v)
+          values[j] = (drafted[ReactiveFlags.STATE] as DraftState).base
+          changed = true
+          continue
         }
+      }
+      // Case 2: direct draft proxy (e.g. added via Set.add(draftProxy))
+      if (v !== null && typeof v === 'object' && v[ReactiveFlags.STATE]) {
+        values[j] = (v[ReactiveFlags.STATE] as DraftState).base
+        changed = true
+      }
+    }
+    if (changed) {
+      copy.clear()
+      for (let j = 0; j < values.length; j++) {
+        copy.add(values[j])
       }
     }
     return
   }
 
   // Map: replace draft proxy values with resolved base values.
-  // Only children (created via lazy drafting) need resolution.
+  // Try key-based O(1) resolution first; fall back to full scan
+  // when a draft was moved to a different key (delete + set).
   if (copy instanceof Map) {
     const ch = state.children!
+    let needsScan = false
     for (let j = 0; j < ch.length; j++) {
       const child = ch[j]
       const key = child.key
       if (key !== NO_KEY && copy.get(key) === child.proxy) {
         copy.set(key, child.base)
+      } else {
+        needsScan = true
       }
+    }
+    if (needsScan) {
+      copy.forEach((val: any, key: any) => {
+        if (
+          val !== null &&
+          typeof val === 'object' &&
+          val[ReactiveFlags.STATE]
+        ) {
+          copy.set(key, (val[ReactiveFlags.STATE] as DraftState).base)
+        }
+      })
     }
     return
   }
