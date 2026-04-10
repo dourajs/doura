@@ -472,12 +472,27 @@ describe(`reactivity/draft`, () => {
     })
 
     // NOTE: Except the root draft.
+    // Multi-reference: draft.b = draft.a without delete.
+    // child.key is updated to 'b', so key-based resolution only resolves 'b'.
+    // The copy at 'a' still holds the draft proxy — needsScan fallback catches it.
     it('supports multiple references to any modified draft', () => {
       const next = produce({ a: { b: 1 } } as any, (d) => {
         d.a.b++
         d.b = d.a
       })
       expect(next.a).toBe(next.b)
+      expect(isDraft(next.a)).toBe(false)
+      expect(isDraft(next.b)).toBe(false)
+    })
+
+    it('supports multiple references to any modified draft (array)', () => {
+      const next = produce([{ b: 1 }, null] as any[], (d) => {
+        d[0].b++
+        d[1] = d[0]
+      })
+      expect(next[0]).toBe(next[1])
+      expect(isDraft(next[0])).toBe(false)
+      expect(isDraft(next[1])).toBe(false)
     })
 
     it('can rename nested objects (no changes)', () => {

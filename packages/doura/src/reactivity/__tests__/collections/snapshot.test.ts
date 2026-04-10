@@ -167,6 +167,21 @@ describe('reactivity/collections', () => {
       expect(result.get('b')).toBe(base.get('b'))
     })
 
+    test('Map: multiple references to same draft (needsScan fallback)', () => {
+      // draft.set('b', draft.get('a')) without deleting 'a'.
+      // child.key is updated to 'b', so key-based resolution only resolves 'b'.
+      // The value at 'a' still holds the draft proxy — needsScan catches it.
+      const base = new Map<string, { value: number }>([['a', { value: 1 }]])
+      const result = produce(base, (draft) => {
+        const a = draft.get('a')!
+        a.value = 10
+        draft.set('b', a)
+      })
+      expect(result.get('a')).toBe(result.get('b'))
+      expect(isDraft(result.get('a')!)).toBe(false)
+      expect(isDraft(result.get('b')!)).toBe(false)
+    })
+
     test('Set: eager finalization should not leak draft proxies into result', () => {
       const obj1 = { value: 1 }
       const obj2 = { value: 2 }
