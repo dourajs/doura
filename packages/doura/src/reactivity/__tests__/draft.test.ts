@@ -1,5 +1,5 @@
 import { draft, snapshot } from '../draft'
-import { isModified, markRaw } from '../common'
+import { isModified, markRaw, markStrict } from '../common'
 import { each } from '../../utils'
 
 const produce = <T extends any = any>(value: T, cb: (v: T) => void) => {
@@ -321,16 +321,36 @@ describe(`reactivity/draft`, () => {
       })
     })
 
-    it('preserves non-enumerable properties', () => {
-      const baseState = {} as any
-      // Non-enumerable object property
+    it('does not preserve non-enumerable properties by default (same as Mutative)', () => {
+      const baseState = { x: 1 } as any
       Object.defineProperty(baseState, 'foo', {
         value: { a: 1 },
         enumerable: false,
         configurable: true,
         writable: true,
       })
-      // Non-enumerable primitive property
+      Object.defineProperty(baseState, 'bar', {
+        value: 1,
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      })
+      const nextState = produce(baseState, (s) => {
+        s.x = 2
+      })
+      // Non-enumerable props are lost after copy-on-write
+      expect(nextState.foo).toBeUndefined()
+      expect(nextState.bar).toBeUndefined()
+    })
+
+    it('preserves non-enumerable properties with markStrict', () => {
+      const baseState = markStrict({} as any)
+      Object.defineProperty(baseState, 'foo', {
+        value: { a: 1 },
+        enumerable: false,
+        configurable: true,
+        writable: true,
+      })
       Object.defineProperty(baseState, 'bar', {
         value: 1,
         enumerable: false,

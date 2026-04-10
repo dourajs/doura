@@ -11,6 +11,7 @@ export declare const RawSymbol: unique symbol
 
 export const enum ReactiveFlags {
   SKIP = '__r_skip',
+  STRICT = '__r_strict',
   IS_REACTIVE = '__r_isReactive',
   RAW = '__r_raw',
   STATE = '__r_state',
@@ -55,6 +56,19 @@ export function markRaw<T extends object>(
   value: T
 ): T & { [RawSymbol]?: true } {
   def(value, ReactiveFlags.SKIP, true)
+  return value
+}
+
+/**
+ * Mark an object so that shallowCopy uses strictCopy (preserving all
+ * property descriptors including non-enumerable and symbol properties).
+ *
+ * By default, plain objects are copied with Object.keys only (fast path).
+ * Use markStrict when a plain object has non-enumerable properties that
+ * must survive copy-on-write.
+ */
+export function markStrict<T extends object>(value: T): T {
+  def(value, ReactiveFlags.STRICT, true)
   return value
 }
 

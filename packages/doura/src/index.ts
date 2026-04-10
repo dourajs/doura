@@ -31,4 +31,4 @@ export { Doura, DouraOptions, doura } from './doura'
 
 export { default as devtool } from './devtool'
 
-export { draft, snapshot, markRaw } from './reactivity'
+export { draft, snapshot, markRaw, markStrict } from './reactivity'

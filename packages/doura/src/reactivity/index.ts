@@ -5,6 +5,7 @@ export {
   isModified,
   markUnchanged,
   markRaw,
+  markStrict,
 } from './common'
 export { View, view, ViewGetter } from './view'
 export { draft, snapshot, watch, resetDraftChildren } from './draft'
