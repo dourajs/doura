@@ -20,3 +20,6 @@ temp/
 packages/*/dist/
 examples/*/build
 benchmark.csv
+
+# Agent
+.claude
