@@ -9,7 +9,7 @@ import {
 import { mutableHandlers } from './baseHandlers'
 import { mutableCollectionHandlers } from './collectionHandlers'
 import { DraftSnapshot, snapshotHandler } from './snapshotHandler'
-import { NOOP, isObject, shallowCopy } from '../utils'
+import { NOOP, isObject, isArray, shallowCopy } from '../utils'
 import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
 export type PatchPath = (string | number)[]
@@ -29,6 +29,9 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   root: DraftState
   // The parent state.
   parent?: DraftState
+  // The key in the parent's copy that holds this draft's proxy.
+  // Used during finalization to eagerly replace draft refs with resolved values.
+  key: PropertyKey | undefined
   // The base object.
   base: T
   // The base proxy, draft itself.
@@ -96,7 +99,8 @@ export function resetDraftChildren(draft: Drafted) {
 let uid = 0
 export function draft<T extends Objectish>(
   target: T & Target,
-  parent?: DraftState
+  parent?: DraftState,
+  key?: PropertyKey
 ): T & Drafted {
   // only specific value types can be observed.
   const targetType = getTargetType(target)
@@ -118,6 +122,7 @@ export function draft<T extends Objectish>(
     id: uid++,
     root: null as any, // set below
     parent: parent,
+    key: key,
     base: target,
     proxy: null as any, // set below
     copy: null,
@@ -185,6 +190,110 @@ export function watch(draft: any, cb: () => void): () => void {
   }
 }
 
+/**
+ * Steal copies from modified draft states and reset them.
+ * Common helper used by both snapshot paths.
+ * Processes states bottom-up (children before parents in the queue)
+ * so that when we resolve draft refs in a parent's copy, child copies
+ * are already finalized.
+ */
+function stealAndReset(state: DraftState): any {
+  // Steal copy or shallow-copy base (when modified via bubble-up only)
+  const value = state.copy ? state.copy : shallowCopy(state.base)
+  state.base = value as any
+  state.copy = null
+  state.modified = false
+  return value
+}
+
+/**
+ * Resolve draft proxy references in a stolen copy.
+ * Uses children's stored keys for O(1) lookup per child.
+ * Falls back to a full scan when a child was moved or deleted.
+ */
+function resolveDraftRefs(state: DraftState, copy: any) {
+  if (!state.children) return
+
+  const children = state.children
+  let needsScan = false
+
+  for (let j = 0; j < children.length; j++) {
+    const child = children[j]
+    const key = child.key
+    if (key !== undefined && copy[key as any] === child.proxy) {
+      copy[key as any] = child.base
+    } else {
+      needsScan = true
+    }
+  }
+
+  if (needsScan) {
+    if (isArray(copy)) {
+      for (let j = 0; j < copy.length; j++) {
+        const val = copy[j]
+        if (
+          val !== null &&
+          typeof val === 'object' &&
+          val[ReactiveFlags.STATE]
+        ) {
+          copy[j] = (val[ReactiveFlags.STATE] as DraftState).base
+        }
+      }
+    } else {
+      const keys = Object.keys(copy)
+      for (let j = 0; j < keys.length; j++) {
+        const val = copy[keys[j]]
+        if (
+          val !== null &&
+          typeof val === 'object' &&
+          val[ReactiveFlags.STATE]
+        ) {
+          copy[keys[j]] = (val[ReactiveFlags.STATE] as DraftState).base
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Eager finalization: walk modified states, steal copies, and resolve
+ * all draft proxy references in-place. Returns a plain (non-Proxy)
+ * object with structural sharing for unmodified subtrees.
+ *
+ * This is the fast path for standalone draft()/snapshot() usage.
+ * Avoids allocating Maps, DraftSnapshot objects, and snapshot Proxies.
+ */
+function finalizeDraft(rootDraft: Drafted): any {
+  const rootState: DraftState = rootDraft[ReactiveFlags.STATE]
+  if (!rootState.modified) {
+    return rootState.base
+  }
+
+  // Collect modified states via BFS, then process in reverse (leaf-first).
+  const modified: DraftState[] = [rootState]
+  let idx = 0
+  while (idx < modified.length) {
+    const s = modified[idx++]
+    if (s.children) {
+      for (let i = 0; i < s.children.length; i++) {
+        const child = s.children[i]
+        if (child.modified) {
+          modified.push(child)
+        }
+      }
+    }
+  }
+
+  // Process leaf-first: steal copies and resolve draft refs.
+  for (let i = modified.length - 1; i >= 0; i--) {
+    const state = modified[i]
+    const copy = stealAndReset(state)
+    resolveDraftRefs(state, copy)
+  }
+
+  return rootState.base
+}
+
 export function takeSnapshotFromDraft(
   draft: Drafted,
   snapshots?: Map<any, any>
@@ -204,22 +313,7 @@ export function takeSnapshotFromDraft(
     if (!state.modified) {
       continue
     }
-    // Steal the copy directly instead of shallow-copying it again.
-    // The copy is already a shallow clone of base (created by prepareCopy).
-    // We hand it to the snapshot and reset the draft: set base to the
-    // stolen copy so future mutations start from the correct state,
-    // and null out copy so the next mutation triggers a fresh prepareCopy.
-    // This is the same "steal the copy" approach Immer and Mutative use.
-    //
-    // When copy is null, this state was marked modified via markChanged
-    // bubble-up from a child, but prepareCopy was never called because
-    // the state itself was never directly written. In this case, base
-    // already reflects the current state (children are draft proxies
-    // reachable from base), so we create the snapshot copy from base.
-    const value = state.copy ? state.copy : shallowCopy(state.base)
-    state.base = value as any
-    state.copy = null
-    state.modified = false
+    const value = stealAndReset(state)
     snapshots_.delete(state.proxy)
     copies.set(state, value)
     if (state.children) {
@@ -254,6 +348,13 @@ export function snapshot<T>(
     return value
   }
 
+  // Fast path: when no external snapshots cache is provided (standalone usage),
+  // use eager finalization that avoids Map/Proxy allocations entirely.
+  if (!snapshots && isDraft(value) && (value as any) === (draft as any)) {
+    return finalizeDraft(draft) as T
+  }
+
+  // Slow path: model system with structural sharing via snapshots map.
   const draftSnapshot = takeSnapshotFromDraft(draft, snapshots)
   return createSnapshotProxy(value, draftSnapshot)
 }
