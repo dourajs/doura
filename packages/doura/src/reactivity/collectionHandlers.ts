@@ -82,7 +82,7 @@ function get(this: AnyMap & Drafted, key: unknown) {
 
   if (!isDraft(value)) {
     prepareCopy(state)
-    value = draft(value, state)
+    value = draft(value, state, key)
     state.copy!.set(key, value)
   }
 

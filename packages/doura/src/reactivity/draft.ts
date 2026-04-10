@@ -31,7 +31,8 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   parent?: DraftState
   // The key in the parent's copy that holds this draft's proxy.
   // Used during finalization to eagerly replace draft refs with resolved values.
-  key: PropertyKey | undefined
+  // For objects/arrays: PropertyKey. For Map entries: any Map key type.
+  key: any
   // The base object.
   base: T
   // The base proxy, draft itself.
@@ -96,11 +97,15 @@ export function resetDraftChildren(draft: Drafted) {
   }
 }
 
+// Sentinel for "no key set" — distinguishes from undefined which
+// is a valid Map key.
+const NO_KEY = Symbol.for('__doura_no_key')
+
 let uid = 0
 export function draft<T extends Objectish>(
   target: T & Target,
   parent?: DraftState,
-  key?: PropertyKey
+  key?: any
 ): T & Drafted {
   // only specific value types can be observed.
   const targetType = getTargetType(target)
@@ -122,7 +127,7 @@ export function draft<T extends Objectish>(
     id: uid++,
     root: null as any, // set below
     parent: parent,
-    key: key,
+    key: arguments.length >= 3 ? key : NO_KEY,
     base: target,
     proxy: null as any, // set below
     copy: null,
@@ -215,19 +220,23 @@ function stealAndReset(state: DraftState): any {
 function resolveDraftRefs(state: DraftState, copy: any) {
   if (!state.children) return
 
-  // Set: copy still holds original refs; state.drafts maps original → draft.
-  // Replace originals that were drafted with their resolved base values.
+  // Set: copy holds original refs; state.drafts maps original → draft.
+  // Rebuild the Set to preserve insertion order while replacing drafted
+  // originals with their resolved base values.
   if (copy instanceof Set) {
     const setState = state as any
     if (setState.drafts && setState.drafts.size > 0) {
-      const replacements: [any, any][] = []
-      setState.drafts.forEach((drafted: any, original: any) => {
-        const childState: DraftState = drafted[ReactiveFlags.STATE]
-        replacements.push([original, childState.base])
-      })
-      for (let j = 0; j < replacements.length; j++) {
-        copy.delete(replacements[j][0])
-        copy.add(replacements[j][1])
+      const draftsMap: Map<any, any> = setState.drafts
+      const values = Array.from(copy)
+      copy.clear()
+      for (let j = 0; j < values.length; j++) {
+        const v = values[j]
+        const drafted = draftsMap.get(v)
+        if (drafted) {
+          copy.add((drafted[ReactiveFlags.STATE] as DraftState).base)
+        } else {
+          copy.add(v)
+        }
       }
     }
     return
@@ -240,7 +249,7 @@ function resolveDraftRefs(state: DraftState, copy: any) {
     for (let j = 0; j < ch.length; j++) {
       const child = ch[j]
       const key = child.key
-      if (key !== undefined && copy.get(key) === child.proxy) {
+      if (key !== NO_KEY && copy.get(key) === child.proxy) {
         copy.set(key, child.base)
       }
     }
@@ -254,7 +263,7 @@ function resolveDraftRefs(state: DraftState, copy: any) {
   for (let j = 0; j < children.length; j++) {
     const child = children[j]
     const key = child.key
-    if (key !== undefined && copy[key as any] === child.proxy) {
+    if (key !== NO_KEY && copy[key as any] === child.proxy) {
       copy[key as any] = child.base
     } else {
       needsScan = true
