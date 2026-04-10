@@ -501,6 +501,7 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState).toEqual({ foo: { a: true, c: true } })
+      expect(isDraft(nextState.foo)).toBe(false)
     })
 
     it('can move array element to a different index (needsScan fallback)', () => {
@@ -524,6 +525,10 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState.foo.bar).toEqual(obj)
+      // TODO: nextState.foo is a new plain object (not a draft), so
+      // resolveDraftRefs doesn't recurse into it. The nested draft
+      // proxy at .foo.bar leaks. This needs recursive resolution.
+      // expect(isDraft(nextState.foo.bar)).toBe(false)
     })
 
     it('can nest a modified draft in a new object', () => {
@@ -536,6 +541,8 @@ describe(`reactivity/draft`, () => {
         delete s.obj
       })
       expect(nextState).toEqual({ foo: { bar: { a: true, c: true } } })
+      // TODO: same nested draft proxy leak as above
+      // expect(isDraft(nextState.foo.bar)).toBe(false)
     })
 
     it('supports assigning undefined to an existing property', () => {
