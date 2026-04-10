@@ -40,8 +40,8 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   disposed: boolean
   // listener
   listeners: Array<() => void>
-  // all drafts created by the root.
-  children: DraftState[]
+  // child drafts reachable from this state's copy, with reference counts.
+  children: Map<DraftState, number>
 }
 
 export interface ObjectDraftState extends DraftStateBase<AnyObject> {
@@ -62,6 +62,28 @@ export type DraftState = ObjectDraftState | MapDraftState | SetDraftState
 export function disposeDraft(draft: Drafted) {
   const state: DraftState = draft[ReactiveFlags.STATE]
   state.disposed = true
+}
+
+/**
+ * Discard orphaned child drafts from the draft tree.
+ * Clears children arrays and resets copy on all descendant states,
+ * so the next property access rebuilds from the current base/copy.
+ * Used after replace() to prevent accumulation from previous state trees.
+ */
+export function resetDraftChildren(draft: Drafted) {
+  const root: DraftState = draft[ReactiveFlags.STATE]
+  // BFS: clear all children but keep root's own copy intact
+  // (root copy holds the just-assigned new value)
+  const queue: DraftState[] = [...root.children.keys()]
+  root.children = new Map()
+  while (queue.length) {
+    const s = queue.pop()!
+    for (const [c] of s.children) {
+      queue.push(c)
+    }
+    s.children = new Map()
+    s.copy = null
+  }
 }
 
 let uid = 0
@@ -95,7 +117,7 @@ export function draft<T extends Objectish>(
     modified: false,
     disposed: false,
     listeners: [],
-    children: [],
+    children: new Map(),
   }
   let proxyTarget: DraftState = state
   let proxyHandlers: ProxyHandler<any> = mutableHandlers
@@ -131,7 +153,10 @@ export function draft<T extends Objectish>(
   proxyTarget.proxy = proxy
   if (parent) {
     proxyTarget.root = parent.root
-    parent.children.push(proxyTarget)
+    parent.children.set(
+      proxyTarget,
+      (parent.children.get(proxyTarget) || 0) + 1
+    )
   } else {
     proxyTarget.root = proxyTarget
   }
@@ -179,7 +204,7 @@ export function takeSnapshotFromDraft(
       value = createSnapshotProxy(state.base, draftSnapshot)
     }
     copies.set(state, value)
-    for (const c of state.children) {
+    for (const [c] of state.children) {
       queue.push(c)
     }
   }
@@ -208,6 +233,21 @@ export function snapshot<T>(
 
   const draftSnapshot = takeSnapshotFromDraft(draft, snapshots)
   return createSnapshotProxy(value, draftSnapshot)
+}
+
+export function addChildRef(parent: DraftState, child: DraftState) {
+  parent.children.set(child, (parent.children.get(child) || 0) + 1)
+}
+
+export function removeChildRef(parent: DraftState, child: DraftState) {
+  const count = parent.children.get(child)
+  if (count !== undefined) {
+    if (count <= 1) {
+      parent.children.delete(child)
+    } else {
+      parent.children.set(child, count - 1)
+    }
+  }
 }
 
 function updateDraftState(state: DraftState, base: AnyObject) {

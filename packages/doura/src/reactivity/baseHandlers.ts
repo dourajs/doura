@@ -1,4 +1,11 @@
-import { ObjectDraftState, draft, draftMap } from './draft'
+import {
+  ObjectDraftState,
+  DraftState,
+  draft,
+  draftMap,
+  addChildRef,
+  removeChildRef,
+} from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import {
   ReactiveFlags,
@@ -191,6 +198,19 @@ function createSetter() {
     )
       return true
 
+    // Maintain children refcount: decrement old, increment new
+    const oldCopyValue = state.copy![prop]
+    const oldChildState: DraftState | undefined =
+      oldCopyValue && oldCopyValue[ReactiveFlags.STATE]
+    const newChildState: DraftState | undefined =
+      value && (value as any)[ReactiveFlags.STATE]
+    if (oldChildState) {
+      removeChildRef(state, oldChildState)
+    }
+    if (newChildState) {
+      addChildRef(state, newChildState)
+    }
+
     state.copy![prop] = value
 
     // don't trigger if target is something up in the prototype chain of original
@@ -218,6 +238,12 @@ function deleteProperty(state: ObjectDraftState, prop: string): boolean {
   }
 
   if (state.copy) {
+    // Decrement refcount for the deleted child draft
+    const oldCopyValue = state.copy[prop]
+    if (oldCopyValue && oldCopyValue[ReactiveFlags.STATE]) {
+      removeChildRef(state, oldCopyValue[ReactiveFlags.STATE] as DraftState)
+    }
+
     const result = delete state.copy[prop]
     if (result && hadKey) {
       trigger(state, TriggerOpTypes.DELETE, prop, undefined, current)
