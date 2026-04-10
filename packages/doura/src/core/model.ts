@@ -12,6 +12,7 @@ import {
   resetTracking,
   isModified,
   markUnchanged,
+  resetDraftChildren,
 } from '../reactivity'
 import {
   Views,
@@ -285,10 +286,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.stateRef.value = newState
     this._watchStateChange = true
 
+    // Clear old draft children to prevent accumulation from previous state trees
+    resetDraftChildren(this.stateRef as any)
+
     // invalid all views;
     for (const view of this.viewInstances) {
       view.effect.scheduler!()
     }
+
+    this._lastDraftToSnapshot.clear()
 
     this.dispatch({
       type: ActionType.REPLACE,

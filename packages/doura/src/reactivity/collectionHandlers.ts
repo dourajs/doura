@@ -4,6 +4,7 @@ import {
   SetDraftState,
   DraftType,
   DraftState,
+  removeChildRef,
 } from './draft'
 import { ReactiveFlags, latest, markChanged, isDraft, Drafted } from './common'
 import {
@@ -84,6 +85,13 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
   const _doSet = () => {
     prepareCopy(state)
     markChanged(state)
+    // Decrement refcount for old child draft when overwriting
+    if (hadKey) {
+      const oldCopy = state.copy!.get(key)
+      if (oldCopy && isDraft(oldCopy)) {
+        removeChildRef(state, oldCopy[ReactiveFlags.STATE] as DraftState)
+      }
+    }
     state.copy!.set(key, value)
   }
 
@@ -150,9 +158,19 @@ function deleteEntry(this: CollectionTypes & Drafted, key: unknown) {
   // forward the operation before queueing reactions
   prepareCopy(state)
   markChanged(state)
+  // Decrement refcount for deleted child draft
+  if (state.type === DraftType.Map) {
+    const oldValue = state.copy!.get(key)
+    if (oldValue && isDraft(oldValue)) {
+      removeChildRef(state, oldValue[ReactiveFlags.STATE] as DraftState)
+    }
+  }
   let result = state.copy!.delete(key)
   if (state.type === DraftType.Set && !result && state.drafts.has(key)) {
     const drafted = state.drafts.get(key)
+    if (drafted && drafted[ReactiveFlags.STATE]) {
+      removeChildRef(state, drafted[ReactiveFlags.STATE] as DraftState)
+    }
     result = state.copy!.delete(drafted)
     state.drafts.delete(key)
   }
@@ -171,6 +189,8 @@ function clear(this: CollectionTypes & Drafted) {
   if (hadItems) {
     prepareCopy(state)
     markChanged(state)
+    // Remove all child drafts since the collection is being emptied
+    state.children = new Map()
     ;(state.copy as any).clear()
     trigger(state, TriggerOpTypes.CLEAR, undefined, undefined)
   }

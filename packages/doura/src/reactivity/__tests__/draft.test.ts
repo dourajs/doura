@@ -755,6 +755,66 @@ describe(`reactivity/draft`, () => {
     const dObj = draft(markRaw(obj))
     expect(dObj).toBe(obj)
   })
+
+  describe('draft children cleanup', () => {
+    function getChildrenCount(d: any): number {
+      const state = d['__r_state']
+      let count = 0
+      const queue = [state]
+      while (queue.length) {
+        const s = queue.pop()!
+        count++
+        // children is Set (current) or Map (after refcount fix) — both are iterable
+        for (const entry of s.children) {
+          // Map entries are [key, value], Set entries are just values
+          const child = Array.isArray(entry) ? entry[0] : entry
+          queue.push(child)
+        }
+      }
+      return count
+    }
+
+    it('should remove child from children when property is deleted', () => {
+      const root = draft({ a: { x: 1 }, b: 2 } as any)
+      // Access nested object to create child draft
+      void root.a.x
+      expect(getChildrenCount(root)).toBe(2) // root + a
+
+      // Delete property that holds the child draft
+      delete root.a
+
+      // Child should be removed from children
+      expect(getChildrenCount(root)).toBe(1) // only root
+    })
+
+    it('should keep child in children when it is still referenced by another property', () => {
+      const root = draft({ obj: {} } as any)
+      const obj = root.obj
+      expect(getChildrenCount(root)).toBe(2) // root + obj
+
+      // Assign same draft to another property
+      root.foo = obj
+      // Delete original property
+      delete root.obj
+
+      // Child should still be in children (referenced by foo)
+      expect(getChildrenCount(root)).toBe(2) // root + obj (via foo)
+    })
+
+    it('should remove child from children after replace overwrites it', () => {
+      const root = draft({ value: { nested: { deep: 1 } } } as any)
+      // Access deep path to create child chain
+      void root.value.nested.deep
+      expect(getChildrenCount(root)).toBe(3) // root + value + nested (deep is number, not drafted)
+
+      // Replace value with a plain object
+      root.value = { other: 2 }
+
+      // Old child chain (value→nested) should be removed,
+      // only root remains (new plain value not yet drafted)
+      expect(getChildrenCount(root)).toBe(1) // only root
+    })
+  })
 })
 
 describe(`reactivity/snapshot`, () => {

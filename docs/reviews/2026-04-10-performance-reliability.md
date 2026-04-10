@@ -26,7 +26,7 @@
 
 ---
 
-### 2. Set 的 `has()` 实现有正确性 bug
+### [Fixed] 2. Set 的 `has()` 实现有正确性 bug
 
 **位置**：`packages/doura/src/reactivity/collectionHandlers.ts:125-127`
 
@@ -50,25 +50,6 @@ d.forEach(() => {})
 ```
 
 **建议**：修正条件逻辑，`state.drafts.has(key)` 即可判定原始值存在于 Set 中。
-
----
-
-### 3. 生产环境 scheduler 无全局递归保护
-
-**位置**：`packages/doura/src/core/scheduler.ts:240-242, 268-274`
-
-```ts
-// scheduler.ts:240-242
-const check = __DEV__
-  ? (job: SchedulerJob) => checkRecursiveUpdates(seen!, job)
-  : NOOP  // <-- 生产环境不检查
-```
-
-`flushJobs` 在 queue 非空时递归调用自身（`scheduler.ts:268-274`）。`RECURSION_LIMIT` 检查仅在 `__DEV__` 模式下生效。
-
-**后果**：生产环境中如果 job A 触发 job B、job B 触发 job A（通过 model 间 `depend` 和 subscriber 互相修改），会无限递归直到栈溢出，表现为页面白屏且无有意义的错误信息。
-
-**建议**：在 `flushJobs` 中增加与 `__DEV__` 无关的全局迭代计数，超过阈值时 throw 并清空 queue。成本极低（一个整数比较），但能防止生产环境静默崩溃。
 
 ---
 
