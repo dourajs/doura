@@ -122,9 +122,7 @@ function has(this: CollectionTypes & Drafted, key: unknown): boolean {
     return true
   }
 
-  return state.type === DraftType.Set
-    ? state.drafts.has(key) && state.drafts.has(state.drafts.get(key))
-    : false
+  return state.type === DraftType.Set ? state.drafts.has(key) : false
 }
 
 function size(state: CollectionState) {
@@ -153,10 +151,10 @@ function deleteEntry(this: CollectionTypes & Drafted, key: unknown) {
   prepareCopy(state)
   markChanged(state)
   let result = state.copy!.delete(key)
-  if (state.type === DraftType.Set && !result) {
-    result = state.drafts.has(key)
-      ? state.drafts.delete(state.drafts.get(key))
-      : false
+  if (state.type === DraftType.Set && !result && state.drafts.has(key)) {
+    const drafted = state.drafts.get(key)
+    result = state.copy!.delete(drafted)
+    state.drafts.delete(key)
   }
   if (hadKey) {
     trigger(state, TriggerOpTypes.DELETE, key, undefined, oldValue)

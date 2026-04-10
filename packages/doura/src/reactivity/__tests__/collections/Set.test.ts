@@ -378,6 +378,38 @@ describe('reactivity/collections', () => {
       expect(dummy).toBe(2)
     })
 
+    it('should return true for has() with original object key after copy is prepared', () => {
+      const obj1 = { id: 1 }
+      const obj2 = { id: 2 }
+      const raw = new Set([obj1, obj2])
+      const set = draft(raw)
+
+      // trigger prepareSetCopy by iterating
+      set.forEach(() => {})
+
+      // has() with original object references should still return true
+      expect(set.has(obj1)).toBe(true)
+      expect(set.has(obj2)).toBe(true)
+
+      // non-existent object should return false
+      expect(set.has({ id: 3 })).toBe(false)
+    })
+
+    it('should observe has() reactively for original object keys in pre-initialized Set', () => {
+      const obj = { id: 1 }
+      const raw = new Set([obj])
+      const set = draft(raw)
+
+      let dummy: boolean | undefined
+      effect(() => {
+        dummy = set.has(obj)
+      })
+
+      expect(dummy).toBe(true)
+      set.delete(obj)
+      expect(dummy).toBe(false)
+    })
+
     it('should work with draft entries in raw set', () => {
       const raw = new Set()
       const entry = draft({})
