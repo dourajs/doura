@@ -190,7 +190,7 @@ function clear(this: CollectionTypes & Drafted) {
     prepareCopy(state)
     markChanged(state)
     // Remove all child drafts since the collection is being emptied
-    state.children = new Map()
+    state.children = null
     ;(state.copy as any).clear()
     trigger(state, TriggerOpTypes.CLEAR, undefined, undefined)
   }

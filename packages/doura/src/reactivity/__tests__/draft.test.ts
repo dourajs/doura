@@ -764,11 +764,11 @@ describe(`reactivity/draft`, () => {
       while (queue.length) {
         const s = queue.pop()!
         count++
-        // children is Set (current) or Map (after refcount fix) — both are iterable
-        for (const entry of s.children) {
-          // Map entries are [key, value], Set entries are just values
-          const child = Array.isArray(entry) ? entry[0] : entry
-          queue.push(child)
+        // children is lazily allocated (null when no children)
+        if (s.children) {
+          for (const child of s.children) {
+            queue.push(child)
+          }
         }
       }
       return count
