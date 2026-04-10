@@ -2,7 +2,7 @@
 **/node_modules
 packages/*/dist
 benchmark
-docs
+doc-sites
 test-dts
 commitlint.config.js
 **/__tests__
