@@ -92,7 +92,6 @@ function get(this: AnyMap & Drafted, key: unknown) {
       if (parentCopy.get(key) === childProxy) {
         const childState: DraftState = childProxy[ReactiveFlags.STATE]
         parentCopy.set(key, childState.base)
-        state.root.finalizeRemaining!.count--
       }
     })
   }
