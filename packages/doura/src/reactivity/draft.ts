@@ -43,9 +43,19 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   modified: boolean
   // True after being disposed
   disposed: boolean
-  // Set on root when a draftable non-draft value is assigned to a
-  // draft property (e.g. draft.foo = { bar: draftProxy }). Signals
-  // that handleValue must run during eager finalization.
+  // Flat finalization callbacks (root only).
+  // Every child draft pushes a callback at creation time.
+  // Popped LIFO during finalizeDraft for leaf-first resolution.
+  finalities: Array<() => void> | null
+  // Tracks which keys were user-assigned (true) or deleted (false).
+  // Lazily created on first set/delete. Used by finalization to know
+  // which keys need handleValue scanning.
+  assignedMap: Map<any, boolean> | null
+  // Mutable counter for finalization (root only): tracks how many child
+  // draft proxies remain unresolved. Set at the start of finalizeDraft,
+  // decremented by callbacks and handleValue. Null outside finalization.
+  finalizeRemaining: { count: number } | null
+  // @deprecated — to be removed when finalizeDraft is rewritten (Task 6).
   hasDraftableAssignment?: boolean
   // listener (lazy: only allocated when watch() is called)
   listeners: Array<() => void> | null
@@ -137,6 +147,9 @@ export function draft<T extends Objectish>(
     copy: null,
     modified: false,
     disposed: false,
+    finalities: null, // set on root below
+    assignedMap: null, // lazy, created on first set/delete
+    finalizeRemaining: null, // set during finalization
     listeners: null,
     children: null,
   }
@@ -172,6 +185,7 @@ export function draft<T extends Objectish>(
     addChildRef(parent, proxyTarget)
   } else {
     proxyTarget.root = proxyTarget
+    proxyTarget.finalities = [] // root owns the flat callback array
   }
 
   return proxyTarget.proxy as any
