@@ -120,13 +120,21 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
       }
     }
     state.copy!.set(key, value)
-    // Track new child draft so finalization can resolve it
+    // Track new child draft
     if (value && isDraft(value as any)) {
       const childState = (value as any)[ReactiveFlags.STATE] as DraftState
       addChildRef(state, childState)
       childState.key = key
     } else if (isObject(value as any)) {
+      // @deprecated — kept until finalizeDraft is rewritten (Task 6).
       state.root.hasDraftableAssignment = true
+    }
+    // Track this key as user-assigned for finalization.
+    if (hadKey && state.base.has(key) && is(value, state.base.get(key))) {
+      if (state.assignedMap) state.assignedMap.delete(key)
+    } else {
+      if (!state.assignedMap) state.assignedMap = new Map()
+      state.assignedMap.set(key, true)
     }
   }
 
@@ -150,10 +158,12 @@ function add(this: AnySet & Drafted, value: unknown) {
     prepareSetCopy(state)
     markChanged(state)
     state.copy!.add(value)
-    // Track new child draft so finalization can resolve it
     if (value && isDraft(value as any)) {
       addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
     }
+    // Track this value as assigned for finalization.
+    if (!state.assignedMap) state.assignedMap = new Map()
+    state.assignedMap.set(value, true)
     trigger(state, TriggerOpTypes.ADD, value, value)
   }
   return this
@@ -226,6 +236,9 @@ function deleteEntry(this: CollectionTypes & Drafted, key: unknown) {
     state.drafts.delete(key)
   }
   if (hadKey) {
+    // Track this key as deleted for finalization.
+    if (!state.assignedMap) state.assignedMap = new Map()
+    state.assignedMap.set(key, false)
     trigger(state, TriggerOpTypes.DELETE, key, undefined, oldValue)
   }
   return result
