@@ -43,10 +43,6 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   modified: boolean
   // True after being disposed
   disposed: boolean
-  // Flat finalization callbacks (root only).
-  // Every child draft pushes a callback at creation time.
-  // Popped LIFO during finalizeDraft for leaf-first resolution.
-  finalities: Array<() => void> | null
   // Tracks which keys were user-assigned (true) or deleted (false).
   // Lazily created on first set/delete. Used by finalization to know
   // which keys need handleValue scanning.
@@ -145,7 +141,6 @@ export function draft<T extends Objectish>(
     copy: null,
     modified: false,
     disposed: false,
-    finalities: null, // set on root below
     assignedMap: null, // lazy, created on first set/delete
     listeners: null,
     children: null,
@@ -182,7 +177,6 @@ export function draft<T extends Objectish>(
     addChildRef(parent, proxyTarget)
   } else {
     proxyTarget.root = proxyTarget
-    proxyTarget.finalities = [] // root owns the flat callback array
   }
 
   return proxyTarget.proxy as any
@@ -475,9 +469,9 @@ function resolveSetDrafts(state: SetDraftState): void {
 }
 
 /**
- * Eager finalization: pop flat callbacks (LIFO, leaf-first) to resolve
- * direct child draft proxies, then walk assignedMap entries to resolve
- * nested draft proxies in user-assigned values.
+ * Eager finalization: steal copies, resolve child draft proxies via
+ * children iteration, then walk assignedMap entries to resolve nested
+ * draft proxies in user-assigned values.
  *
  * This is the fast path for standalone draft()/snapshot() usage.
  * Avoids allocating Maps, DraftSnapshot objects, and snapshot Proxies.
@@ -489,7 +483,6 @@ function finalizeDraft(rootDraft: Drafted): any {
   }
 
   // Phase 1: Steal copies from all modified states (BFS, then leaf-first reset).
-  // This must happen before callbacks run so that child.base is the finalized copy.
   const modified: DraftState[] = [rootState]
   let idx = 0
   while (idx < modified.length) {
@@ -507,24 +500,43 @@ function finalizeDraft(rootDraft: Drafted): any {
     stealAndReset(modified[i])
   }
 
-  // Phase 2: Pop finalization callbacks (LIFO = leaf-first).
-  const finalities = rootState.root.finalities!
-  const childCount = finalities.length
-  while (finalities.length > 0) {
-    finalities.pop()!()
+  // Phase 2: Resolve child draft proxies at their creation-time keys.
+  // Iterates each modified state's children and replaces draft proxies
+  // with their stolen base values. state.key is immutable (creation-time
+  // key, never updated by set trap), so it always points to the original
+  // position where the child draft was created.
+  for (let i = 0; i < modified.length; i++) {
+    const s = modified[i]
+    if (!s.children) continue
+    const parentCopy = s.base // after stealAndReset, base IS the stolen copy
+    if (parentCopy instanceof Map) {
+      for (let j = 0; j < s.children.length; j++) {
+        const child = s.children[j]
+        if (child.key !== NO_KEY && parentCopy.get(child.key) === child.proxy) {
+          parentCopy.set(child.key, child.base)
+        }
+      }
+    } else if (!(parentCopy instanceof Set)) {
+      for (let j = 0; j < s.children.length; j++) {
+        const child = s.children[j]
+        if (
+          child.key !== NO_KEY &&
+          parentCopy[child.key as any] === child.proxy
+        ) {
+          parentCopy[child.key as any] = child.base
+        }
+      }
+    }
   }
 
   // Phase 3: Resolve draft proxies at user-assigned keys and recurse
   // into non-draft assigned values when hasDraftableAssignment is set.
-  // Runs when child drafts exist (may have been moved to assigned keys)
-  // OR when hasDraftableAssignment is set (foreign drafts from another
-  // root may be nested in a user-assigned plain object).
+  // Handles: rename (move + delete), multi-reference, nested-in-plain-object,
+  // and cross-root foreign drafts.
   const scanNonDrafts = !!rootState.root.hasDraftableAssignment
-  if (childCount > 0 || scanNonDrafts) {
-    const handled = new Set<any>()
-    for (let i = 0; i < modified.length; i++) {
-      finalizeAssigned(modified[i], handled, scanNonDrafts)
-    }
+  const handled = new Set<any>()
+  for (let i = 0; i < modified.length; i++) {
+    finalizeAssigned(modified[i], handled, scanNonDrafts)
   }
 
   // Phase 4: Resolve Set draft proxies (lazy-drafted via state.drafts).
