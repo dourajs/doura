@@ -51,11 +51,9 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   // Lazily created on first set/delete. Used by finalization to know
   // which keys need handleValue scanning.
   assignedMap: Map<any, boolean> | null
-  // Mutable counter for finalization (root only): tracks how many child
-  // draft proxies remain unresolved. Set at the start of finalizeDraft,
-  // decremented by callbacks and handleValue. Null outside finalization.
-  finalizeRemaining: { count: number } | null
-  // @deprecated — to be removed when finalizeDraft is rewritten (Task 6).
+  // Set on root when a draftable non-draft value is assigned to a
+  // draft property (e.g. draft.foo = { bar: draftProxy }). Signals
+  // that handleValue must recurse into assigned values during finalization.
   hasDraftableAssignment?: boolean
   // listener (lazy: only allocated when watch() is called)
   listeners: Array<() => void> | null
@@ -149,7 +147,6 @@ export function draft<T extends Objectish>(
     disposed: false,
     finalities: null, // set on root below
     assignedMap: null, // lazy, created on first set/delete
-    finalizeRemaining: null, // set during finalization
     listeners: null,
     children: null,
   }
@@ -230,146 +227,12 @@ function stealAndReset(state: DraftState): any {
 }
 
 /**
- * Resolve draft proxy references in a stolen copy.
- * Uses children's stored keys for O(1) lookup per child.
- * Falls back to a full scan when a child was moved or deleted.
- * Handles plain objects, arrays, Sets, and Maps.
- */
-function resolveDraftRefs(state: DraftState, copy: any) {
-  if (!state.children) return
-
-  // Set: copy may contain original refs (lazy-drafted via state.drafts)
-  // and/or direct draft proxies (added via Set.add(draftProxy)).
-  // Rebuild the Set to preserve insertion order while resolving both.
-  if (copy instanceof Set) {
-    const setState = state as any
-    const draftsMap: Map<any, any> | undefined =
-      setState.drafts?.size > 0 ? setState.drafts : undefined
-    const values = Array.from(copy)
-    let changed = false
-    for (let j = 0; j < values.length; j++) {
-      const v = values[j]
-      // Case 1: original value that was lazily drafted
-      if (draftsMap) {
-        const drafted = draftsMap.get(v)
-        if (drafted) {
-          values[j] = (drafted[ReactiveFlags.STATE] as DraftState).base
-          changed = true
-          continue
-        }
-      }
-      // Case 2: direct draft proxy (e.g. added via Set.add(draftProxy))
-      if (v !== null && typeof v === 'object' && v[ReactiveFlags.STATE]) {
-        values[j] = (v[ReactiveFlags.STATE] as DraftState).base
-        changed = true
-      }
-    }
-    if (changed) {
-      copy.clear()
-      for (let j = 0; j < values.length; j++) {
-        copy.add(values[j])
-      }
-    }
-    return
-  }
-
-  // Map: replace draft proxy values with resolved base values.
-  // Try key-based O(1) resolution first; fall back to full scan
-  // when a draft was moved to a different key (delete + set).
-  if (copy instanceof Map) {
-    const ch = state.children!
-    let needsScan = false
-    for (let j = 0; j < ch.length; j++) {
-      const child = ch[j]
-      const key = child.key
-      if (key !== NO_KEY && copy.get(key) === child.proxy) {
-        copy.set(key, child.base)
-      } else {
-        needsScan = true
-      }
-    }
-    if (needsScan) {
-      copy.forEach((val: any, key: any) => {
-        if (
-          val !== null &&
-          typeof val === 'object' &&
-          val[ReactiveFlags.STATE]
-        ) {
-          copy.set(key, (val[ReactiveFlags.STATE] as DraftState).base)
-        }
-      })
-    }
-    return
-  }
-
-  // Object / Array
-  const children = state.children
-  let needsScan = false
-
-  for (let j = 0; j < children.length; j++) {
-    const child = children[j]
-    const key = child.key
-    if (key !== NO_KEY && copy[key as any] === child.proxy) {
-      copy[key as any] = child.base
-    } else {
-      needsScan = true
-    }
-  }
-
-  if (needsScan) {
-    if (isArray(copy)) {
-      for (let j = 0; j < copy.length; j++) {
-        const val = copy[j]
-        if (
-          val !== null &&
-          typeof val === 'object' &&
-          val[ReactiveFlags.STATE]
-        ) {
-          copy[j] = (val[ReactiveFlags.STATE] as DraftState).base
-        }
-      }
-    } else {
-      const keys = Object.keys(copy)
-      for (let j = 0; j < keys.length; j++) {
-        const val = copy[keys[j]]
-        if (
-          val !== null &&
-          typeof val === 'object' &&
-          val[ReactiveFlags.STATE]
-        ) {
-          copy[keys[j]] = (val[ReactiveFlags.STATE] as DraftState).base
-        }
-      }
-    }
-  }
-}
-
-/**
- * Resolve a single draft proxy found by handleValue: ensure its copy
- * is stolen (if modified) and return the finalized base value.
- * Handles drafts that were disconnected from the tree (e.g. deleted
- * from parent then nested in a new plain object).
- */
-function finalizeDraftValue(state: DraftState): any {
-  if (state.modified && state.copy) {
-    // This draft was modified but not yet finalized by the main loop
-    // (disconnected from the tree). Steal its copy now.
-    stealAndReset(state)
-  }
-  return state.base
-}
-
-/**
  * Recursively resolve draft proxies nested inside non-draft draftable
  * objects (e.g. { bar: draftProxy } assigned via draft.foo = { bar: draft.obj }).
  *
- * Similar to Mutative's handleValue: traverses all properties of a
- * draftable object, replacing draft proxies with their finalized base.
- * Uses a Set to prevent infinite recursion on circular references.
- *
- * Early termination (Immer-style): tracks remaining unresolved drafts.
- * When the count reaches 0, all drafts are resolved and further
- * recursion is skipped — avoids traversing large assigned data trees.
+ * Traverses all properties of a draftable object, replacing draft proxies
+ * with their finalized base. Uses a Set to prevent infinite recursion on
+ * circular references. Early-exits when remaining.count hits 0.
  */
 function handleValue(
   target: any,
@@ -381,64 +244,184 @@ function handleValue(
     target === null ||
     typeof target !== 'object' ||
     handled.has(target) ||
-    target[ReactiveFlags.STATE] || // is a draft, skip (shouldn't happen)
-    target[ReactiveFlags.SKIP] // markRaw
+    target[ReactiveFlags.STATE] ||
+    target[ReactiveFlags.SKIP] ||
+    Object.isFrozen(target)
   ) {
     return
   }
   handled.add(target)
 
-  // Helper: process a single value — resolve draft or recurse into draftable
-  const processVal = (val: any, setter: (resolved: any) => void): void => {
-    if (val === null || typeof val !== 'object') return
-    if (val[ReactiveFlags.STATE]) {
-      setter(finalizeDraftValue(val[ReactiveFlags.STATE] as DraftState))
-      remaining.count--
-    } else if (remaining.count > 0) {
-      handleValue(val, handled, remaining)
-    }
-  }
-
   if (isArray(target)) {
     for (let i = 0; i < target.length; i++) {
-      processVal(target[i], (v) => {
-        target[i] = v
-      })
-      if (remaining.count <= 0) return
+      const val = target[i]
+      if (val !== null && typeof val === 'object') {
+        if (val[ReactiveFlags.STATE]) {
+          const childState = val[ReactiveFlags.STATE] as DraftState
+          target[i] = childState.copy ?? childState.base
+          if (--remaining.count <= 0) return
+        } else {
+          handleValue(val, handled, remaining)
+          if (remaining.count <= 0) return
+        }
+      }
     }
   } else if (target instanceof Map) {
     target.forEach((val: any, key: any) => {
-      processVal(val, (v) => target.set(key, v))
+      if (remaining.count <= 0) return
+      if (val !== null && typeof val === 'object') {
+        if (val[ReactiveFlags.STATE]) {
+          const childState = val[ReactiveFlags.STATE] as DraftState
+          target.set(key, childState.copy ?? childState.base)
+          remaining.count--
+        } else {
+          handleValue(val, handled, remaining)
+        }
+      }
     })
   } else if (target instanceof Set) {
     const replacements: [any, any][] = []
     target.forEach((val: any) => {
-      processVal(val, (v) => replacements.push([val, v]))
+      if (remaining.count <= 0) return
+      if (val !== null && typeof val === 'object') {
+        if (val[ReactiveFlags.STATE]) {
+          const childState = val[ReactiveFlags.STATE] as DraftState
+          replacements.push([val, childState.copy ?? childState.base])
+          remaining.count--
+        } else {
+          handleValue(val, handled, remaining)
+        }
+      }
     })
     for (let i = 0; i < replacements.length; i++) {
       target.delete(replacements[i][0])
       target.add(replacements[i][1])
     }
   } else {
-    // Plain object — use getOwnPropertyDescriptor to avoid
-    // triggering getters (which may throw or have side effects).
+    // Plain object — use getOwnPropertyDescriptor to avoid triggering
+    // getters (which may throw or have side effects). User-assigned
+    // objects may have accessor properties that aren't data values.
     const keys = Object.keys(target)
     for (let i = 0; i < keys.length; i++) {
       const desc = Object.getOwnPropertyDescriptor(target, keys[i])
       if (desc && 'value' in desc) {
-        processVal(desc.value, (v) => {
-          target[keys[i]] = v
-        })
-        if (remaining.count <= 0) return
+        const val = desc.value
+        if (val !== null && typeof val === 'object') {
+          if (val[ReactiveFlags.STATE]) {
+            const childState = val[ReactiveFlags.STATE] as DraftState
+            target[keys[i]] = childState.copy ?? childState.base
+            if (--remaining.count <= 0) return
+          } else {
+            handleValue(val, handled, remaining)
+            if (remaining.count <= 0) return
+          }
+        }
       }
     }
   }
 }
 
 /**
- * Eager finalization: walk modified states, steal copies, and resolve
- * all draft proxy references in-place. Returns a plain (non-Proxy)
- * object with structural sharing for unmodified subtrees.
+ * For each user-assigned key (assignedMap.get(key) === true) in a state's
+ * copy, resolve draft proxies directly and recurse into non-draft objects
+ * via handleValue. Direct draft resolution always runs (a draft proxy at
+ * an assigned key must always be replaced). handleValue recursion is
+ * gated by scanNonDrafts (skip when no draftable non-draft values were
+ * assigned — equivalent to the old hasDraftableAssignment flag).
+ */
+function finalizeAssigned(
+  state: DraftState,
+  handled: Set<any>,
+  scanNonDrafts: boolean
+): void {
+  if (!state.assignedMap) return
+
+  const copy = state.copy ? state.copy : state.base
+
+  // Helper: resolve a single assigned value.
+  const resolveVal = (val: any, setter: (resolved: any) => void): void => {
+    if (val === null || typeof val !== 'object') return
+    if (val[ReactiveFlags.STATE]) {
+      // Draft proxy at an assigned key (e.g. moved via s.foo = s.obj)
+      const childState = val[ReactiveFlags.STATE] as DraftState
+      setter(childState.copy ?? childState.base)
+    } else if (scanNonDrafts) {
+      // Recurse into non-draft objects only when hasDraftableAssignment is set
+      handleValue(val, handled, { count: Infinity })
+    }
+  }
+
+  if (copy instanceof Set) {
+    state.assignedMap.forEach((assigned, value) => {
+      if (assigned) {
+        resolveVal(value, (v) => {
+          copy.delete(value)
+          copy.add(v)
+        })
+      }
+    })
+    return
+  }
+
+  if (copy instanceof Map) {
+    state.assignedMap.forEach((assigned, key) => {
+      if (assigned) {
+        resolveVal(copy.get(key), (v) => copy.set(key, v))
+      }
+    })
+    return
+  }
+
+  // Object / Array
+  state.assignedMap.forEach((assigned, key) => {
+    if (assigned) {
+      resolveVal((copy as any)[key], (v) => {
+        ;(copy as any)[key] = v
+      })
+    }
+  })
+}
+
+/**
+ * Resolve Set draft proxies: replace original values with their
+ * finalized drafts, and replace direct draft proxies with base values.
+ */
+function resolveSetDrafts(state: SetDraftState): void {
+  const copy = state.copy ?? state.base
+  const draftsMap = state.drafts?.size > 0 ? state.drafts : undefined
+  if (!draftsMap && !state.children) return
+
+  const values = Array.from(copy)
+  let changed = false
+  for (let j = 0; j < values.length; j++) {
+    const v = values[j]
+    // Case 1: original value that was lazily drafted
+    if (draftsMap) {
+      const drafted = draftsMap.get(v)
+      if (drafted) {
+        values[j] = (drafted[ReactiveFlags.STATE] as DraftState).base
+        changed = true
+        continue
+      }
+    }
+    // Case 2: direct draft proxy (e.g. added via Set.add(draftProxy))
+    if (v !== null && typeof v === 'object' && v[ReactiveFlags.STATE]) {
+      values[j] = (v[ReactiveFlags.STATE] as DraftState).base
+      changed = true
+    }
+  }
+  if (changed) {
+    copy.clear()
+    for (let j = 0; j < values.length; j++) {
+      copy.add(values[j])
+    }
+  }
+}
+
+/**
+ * Eager finalization: pop flat callbacks (LIFO, leaf-first) to resolve
+ * direct child draft proxies, then walk assignedMap entries to resolve
+ * nested draft proxies in user-assigned values.
  *
  * This is the fast path for standalone draft()/snapshot() usage.
  * Avoids allocating Maps, DraftSnapshot objects, and snapshot Proxies.
@@ -449,7 +432,8 @@ function finalizeDraft(rootDraft: Drafted): any {
     return rootState.base
   }
 
-  // Collect modified states via BFS, then process in reverse (leaf-first).
+  // Phase 1: Steal copies from all modified states (BFS, then leaf-first reset).
+  // This must happen before callbacks run so that child.base is the finalized copy.
   const modified: DraftState[] = [rootState]
   let idx = 0
   while (idx < modified.length) {
@@ -463,60 +447,40 @@ function finalizeDraft(rootDraft: Drafted): any {
       }
     }
   }
-
-  // Process leaf-first: steal copies and resolve direct draft refs.
   for (let i = modified.length - 1; i >= 0; i--) {
-    const state = modified[i]
-    const copy = stealAndReset(state)
-    resolveDraftRefs(state, copy)
+    stealAndReset(modified[i])
   }
 
-  // If a draftable non-draft value was assigned (e.g. draft.foo = { bar: draftProxy }),
-  // recursively scan each modified state's copy for nested draft proxies.
-  // Only scan values that differ from the original base (user-assigned values).
-  // Early termination: skip entirely if no such assignments were made.
-  if (rootState.root.hasDraftableAssignment) {
+  // Save child-draft count before popping. Equivalent to Mutative's
+  // `finalities.revoke.length > 1` check — if no child drafts were
+  // ever created, Phases 2 and 3 can be skipped entirely.
+  const finalities = rootState.root.finalities!
+  const childCount = finalities.length
+
+  if (childCount > 0) {
+    // Phase 2: Pop finalization callbacks (LIFO = leaf-first).
+    // Each callback checks if the child proxy is still at its original key
+    // in the parent's copy. If so, replaces it with the finalized base.
+    while (finalities.length > 0) {
+      finalities.pop()!()
+    }
+
+    // Phase 3: Resolve draft proxies at user-assigned keys (always needed —
+    // a draft may have been moved to a new key via assignment) and recurse
+    // into non-draft assigned values only when hasDraftableAssignment is set
+    // (a draftable non-draft value was assigned, e.g. { bar: draftProxy }).
     const handled = new Set<any>()
-    const remaining = { count: Infinity }
-    for (let i = modified.length - 1; i >= 0; i--) {
-      const state = modified[i]
-      const copy = state.base // after stealAndReset, base IS the copy
-      // Build set of known child bases to skip (they are already resolved
-      // or are original values that can't contain draft proxies).
-      const childBases = new Set<any>()
-      if (state.children) {
-        for (let j = 0; j < state.children.length; j++) {
-          childBases.add(state.children[j].base)
-        }
-      }
-      const scanVal = (val: any) => {
-        if (
-          val !== null &&
-          typeof val === 'object' &&
-          !childBases.has(val) &&
-          !val[ReactiveFlags.STATE]
-        ) {
-          handleValue(val, handled, remaining)
-        }
-      }
-      if (copy instanceof Map) {
-        copy.forEach((val: any) => scanVal(val))
-      } else if (!(copy instanceof Set)) {
-        // Object or Array
-        if (isArray(copy)) {
-          for (let j = 0; j < copy.length; j++) {
-            scanVal(copy[j])
-          }
-        } else {
-          const keys = Object.keys(copy)
-          for (let j = 0; j < keys.length; j++) {
-            const desc = Object.getOwnPropertyDescriptor(copy, keys[j])
-            if (desc && 'value' in desc) {
-              scanVal(desc.value)
-            }
-          }
-        }
-      }
+    const scanNonDrafts = !!rootState.root.hasDraftableAssignment
+    for (let i = 0; i < modified.length; i++) {
+      finalizeAssigned(modified[i], handled, scanNonDrafts)
+    }
+  }
+
+  // Phase 4: Resolve Set draft proxies (lazy-drafted via state.drafts).
+  for (let i = 0; i < modified.length; i++) {
+    const state = modified[i]
+    if (state.type === DraftType.Set) {
+      resolveSetDrafts(state as any)
     }
   }
 

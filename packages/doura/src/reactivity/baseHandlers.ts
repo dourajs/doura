@@ -147,7 +147,6 @@ function createGetter(): ProxyGetter {
         if (parentCopy[prop as any] === childProxy) {
           const childState: DraftState = childProxy[ReactiveFlags.STATE]
           parentCopy[prop as any] = childState.base
-          state.root.finalizeRemaining!.count--
         }
       })
     }
