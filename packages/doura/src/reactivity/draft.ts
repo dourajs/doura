@@ -469,9 +469,9 @@ function resolveSetDrafts(state: SetDraftState): void {
 }
 
 /**
- * Eager finalization: steal copies, resolve child draft proxies via
- * children iteration, then walk assignedMap entries to resolve nested
- * draft proxies in user-assigned values.
+ * Eager finalization: collect modified states via BFS, then process
+ * leaf-first in a single reverse pass — steal, resolve children,
+ * resolve assigned keys, and handle Sets.
  *
  * This is the fast path for standalone draft()/snapshot() usage.
  * Avoids allocating Maps, DraftSnapshot objects, and snapshot Proxies.
@@ -482,7 +482,8 @@ function finalizeDraft(rootDraft: Drafted): any {
     return rootState.base
   }
 
-  // Phase 1: Steal copies from all modified states (BFS, then leaf-first reset).
+  // BFS: collect all modified states. markChanged() bubbles up from leaf
+  // to root, so an unmodified state cannot have modified descendants.
   const modified: DraftState[] = [rootState]
   let idx = 0
   while (idx < modified.length) {
@@ -496,54 +497,52 @@ function finalizeDraft(rootDraft: Drafted): any {
       }
     }
   }
-  for (let i = modified.length - 1; i >= 0; i--) {
-    stealAndReset(modified[i])
-  }
 
-  // Phase 2: Resolve child draft proxies at their creation-time keys.
-  // Iterates each modified state's children and replaces draft proxies
-  // with their stolen base values. state.key is immutable (creation-time
-  // key, never updated by set trap), so it always points to the original
-  // position where the child draft was created.
-  for (let i = 0; i < modified.length; i++) {
+  // Single reverse pass (leaf-first): steal + resolve children +
+  // resolve assigned keys + resolve Sets. Leaf-first order ensures
+  // child.base is fully resolved before the parent reads it.
+  const scanNonDrafts = !!rootState.root.hasDraftableAssignment
+  const handled = new Set<any>()
+  for (let i = modified.length - 1; i >= 0; i--) {
     const s = modified[i]
-    if (!s.children) continue
+
+    // Steal copy (or shallow-copy base for bubble-up-only states).
+    stealAndReset(s)
     const parentCopy = s.base // after stealAndReset, base IS the stolen copy
-    if (parentCopy instanceof Map) {
-      for (let j = 0; j < s.children.length; j++) {
-        const child = s.children[j]
-        if (child.key !== NO_KEY && parentCopy.get(child.key) === child.proxy) {
-          parentCopy.set(child.key, child.base)
+
+    // Resolve child draft proxies at their creation-time keys.
+    // state.key is immutable (never updated by set trap), so it always
+    // points to the original position where the child was created.
+    if (s.children) {
+      if (parentCopy instanceof Map) {
+        for (let j = 0; j < s.children.length; j++) {
+          const child = s.children[j]
+          if (
+            child.key !== NO_KEY &&
+            parentCopy.get(child.key) === child.proxy
+          ) {
+            parentCopy.set(child.key, child.base)
+          }
         }
-      }
-    } else if (!(parentCopy instanceof Set)) {
-      for (let j = 0; j < s.children.length; j++) {
-        const child = s.children[j]
-        if (
-          child.key !== NO_KEY &&
-          parentCopy[child.key as any] === child.proxy
-        ) {
-          parentCopy[child.key as any] = child.base
+      } else if (!(parentCopy instanceof Set)) {
+        for (let j = 0; j < s.children.length; j++) {
+          const child = s.children[j]
+          if (
+            child.key !== NO_KEY &&
+            parentCopy[child.key as any] === child.proxy
+          ) {
+            parentCopy[child.key as any] = child.base
+          }
         }
       }
     }
-  }
 
-  // Phase 3: Resolve draft proxies at user-assigned keys and recurse
-  // into non-draft assigned values when hasDraftableAssignment is set.
-  // Handles: rename (move + delete), multi-reference, nested-in-plain-object,
-  // and cross-root foreign drafts.
-  const scanNonDrafts = !!rootState.root.hasDraftableAssignment
-  const handled = new Set<any>()
-  for (let i = 0; i < modified.length; i++) {
-    finalizeAssigned(modified[i], handled, scanNonDrafts)
-  }
+    // Resolve draft proxies at user-assigned keys + nested in plain objects.
+    finalizeAssigned(s, handled, scanNonDrafts)
 
-  // Phase 4: Resolve Set draft proxies (lazy-drafted via state.drafts).
-  for (let i = 0; i < modified.length; i++) {
-    const state = modified[i]
-    if (state.type === DraftType.Set) {
-      resolveSetDrafts(state as any)
+    // Resolve Set draft proxies (lazy-drafted via state.drafts).
+    if (s.type === DraftType.Set) {
+      resolveSetDrafts(s as any)
     }
   }
 
@@ -649,6 +648,3 @@ export function removeChildRef(parent: DraftState, child: DraftState) {
     parent.children.splice(idx, 1)
   }
 }
-
-// updateDraftState is no longer needed - takeSnapshotFromDraft steals the copy
-// directly instead of making a new shallow copy.
