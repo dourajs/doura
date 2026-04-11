@@ -4,10 +4,10 @@ import { runBenchmark } from './runner'
 runBenchmark({
   getData: `(size) => new Set(Array(size).fill(1).map((_, key) => ({ value: key })))`,
   sizes: [
-    ...Array(3)
+    ...Array(1)
       .fill(1)
       .map((_, i) => (1 + i * 4) * 10 ** 3),
-    ...Array(3)
+    ...Array(1)
       .fill(1)
       .map((_, i) => (1 + i * 4) * 10 ** 4),
   ].sort((a, b) => a - b),

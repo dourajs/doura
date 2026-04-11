@@ -1,10 +1,10 @@
-跑 benchmark/suite/set，通过分析代码， profile 等工具调试 doura 性能瓶颈，优化到分数和 mutative 持平或超出，达成目标时输出 <promise>DONE</promise>
+跑 benchmark/suite/set，benchmark/suite/map 通过分析代码，profile 等工具确定 doura 的性能瓶颈，优化性能，使性能水平和 mutative 持平或超出，达成目标时输出 <promise>DONE</promise>
 
 跑suite:
 1. build
 `pnpm build doura --types`
 2. run
-`NODE_ENV=production ts-node benchmark/suite/$benchmark-name.ts`
+`NODE_ENV=production pnpm ts-node benchmark/suite/$benchmark-name.ts`
 
 rules:
 - 不要只猜测，要验证结论，验证结论时要用控制变量法，交叉检查

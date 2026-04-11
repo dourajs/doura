@@ -99,7 +99,7 @@ describe('reactivity/collections', () => {
       expect(true).toBe(true)
     })
 
-    // Eager finalization (fast path) steals copies from modified draft states
+    // Finalization steals copies from modified draft states
     // and returns them directly without snapshot Proxy wrapping. If child
     // draft proxies are not resolved to plain values, they leak into the
     // result with three consequences:
@@ -113,7 +113,7 @@ describe('reactivity/collections', () => {
     // through toSnapshot(), which creates read-only snapshot proxies
     // with no set trap and no draft state reference.
 
-    test('Map: eager finalization should not leak draft proxies into result', () => {
+    test('Map: should not leak draft proxies into result', () => {
       const base = new Map<string, { value: number }>([
         ['a', { value: 1 }],
         ['b', { value: 2 }],
@@ -148,24 +148,7 @@ describe('reactivity/collections', () => {
       expect(result.get('b')).toBe(base.get('b'))
     })
 
-    test('Map: moved draft (delete + set to new key) — fast path', () => {
-      const base = new Map<string, { value: number }>([
-        ['a', { value: 1 }],
-        ['b', { value: 2 }],
-      ])
-      const result = produce(base, (draft) => {
-        const a = draft.get('a')!
-        a.value = 10
-        draft.delete('a')
-        draft.set('c', a)
-      })
-      expect(result.has('a')).toBe(false)
-      expect(result.get('c')!.value).toBe(10)
-      expect(isDraft(result.get('c')!)).toBe(false)
-      expect(result.get('b')).toBe(base.get('b'))
-    })
-
-    test('Map: moved draft (delete + set to new key) — slow path', () => {
+    test('Map: moved draft (delete + set to new key)', () => {
       const base = new Map<string, any>([
         ['a', { value: 1 }],
         ['b', { value: 2 }],
@@ -179,21 +162,10 @@ describe('reactivity/collections', () => {
       expect(snap.has('a')).toBe(false)
       expect(snap.get('c')!.value).toBe(10)
       expect(isDraft(snap.get('c')!)).toBe(false)
+      expect(snap.get('b')!).toBe(base.get('b'))
     })
 
-    test('Map: multiple references to same draft — fast path', () => {
-      const base = new Map<string, { value: number }>([['a', { value: 1 }]])
-      const result = produce(base, (draft) => {
-        const a = draft.get('a')!
-        a.value = 10
-        draft.set('b', a)
-      })
-      expect(result.get('a')).toBe(result.get('b'))
-      expect(isDraft(result.get('a')!)).toBe(false)
-      expect(isDraft(result.get('b')!)).toBe(false)
-    })
-
-    test('Map: multiple references to same draft — slow path', () => {
+    test('Map: multiple references to same draft', () => {
       const base = new Map<string, any>([['a', { value: 1 }]])
       const drafted = draft(base)
       const a = drafted.get('a')!
@@ -202,6 +174,7 @@ describe('reactivity/collections', () => {
       const snap = snapshot(drafted, drafted, new Map())
       expect(snap.get('a')).toBe(snap.get('b'))
       expect(isDraft(snap.get('a')!)).toBe(false)
+      expect(isDraft(snap.get('b')!)).toBe(false)
     })
 
     test('Map: draft nested in new plain object assigned via set()', () => {

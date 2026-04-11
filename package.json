@@ -16,8 +16,6 @@
     "build": "node scripts/build.js",
     "benchmark": "pnpm build doura --types && ts-node benchmark/reactivity.ts",
     "benchmark:suite": "pnpm build doura --types && NODE_ENV=production ts-node benchmark/suite/index.ts",
-    "benchmark:suite:array": "pnpm build doura --types && NODE_ENV=production ts-node benchmark/suite/array.ts",
-    "benchmark:suite:object": "pnpm build doura --types && NODE_ENV=production ts-node benchmark/suite/object.ts",
     "clean": "pnpm -r --parallel exec rm -rf node_modules dist && pnpm exec rm -rf node_modules",
     "test": "run-s \"test-unit {@}\" \"test-dts {@}\"",
     "test-unit": "jest",
