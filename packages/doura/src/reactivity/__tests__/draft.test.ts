@@ -1173,6 +1173,29 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     expect(isDraft(snap.wrapper.level1.level2.obj)).toBe(false)
   })
 
+  it('spread draft nested in assignment + readback — fast path', () => {
+    const nextState = produce({ obj: { a: 1 } } as any, (s) => {
+      s.obj.a = 2
+      s.wrapper = { level1: { level2: { ...s } } }
+      void s.wrapper.level1 // readback: triggers get trap, wraps wrapper in draft proxy
+      delete s.obj
+    })
+    expect(nextState.wrapper.level1.level2.obj).toEqual({ a: 2 })
+    expect(isDraft(nextState.wrapper.level1.level2.obj)).toBe(false)
+  })
+
+  it('spread draft nested in assignment + readback — slow path', () => {
+    const state = { obj: { a: 1 } } as any
+    const drafted = draft(state)
+    drafted.obj.a = 2
+    drafted.wrapper = { level1: { level2: { ...drafted } } }
+    void drafted.wrapper.level1 // readback: triggers get trap
+    delete drafted.obj
+    const snap = snapshot(drafted, drafted, new Map())
+    expect(snap.wrapper.level1.level2.obj).toEqual({ a: 2 })
+    expect(isDraft(snap.wrapper.level1.level2.obj)).toBe(false)
+  })
+
   it('cross-root: foreign draft nested in plain object — fast path', () => {
     const root1 = draft({ obj: { a: 1 } })
     root1.obj.a = 2
