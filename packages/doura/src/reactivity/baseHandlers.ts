@@ -137,6 +137,19 @@ function createGetter(): ProxyGetter {
     if (!value[ReactiveFlags.STATE]) {
       prepareCopy(state)
       value = state.copy![prop as any] = draft(value, state, prop)
+      // Register flat finalization callback on root.
+      // At finalization time, checks if the child proxy is still at this
+      // key in the parent's copy. If so, replaces it with the finalized
+      // base value and decrements the remaining-unresolved-drafts counter.
+      const childProxy = value
+      state.root.finalities!.push(() => {
+        const parentCopy = state.copy ? state.copy : state.base
+        if (parentCopy[prop as any] === childProxy) {
+          const childState: DraftState = childProxy[ReactiveFlags.STATE]
+          parentCopy[prop as any] = childState.base
+          state.root.finalizeRemaining!.count--
+        }
+      })
     }
 
     trackDraft(value)
