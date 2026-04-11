@@ -87,13 +87,14 @@ function get(this: AnyMap & Drafted, key: unknown) {
     state.copy!.set(key, value)
     // Register flat finalization callback for this Map child.
     const childProxy = value
+    const childState: DraftState = childProxy[ReactiveFlags.STATE]
     state.root.finalities!.push(() => {
       const parentCopy = state.copy ? state.copy : state.base
       if (parentCopy.get(key) === childProxy) {
-        const childState: DraftState = childProxy[ReactiveFlags.STATE]
         parentCopy.set(key, childState.base)
       }
     })
+    state.root.childDraftStates!.push(childState)
   }
 
   trackDraft(value)

@@ -47,6 +47,10 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   // Every child draft pushes a callback at creation time.
   // Popped LIFO during finalizeDraft for leaf-first resolution.
   finalities: Array<() => void> | null
+  // Flat list of ALL child draft states ever created (root only).
+  // Immune to removeChildRef — used by takeSnapshotFromDraft (slow path)
+  // to find orphaned drafts that were removed from children via delete.
+  childDraftStates: DraftState[] | null
   // Tracks which keys were user-assigned (true) or deleted (false).
   // Lazily created on first set/delete. Used by finalization to know
   // which keys need handleValue scanning.
@@ -146,6 +150,7 @@ export function draft<T extends Objectish>(
     modified: false,
     disposed: false,
     finalities: null, // set on root below
+    childDraftStates: null, // set on root below
     assignedMap: null, // lazy, created on first set/delete
     listeners: null,
     children: null,
@@ -183,6 +188,7 @@ export function draft<T extends Objectish>(
   } else {
     proxyTarget.root = proxyTarget
     proxyTarget.finalities = [] // root owns the flat callback array
+    proxyTarget.childDraftStates = [] // flat list of all child drafts
   }
 
   return proxyTarget.proxy as any
@@ -383,6 +389,54 @@ function finalizeAssigned(
 }
 
 /**
+ * Slow-path variant of finalizeAssigned: only recurses into non-draft
+ * draftable values via handleValue. Direct draft proxies at assigned
+ * keys are left for toSnapshot to resolve lazily (preserving DraftState
+ * identity for view reactivity). Handles both same-root orphans and
+ * cross-root foreign drafts since handleValue reads
+ * childState.copy ?? childState.base directly.
+ */
+function finalizeAssignedForSnapshot(
+  state: DraftState,
+  handled: Set<any>
+): void {
+  if (!state.assignedMap) return
+
+  const copy = state.copy ? state.copy : state.base
+
+  // Helper: resolve nested draft proxies within an assigned value.
+  // If the value is a draft proxy, enter its base/copy to find nested drafts.
+  // If the value is a plain draftable object, enter it directly.
+  // Direct draft proxies are NOT replaced (left for toSnapshot lazy resolution).
+  const scanValue = (val: any) => {
+    if (val === null || typeof val !== 'object') return
+    if (val[ReactiveFlags.STATE]) {
+      // Draft proxy at assigned key — don't replace it, but scan its
+      // underlying value for nested drafts (e.g. wrapper draft created
+      // by spread `{ ...drafted }` whose base contains orphan draft proxies).
+      const s = val[ReactiveFlags.STATE] as DraftState
+      const underlying = s.copy ?? s.base
+      handleValue(underlying, handled, { count: Infinity })
+    } else {
+      handleValue(val, handled, { count: Infinity })
+    }
+  }
+
+  if (copy instanceof Map) {
+    state.assignedMap.forEach((assigned, key) => {
+      if (assigned) scanValue(copy.get(key))
+    })
+    return
+  }
+
+  if (!(copy instanceof Set)) {
+    state.assignedMap.forEach((assigned, key) => {
+      if (assigned) scanValue((copy as any)[key])
+    })
+  }
+}
+
+/**
  * Resolve Set draft proxies: replace original values with their
  * finalized drafts, and replace direct draft proxies with base values.
  */
@@ -451,26 +505,21 @@ function finalizeDraft(rootDraft: Drafted): any {
     stealAndReset(modified[i])
   }
 
-  // Save child-draft count before popping. Equivalent to Mutative's
-  // `finalities.revoke.length > 1` check — if no child drafts were
-  // ever created, Phases 2 and 3 can be skipped entirely.
+  // Phase 2: Pop finalization callbacks (LIFO = leaf-first).
   const finalities = rootState.root.finalities!
   const childCount = finalities.length
+  while (finalities.length > 0) {
+    finalities.pop()!()
+  }
 
-  if (childCount > 0) {
-    // Phase 2: Pop finalization callbacks (LIFO = leaf-first).
-    // Each callback checks if the child proxy is still at its original key
-    // in the parent's copy. If so, replaces it with the finalized base.
-    while (finalities.length > 0) {
-      finalities.pop()!()
-    }
-
-    // Phase 3: Resolve draft proxies at user-assigned keys (always needed —
-    // a draft may have been moved to a new key via assignment) and recurse
-    // into non-draft assigned values only when hasDraftableAssignment is set
-    // (a draftable non-draft value was assigned, e.g. { bar: draftProxy }).
+  // Phase 3: Resolve draft proxies at user-assigned keys and recurse
+  // into non-draft assigned values when hasDraftableAssignment is set.
+  // Runs when child drafts exist (may have been moved to assigned keys)
+  // OR when hasDraftableAssignment is set (foreign drafts from another
+  // root may be nested in a user-assigned plain object).
+  const scanNonDrafts = !!rootState.root.hasDraftableAssignment
+  if (childCount > 0 || scanNonDrafts) {
     const handled = new Set<any>()
-    const scanNonDrafts = !!rootState.root.hasDraftableAssignment
     for (let i = 0; i < modified.length; i++) {
       finalizeAssigned(modified[i], handled, scanNonDrafts)
     }
@@ -497,21 +546,39 @@ export function takeSnapshotFromDraft(
     snapshots: snapshots || new Map(),
   }
   const snapshots_ = draftSnapshot.snapshots
-  // Only traverse modified states. markChanged() bubbles up from leaf to
-  // root, so an unmodified state cannot have modified descendants.
-  // Unmodified drafts are resolved lazily by snapshotHandler's toSnapshot.
-  const queue = [draft[ReactiveFlags.STATE]]
-  while (queue.length) {
-    const state = queue.pop()!
-    if (!state.modified) {
-      continue
+  const rootState: DraftState = draft[ReactiveFlags.STATE]
+
+  // Steal root if modified.
+  if (rootState.modified) {
+    const value = stealAndReset(rootState)
+    snapshots_.delete(rootState.proxy)
+    copies.set(rootState, value)
+  }
+
+  // Steal all modified child drafts via flat list (includes orphans
+  // that were removed from children via delete).
+  const childDraftStates = rootState.root.childDraftStates
+  if (childDraftStates) {
+    for (let i = 0; i < childDraftStates.length; i++) {
+      const state = childDraftStates[i]
+      if (!state.modified) continue
+      const value = stealAndReset(state)
+      snapshots_.delete(state.proxy)
+      copies.set(state, value)
     }
-    const value = stealAndReset(state)
-    snapshots_.delete(state.proxy)
-    copies.set(state, value)
-    if (state.children) {
-      for (let i = 0; i < state.children.length; i++) {
-        queue.push(state.children[i])
+  }
+
+  // Resolve draft proxies nested in user-assigned non-draft objects.
+  // Direct draft proxies at assigned keys are left for toSnapshot to
+  // resolve lazily (preserving DraftState identity for view reactivity).
+  // Uses handleValue which reads childState.copy ?? childState.base,
+  // handling both same-root orphans and cross-root foreign drafts.
+  if (rootState.root.hasDraftableAssignment) {
+    const handled = new Set<any>()
+    finalizeAssignedForSnapshot(rootState, handled)
+    if (childDraftStates) {
+      for (let i = 0; i < childDraftStates.length; i++) {
+        finalizeAssignedForSnapshot(childDraftStates[i], handled)
       }
     }
   }

@@ -148,9 +148,7 @@ describe('reactivity/collections', () => {
       expect(result.get('b')).toBe(base.get('b'))
     })
 
-    test('Map: moved draft (delete + set to new key) should not leak draft proxy', () => {
-      // Tests the needsScan fallback: child.key='a' but the draft proxy
-      // is moved to key 'c', so key-based resolution misses it.
+    test('Map: moved draft (delete + set to new key) — fast path', () => {
       const base = new Map<string, { value: number }>([
         ['a', { value: 1 }],
         ['b', { value: 2 }],
@@ -167,10 +165,23 @@ describe('reactivity/collections', () => {
       expect(result.get('b')).toBe(base.get('b'))
     })
 
-    test('Map: multiple references to same draft (needsScan fallback)', () => {
-      // draft.set('b', draft.get('a')) without deleting 'a'.
-      // child.key is updated to 'b', so key-based resolution only resolves 'b'.
-      // The value at 'a' still holds the draft proxy — needsScan catches it.
+    test('Map: moved draft (delete + set to new key) — slow path', () => {
+      const base = new Map<string, any>([
+        ['a', { value: 1 }],
+        ['b', { value: 2 }],
+      ])
+      const drafted = draft(base)
+      const a = drafted.get('a')!
+      a.value = 10
+      drafted.delete('a')
+      drafted.set('c', a)
+      const snap = snapshot(drafted, drafted, new Map())
+      expect(snap.has('a')).toBe(false)
+      expect(snap.get('c')!.value).toBe(10)
+      expect(isDraft(snap.get('c')!)).toBe(false)
+    })
+
+    test('Map: multiple references to same draft — fast path', () => {
       const base = new Map<string, { value: number }>([['a', { value: 1 }]])
       const result = produce(base, (draft) => {
         const a = draft.get('a')!
@@ -180,6 +191,17 @@ describe('reactivity/collections', () => {
       expect(result.get('a')).toBe(result.get('b'))
       expect(isDraft(result.get('a')!)).toBe(false)
       expect(isDraft(result.get('b')!)).toBe(false)
+    })
+
+    test('Map: multiple references to same draft — slow path', () => {
+      const base = new Map<string, any>([['a', { value: 1 }]])
+      const drafted = draft(base)
+      const a = drafted.get('a')!
+      a.value = 10
+      drafted.set('b', a)
+      const snap = snapshot(drafted, drafted, new Map())
+      expect(snap.get('a')).toBe(snap.get('b'))
+      expect(isDraft(snap.get('a')!)).toBe(false)
     })
 
     test('Map: draft nested in new plain object assigned via set()', () => {
