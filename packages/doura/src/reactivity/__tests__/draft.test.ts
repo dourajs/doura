@@ -471,67 +471,6 @@ describe(`reactivity/draft`, () => {
       expect(res.a).not.toBe(res.b.c)
     })
 
-    // NOTE: Except the root draft.
-    // Multi-reference: draft.b = draft.a without delete.
-    // child.key is updated to 'b', so key-based resolution only resolves 'b'.
-    // The copy at 'a' still holds the draft proxy — needsScan fallback catches it.
-    it('supports multiple references to any modified draft', () => {
-      const next = produce({ a: { b: 1 } } as any, (d) => {
-        d.a.b++
-        d.b = d.a
-      })
-      expect(next.a).toBe(next.b)
-      expect(isDraft(next.a)).toBe(false)
-      expect(isDraft(next.b)).toBe(false)
-    })
-
-    it('supports multiple references to any modified draft (array)', () => {
-      const next = produce([{ b: 1 }, null] as any[], (d) => {
-        d[0].b++
-        d[1] = d[0]
-      })
-      expect(next[0]).toBe(next[1])
-      expect(isDraft(next[0])).toBe(false)
-      expect(isDraft(next[1])).toBe(false)
-    })
-
-    it('can rename nested objects (no changes)', () => {
-      const nextState = produce({ obj: {} } as any, (s) => {
-        s.foo = s.obj
-        delete s.obj
-      })
-      expect(nextState).toEqual({ foo: {} })
-      expect(isDraft(nextState.foo)).toBe(false)
-    })
-
-    // Very similar to the test before, but the reused object has one
-    // property changed, one added, and one removed.
-    it('can rename nested objects (with changes)', () => {
-      const nextState = produce({ obj: { a: 1, b: 1 } } as any, (s) => {
-        s.obj.a = true // change
-        delete s.obj.b // delete
-        s.obj.c = true // add
-
-        s.foo = s.obj
-        delete s.obj
-      })
-      expect(nextState).toEqual({ foo: { a: true, c: true } })
-      expect(isDraft(nextState.foo)).toBe(false)
-    })
-
-    it('can move array element to a different index (needsScan fallback)', () => {
-      const baseState = [{ value: 1 }, { value: 2 }, { value: 3 }]
-      const nextState = produce(baseState, (s) => {
-        const item = s[0]
-        item.value = 10
-        s[2] = item
-        s[0] = null as any
-      })
-      expect(nextState[0]).toBe(null)
-      expect(nextState[2]).toEqual({ value: 10 })
-      expect(isDraft(nextState[2])).toBe(false)
-    })
-
     it('can nest a draft in a new object', () => {
       const baseState: any = { obj: {} }
       const obj = baseState.obj
@@ -1015,5 +954,221 @@ describe(`reactivity/snapshot`, () => {
       snapshot(drafted, drafted)
     }
     expect(run).not.toThrow()
+  })
+})
+
+describe('rename (move + delete)', () => {
+  it('object rename (no changes) — fast path', () => {
+    const nextState = produce({ obj: {} } as any, (s) => {
+      s.foo = s.obj
+      delete s.obj
+    })
+    expect(nextState).toEqual({ foo: {} })
+    expect(isDraft(nextState.foo)).toBe(false)
+  })
+
+  it('object rename (no changes) — slow path', () => {
+    const state = { obj: {} } as any
+    const drafted = draft(state)
+    drafted.foo = drafted.obj
+    delete drafted.obj
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.foo).toEqual({})
+    expect(isDraft(snap.foo)).toBe(false)
+  })
+
+  it('object rename (with changes) — fast path', () => {
+    const nextState = produce({ obj: { a: 1, b: 1 } } as any, (s) => {
+      s.obj.a = true
+      delete s.obj.b
+      s.obj.c = true
+      s.foo = s.obj
+      delete s.obj
+    })
+    expect(nextState).toEqual({ foo: { a: true, c: true } })
+    expect(isDraft(nextState.foo)).toBe(false)
+  })
+
+  it('object rename (with changes) — slow path', () => {
+    const state = { obj: { a: 1, b: 1 } } as any
+    const drafted = draft(state)
+    drafted.obj.a = true
+    delete drafted.obj.b
+    drafted.obj.c = true
+    drafted.foo = drafted.obj
+    delete drafted.obj
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.foo).toEqual({ a: true, c: true })
+    expect(isDraft(snap.foo)).toBe(false)
+  })
+
+  it('array move — fast path', () => {
+    const baseState = [{ value: 1 }, { value: 2 }, { value: 3 }]
+    const nextState = produce(baseState, (s) => {
+      const item = s[0]
+      item.value = 10
+      s[2] = item
+      s[0] = null as any
+    })
+    expect(nextState[0]).toBe(null)
+    expect(nextState[2]).toEqual({ value: 10 })
+    expect(isDraft(nextState[2])).toBe(false)
+  })
+
+  it('array move — slow path', () => {
+    const state = [{ value: 1 }, { value: 2 }, { value: 3 }]
+    const drafted = draft(state)
+    const item = drafted[0]
+    item.value = 10
+    drafted[2] = item
+    drafted[0] = null as any
+    const snap = snapshot([...drafted] as any, drafted)
+    expect(snap[0]).toBe(null)
+    expect(snap[2]).toEqual({ value: 10 })
+    expect(isDraft(snap[2])).toBe(false)
+  })
+})
+
+describe('multi-reference (same draft at multiple keys)', () => {
+  it('object multi-ref — fast path', () => {
+    const next = produce({ a: { b: 1 } } as any, (d) => {
+      d.a.b++
+      d.b = d.a
+    })
+    expect(next.a).toBe(next.b)
+    expect(isDraft(next.a)).toBe(false)
+    expect(isDraft(next.b)).toBe(false)
+  })
+
+  it('object multi-ref — slow path', () => {
+    const state = { a: { b: 1 } } as any
+    const drafted = draft(state)
+    drafted.a.b++
+    drafted.b = drafted.a
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.a).toBe(snap.b)
+    expect(isDraft(snap.a)).toBe(false)
+    expect(isDraft(snap.b)).toBe(false)
+  })
+
+  it('array multi-ref — fast path', () => {
+    const next = produce([{ b: 1 }, null] as any[], (d) => {
+      d[0].b++
+      d[1] = d[0]
+    })
+    expect(next[0]).toBe(next[1])
+    expect(isDraft(next[0])).toBe(false)
+    expect(isDraft(next[1])).toBe(false)
+  })
+})
+
+describe('orphan draft (nested in plain object, original deleted)', () => {
+  it('unmodified draft in new object — fast path', () => {
+    const baseState: any = { obj: {} }
+    const obj = baseState.obj
+    const nextState = produce(baseState, (s) => {
+      s.foo = { bar: s.obj }
+      delete s.obj
+    })
+    expect(nextState.foo.bar).toEqual(obj)
+    expect(isDraft(nextState.foo.bar)).toBe(false)
+  })
+
+  it('unmodified draft in new object — slow path', () => {
+    const baseState: any = { obj: {} }
+    const obj = baseState.obj
+    const drafted = draft(baseState)
+    drafted.foo = { bar: drafted.obj }
+    delete drafted.obj
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.foo.bar).toEqual(obj)
+    expect(isDraft(snap.foo.bar)).toBe(false)
+  })
+
+  it('modified draft in new object — fast path', () => {
+    const nextState = produce({ obj: { a: 1, b: 1 } } as any, (s) => {
+      s.obj.a = true
+      delete s.obj.b
+      s.obj.c = true
+      s.foo = { bar: s.obj }
+      delete s.obj
+    })
+    expect(nextState).toEqual({ foo: { bar: { a: true, c: true } } })
+    expect(isDraft(nextState.foo.bar)).toBe(false)
+  })
+
+  it('modified draft in new object — slow path', () => {
+    const state = { obj: { a: 1, b: 1 } } as any
+    const drafted = draft(state)
+    drafted.obj.a = true
+    delete drafted.obj.b
+    drafted.obj.c = true
+    drafted.foo = { bar: drafted.obj }
+    delete drafted.obj
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.foo.bar).toEqual({ a: true, c: true })
+    expect(isDraft(snap.foo.bar)).toBe(false)
+  })
+
+  it('deep nesting in plain objects — fast path', () => {
+    const nextState = produce({ obj: { a: 1 } } as any, (s) => {
+      s.obj.a = 2
+      s.wrapper = { level1: { level2: s.obj } }
+      delete s.obj
+    })
+    expect(nextState.wrapper.level1.level2).toEqual({ a: 2 })
+    expect(isDraft(nextState.wrapper.level1.level2)).toBe(false)
+  })
+
+  it('deep nesting in plain objects — slow path', () => {
+    const state = { obj: { a: 1 } } as any
+    const drafted = draft(state)
+    drafted.obj.a = 2
+    drafted.wrapper = { level1: { level2: drafted.obj } }
+    delete drafted.obj
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.wrapper.level1.level2).toEqual({ a: 2 })
+    expect(isDraft(snap.wrapper.level1.level2)).toBe(false)
+  })
+
+  it('draft in array in new object — fast path', () => {
+    const nextState = produce({ obj: { a: 1 } } as any, (s) => {
+      s.obj.a = 2
+      s.list = [s.obj]
+      delete s.obj
+    })
+    expect(nextState.list[0]).toEqual({ a: 2 })
+    expect(isDraft(nextState.list[0])).toBe(false)
+  })
+
+  it('draft in array in new object — slow path', () => {
+    const state = { obj: { a: 1 } } as any
+    const drafted = draft(state)
+    drafted.obj.a = 2
+    drafted.list = [drafted.obj]
+    delete drafted.obj
+    const snap = snapshot({ ...drafted }, drafted)
+    expect(snap.list[0]).toEqual({ a: 2 })
+    expect(isDraft(snap.list[0])).toBe(false)
+  })
+
+  it('cross-root: foreign draft nested in plain object — fast path', () => {
+    const root1 = draft({ obj: { a: 1 } })
+    root1.obj.a = 2
+    const root2 = draft({ data: null } as any)
+    root2.data = { ref: root1.obj }
+    const result = snapshot(root2, root2) as any
+    expect(result.data.ref).toEqual({ a: 2 })
+    expect(isDraft(result.data.ref)).toBe(false)
+  })
+
+  it('cross-root: foreign draft nested in plain object — slow path', () => {
+    const root1 = draft({ obj: { a: 1 } })
+    root1.obj.a = 2
+    const root2 = draft({ data: null } as any)
+    root2.data = { ref: root1.obj }
+    const snap = snapshot({ ...root2 }, root2)
+    expect(snap.data.ref).toEqual({ a: 2 })
+    expect(isDraft(snap.data.ref)).toBe(false)
   })
 })

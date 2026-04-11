@@ -142,13 +142,14 @@ function createGetter(): ProxyGetter {
       // key in the parent's copy. If so, replaces it with the finalized
       // base value and decrements the remaining-unresolved-drafts counter.
       const childProxy = value
+      const childState: DraftState = childProxy[ReactiveFlags.STATE]
       state.root.finalities!.push(() => {
         const parentCopy = state.copy ? state.copy : state.base
         if (parentCopy[prop as any] === childProxy) {
-          const childState: DraftState = childProxy[ReactiveFlags.STATE]
           parentCopy[prop as any] = childState.base
         }
       })
+      state.root.childDraftStates!.push(childState)
     }
 
     trackDraft(value)
