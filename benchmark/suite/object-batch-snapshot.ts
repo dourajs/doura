@@ -1,11 +1,21 @@
 // @ts-nocheck
 /**
- * Benchmark: batch mutation (10% of keys) on nested objects — slow path (snapshot Proxy).
+ * Benchmark: batch mutation (10% of keys) on nested objects — fast path vs slow path.
  *
- * Mirrors object-batch.ts but uses the ModelInternal pattern:
- * long-lived draft + snapshot with snapshots Map + property read.
+ * Both entries use a long-lived draft (ModelInternal pattern).
+ * The only variable is whether snapshot() receives a snapshots Map (slow path)
+ * or not (fast path / finalizeDraft).
  */
 import { runBenchmark } from './runner'
+
+const douraSetup = `
+  const { draft, snapshot } = require('./packages/doura');
+  const STATE = '__r_state';
+  let lastBaseState;
+  let stateRef;
+  let lastDraftToSnapshot;
+  let __iter = 0;
+`
 
 runBenchmark({
   getData: `(size) => Array(size).fill(1).reduce((acc, _, key) => Object.assign(acc, { ['key' + key]: { value: key } }), {})`,
@@ -19,33 +29,24 @@ runBenchmark({
   ].sort((a, b) => a - b),
   libs: [
     {
-      name: 'Mutative',
-      setup: `const { create } = require('mutative');`,
-      fn: `const snap = create(baseState, (draft) => {
-        for (let index = 0; index < size * 0.1; index++) {
-          draft['key' + index].value = i;
+      name: 'Doura (fast)',
+      setup: douraSetup,
+      fn: `
+        if (baseState !== lastBaseState) {
+          lastBaseState = baseState;
+          stateRef = draft({ value: baseState });
         }
-      }); const _ = snap.key0.value;`,
-    },
-    {
-      name: 'Immer',
-      setup: `const { produce } = require('immer');`,
-      fn: `const snap = produce(baseState, (draft) => {
         for (let index = 0; index < size * 0.1; index++) {
-          draft['key' + index].value = i;
+          stateRef.value['key' + index].value = ++__iter;
         }
-      }); const _ = snap.key0.value;`,
-    },
-    {
-      name: 'Doura',
-      setup: `
-        const { draft, snapshot } = require('./packages/doura');
-        const STATE = '__r_state';
-        let lastBaseState;
-        let stateRef;
-        let lastDraftToSnapshot;
-        let __iter = 0;
+        const snap = snapshot(stateRef.value, stateRef.value);
+        const _ = snap.key0.value;
+        stateRef[STATE].modified = false;
       `,
+    },
+    {
+      name: 'Doura (slow)',
+      setup: douraSetup,
       fn: `
         if (baseState !== lastBaseState) {
           lastBaseState = baseState;
