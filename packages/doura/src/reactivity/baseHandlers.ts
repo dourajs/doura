@@ -217,18 +217,22 @@ function createSetter() {
       }
       if (newChildState) {
         addChildRef(state, newChildState)
-        // Update stored key so key-based finalization resolves the
-        // new position directly, avoiding a full needsScan in the
-        // common rename case (move + delete).
         newChildState.key = prop
       } else if (isObject(value)) {
-        // Assigning a draftable non-draft object (e.g. { bar: draftProxy }).
-        // Flag the root so eager finalization knows to run handleValue.
+        // @deprecated — kept until finalizeDraft is rewritten (Task 6).
         state.root.hasDraftableAssignment = true
       }
     }
 
     state.copy![prop] = value
+
+    // Track this key as user-assigned for finalization.
+    if (hasOwn(state.base, prop) && is(value, (state.base as any)[prop])) {
+      if (state.assignedMap) state.assignedMap.delete(prop)
+    } else {
+      if (!state.assignedMap) state.assignedMap = new Map()
+      state.assignedMap.set(prop, true)
+    }
 
     // don't trigger if target is something up in the prototype chain of original.
     // Use direct proxy identity check instead of toState(receiver) to avoid
@@ -265,6 +269,9 @@ function deleteProperty(state: ObjectDraftState, prop: string): boolean {
 
     const result = delete state.copy[prop]
     if (result && hadKey) {
+      // Track this key as deleted for finalization.
+      if (!state.assignedMap) state.assignedMap = new Map()
+      state.assignedMap.set(prop, false)
       trigger(state, TriggerOpTypes.DELETE, prop, undefined, current)
     }
     return result
