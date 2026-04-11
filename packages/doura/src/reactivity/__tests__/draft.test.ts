@@ -866,7 +866,7 @@ describe(`reactivity/snapshot`, () => {
     drafted.anArray[0] = 1
     drafted.anObject.nested.yummie = false
 
-    const value = snapshot({ ...drafted }, drafted)
+    const value = snapshot(drafted, drafted, new Map())
     expect(value.aProp).toEqual(1)
     expect(value.anArray[0]).toEqual(1)
     expect(value.anObject.nested.yummie).toEqual(false)
@@ -895,7 +895,7 @@ describe(`reactivity/snapshot`, () => {
     // Only modify one branch
     drafted.modified.value = 99
 
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
 
     // Modified branch should reflect the change
     expect(snap.modified.value).toBe(99)
@@ -916,7 +916,7 @@ describe(`reactivity/snapshot`, () => {
     void drafted.b.value
     drafted.a.value = 10
 
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.a.value).toBe(10)
     expect(snap.b.value).toBe(2)
 
@@ -972,7 +972,7 @@ describe('rename (move + delete)', () => {
     const drafted = draft(state)
     drafted.foo = drafted.obj
     delete drafted.obj
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.foo).toEqual({})
     expect(isDraft(snap.foo)).toBe(false)
   })
@@ -997,7 +997,7 @@ describe('rename (move + delete)', () => {
     drafted.obj.c = true
     drafted.foo = drafted.obj
     delete drafted.obj
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.foo).toEqual({ a: true, c: true })
     expect(isDraft(snap.foo)).toBe(false)
   })
@@ -1022,7 +1022,7 @@ describe('rename (move + delete)', () => {
     item.value = 10
     drafted[2] = item
     drafted[0] = null as any
-    const snap = snapshot([...drafted] as any, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap[0]).toBe(null)
     expect(snap[2]).toEqual({ value: 10 })
     expect(isDraft(snap[2])).toBe(false)
@@ -1045,7 +1045,7 @@ describe('multi-reference (same draft at multiple keys)', () => {
     const drafted = draft(state)
     drafted.a.b++
     drafted.b = drafted.a
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.a).toBe(snap.b)
     expect(isDraft(snap.a)).toBe(false)
     expect(isDraft(snap.b)).toBe(false)
@@ -1080,7 +1080,7 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     const drafted = draft(baseState)
     drafted.foo = { bar: drafted.obj }
     delete drafted.obj
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.foo.bar).toEqual(obj)
     expect(isDraft(snap.foo.bar)).toBe(false)
   })
@@ -1105,7 +1105,7 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     drafted.obj.c = true
     drafted.foo = { bar: drafted.obj }
     delete drafted.obj
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.foo.bar).toEqual({ a: true, c: true })
     expect(isDraft(snap.foo.bar)).toBe(false)
   })
@@ -1126,7 +1126,7 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     drafted.obj.a = 2
     drafted.wrapper = { level1: { level2: drafted.obj } }
     delete drafted.obj
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.wrapper.level1.level2).toEqual({ a: 2 })
     expect(isDraft(snap.wrapper.level1.level2)).toBe(false)
   })
@@ -1147,9 +1147,30 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     drafted.obj.a = 2
     drafted.list = [drafted.obj]
     delete drafted.obj
-    const snap = snapshot({ ...drafted }, drafted)
+    const snap = snapshot(drafted, drafted, new Map())
     expect(snap.list[0]).toEqual({ a: 2 })
     expect(isDraft(snap.list[0])).toBe(false)
+  })
+
+  it('spread draft nested in assignment — fast path', () => {
+    const nextState = produce({ obj: { a: 1 } } as any, (s) => {
+      s.obj.a = 2
+      s.wrapper = { level1: { level2: { ...s } } }
+      delete s.obj
+    })
+    expect(nextState.wrapper.level1.level2.obj).toEqual({ a: 2 })
+    expect(isDraft(nextState.wrapper.level1.level2.obj)).toBe(false)
+  })
+
+  it('spread draft nested in assignment — slow path', () => {
+    const state = { obj: { a: 1 } } as any
+    const drafted = draft(state)
+    drafted.obj.a = 2
+    drafted.wrapper = { level1: { level2: { ...drafted } } }
+    delete drafted.obj
+    const snap = snapshot(drafted, drafted, new Map())
+    expect(snap.wrapper.level1.level2.obj).toEqual({ a: 2 })
+    expect(isDraft(snap.wrapper.level1.level2.obj)).toBe(false)
   })
 
   it('cross-root: foreign draft nested in plain object — fast path', () => {
@@ -1167,7 +1188,7 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     root1.obj.a = 2
     const root2 = draft({ data: null } as any)
     root2.data = { ref: root1.obj }
-    const snap = snapshot({ ...root2 }, root2)
+    const snap = snapshot(root2, root2, new Map())
     expect(snap.data.ref).toEqual({ a: 2 })
     expect(isDraft(snap.data.ref)).toBe(false)
   })
