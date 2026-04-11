@@ -324,78 +324,15 @@ function handleValue(
 }
 
 /**
- * For each user-assigned key (assignedMap.get(key) === true) in a state's
- * copy, resolve draft proxies directly and recurse into non-draft objects
- * via handleValue. Direct draft resolution always runs (a draft proxy at
- * an assigned key must always be replaced). handleValue recursion is
- * gated by scanNonDrafts (skip when no draftable non-draft values were
- * assigned — equivalent to the old hasDraftableAssignment flag).
- */
-function finalizeAssigned(
-  state: DraftState,
-  handled: Set<any>,
-  scanNonDrafts: boolean
-): void {
-  if (!state.assignedMap) return
-
-  const copy = state.copy ? state.copy : state.base
-
-  // Helper: resolve a single assigned value.
-  const resolveVal = (val: any, setter: (resolved: any) => void): void => {
-    if (val === null || typeof val !== 'object') return
-    if (val[ReactiveFlags.STATE]) {
-      // Draft proxy at an assigned key (e.g. moved via s.foo = s.obj)
-      const childState = val[ReactiveFlags.STATE] as DraftState
-      setter(childState.copy ?? childState.base)
-    } else if (scanNonDrafts) {
-      // Recurse into non-draft objects only when hasDraftableAssignment is set
-      handleValue(val, handled, { count: Infinity })
-    }
-  }
-
-  if (copy instanceof Set) {
-    state.assignedMap.forEach((assigned, value) => {
-      if (assigned) {
-        resolveVal(value, (v) => {
-          copy.delete(value)
-          copy.add(v)
-        })
-      }
-    })
-    return
-  }
-
-  if (copy instanceof Map) {
-    state.assignedMap.forEach((assigned, key) => {
-      if (assigned) {
-        resolveVal(copy.get(key), (v) => copy.set(key, v))
-      }
-    })
-    return
-  }
-
-  // Object / Array
-  state.assignedMap.forEach((assigned, key) => {
-    if (assigned) {
-      resolveVal((copy as any)[key], (v) => {
-        ;(copy as any)[key] = v
-      })
-    }
-  })
-}
-
-/**
- * Slow-path variant of finalizeAssigned: only recurses into non-draft
+ * For each user-assigned key (assignedMap.get(key) === true), resolve
+ * nested draft proxies in non-draft draftable values via handleValue.
  * draftable values via handleValue. Direct draft proxies at assigned
  * keys are left for toSnapshot to resolve lazily (preserving DraftState
  * identity for view reactivity). Handles both same-root orphans and
  * cross-root foreign drafts since handleValue reads
  * childState.copy ?? childState.base directly.
  */
-function finalizeAssignedForSnapshot(
-  state: DraftState,
-  handled: Set<any>
-): void {
+function finalizeAssigned(state: DraftState, handled: Set<any>): void {
   if (!state.assignedMap) return
 
   const copy = state.copy ? state.copy : state.base
@@ -432,123 +369,6 @@ function finalizeAssignedForSnapshot(
   }
 }
 
-/**
- * Resolve Set draft proxies: replace original values with their
- * finalized drafts, and replace direct draft proxies with base values.
- */
-function resolveSetDrafts(state: SetDraftState): void {
-  const copy = state.copy ?? state.base
-  const draftsMap = state.drafts?.size > 0 ? state.drafts : undefined
-  if (!draftsMap && !state.children) return
-
-  const values = Array.from(copy)
-  let changed = false
-  for (let j = 0; j < values.length; j++) {
-    const v = values[j]
-    // Case 1: original value that was lazily drafted
-    if (draftsMap) {
-      const drafted = draftsMap.get(v)
-      if (drafted) {
-        values[j] = (drafted[ReactiveFlags.STATE] as DraftState).base
-        changed = true
-        continue
-      }
-    }
-    // Case 2: direct draft proxy (e.g. added via Set.add(draftProxy))
-    if (v !== null && typeof v === 'object' && v[ReactiveFlags.STATE]) {
-      values[j] = (v[ReactiveFlags.STATE] as DraftState).base
-      changed = true
-    }
-  }
-  if (changed) {
-    copy.clear()
-    for (let j = 0; j < values.length; j++) {
-      copy.add(values[j])
-    }
-  }
-}
-
-/**
- * Eager finalization: collect modified states via BFS, then process
- * leaf-first in a single reverse pass — steal, resolve children,
- * resolve assigned keys, and handle Sets.
- *
- * This is the fast path for standalone draft()/snapshot() usage.
- * Avoids allocating Maps, DraftSnapshot objects, and snapshot Proxies.
- */
-function finalizeDraft(rootDraft: Drafted): any {
-  const rootState: DraftState = rootDraft[ReactiveFlags.STATE]
-  if (!rootState.modified) {
-    return rootState.base
-  }
-
-  // BFS: collect all modified states. markChanged() bubbles up from leaf
-  // to root, so an unmodified state cannot have modified descendants.
-  const modified: DraftState[] = [rootState]
-  let idx = 0
-  while (idx < modified.length) {
-    const s = modified[idx++]
-    if (s.children) {
-      for (let i = 0; i < s.children.length; i++) {
-        const child = s.children[i]
-        if (child.modified) {
-          modified.push(child)
-        }
-      }
-    }
-  }
-
-  // Single reverse pass (leaf-first): steal + resolve children +
-  // resolve assigned keys + resolve Sets. Leaf-first order ensures
-  // child.base is fully resolved before the parent reads it.
-  const scanNonDrafts = !!rootState.root.hasDraftableAssignment
-  const handled = new Set<any>()
-  for (let i = modified.length - 1; i >= 0; i--) {
-    const s = modified[i]
-
-    // Steal copy (or shallow-copy base for bubble-up-only states).
-    stealAndReset(s)
-    const parentCopy = s.base // after stealAndReset, base IS the stolen copy
-
-    // Resolve child draft proxies at their creation-time keys.
-    // state.key is immutable (never updated by set trap), so it always
-    // points to the original position where the child was created.
-    if (s.children) {
-      if (parentCopy instanceof Map) {
-        for (let j = 0; j < s.children.length; j++) {
-          const child = s.children[j]
-          if (
-            child.key !== NO_KEY &&
-            parentCopy.get(child.key) === child.proxy
-          ) {
-            parentCopy.set(child.key, child.base)
-          }
-        }
-      } else if (!(parentCopy instanceof Set)) {
-        for (let j = 0; j < s.children.length; j++) {
-          const child = s.children[j]
-          if (
-            child.key !== NO_KEY &&
-            parentCopy[child.key as any] === child.proxy
-          ) {
-            parentCopy[child.key as any] = child.base
-          }
-        }
-      }
-    }
-
-    // Resolve draft proxies at user-assigned keys + nested in plain objects.
-    finalizeAssigned(s, handled, scanNonDrafts)
-
-    // Resolve Set draft proxies (lazy-drafted via state.drafts).
-    if (s.type === DraftType.Set) {
-      resolveSetDrafts(s as any)
-    }
-  }
-
-  return rootState.base
-}
-
 export function takeSnapshotFromDraft(
   draft: Drafted,
   snapshots?: Map<any, any>
@@ -562,7 +382,7 @@ export function takeSnapshotFromDraft(
 
   // Steal copies from modified states via BFS through children.
   // Orphaned drafts (removed from children via delete) are NOT stolen
-  // here — they are resolved by finalizeAssignedForSnapshot below,
+  // here — they are resolved by finalizeAssigned below,
   // which reads their live copy/base via handleValue.
   const modified: DraftState[] = []
   const queue = [draft[ReactiveFlags.STATE]]
@@ -591,7 +411,44 @@ export function takeSnapshotFromDraft(
   if (draft[ReactiveFlags.STATE].root.hasDraftableAssignment) {
     const handled = new Set<any>()
     for (let i = 0; i < modified.length; i++) {
-      finalizeAssignedForSnapshot(modified[i], handled)
+      finalizeAssigned(modified[i], handled)
+    }
+  }
+
+  // Resolve Set draft proxies: replace original values in stolen Set
+  // copies with their drafted-then-stolen values. Set elements are
+  // lazily drafted (via state.drafts map), so the stolen copy still
+  // contains original refs that need replacing.
+  for (let i = 0; i < modified.length; i++) {
+    const state = modified[i]
+    if (state.type === DraftType.Set) {
+      const setState = state as any as SetDraftState
+      const copy = setState.base // after stealAndReset
+      const draftsMap = setState.drafts?.size > 0 ? setState.drafts : undefined
+      if (!draftsMap) continue
+      const values = Array.from(copy)
+      let changed = false
+      for (let j = 0; j < values.length; j++) {
+        const v = values[j]
+        const drafted = draftsMap.get(v)
+        if (drafted) {
+          values[j] = (drafted[ReactiveFlags.STATE] as DraftState).base
+          changed = true
+        } else if (
+          v !== null &&
+          typeof v === 'object' &&
+          v[ReactiveFlags.STATE]
+        ) {
+          values[j] = (v[ReactiveFlags.STATE] as DraftState).base
+          changed = true
+        }
+      }
+      if (changed) {
+        copy.clear()
+        for (let j = 0; j < values.length; j++) {
+          copy.add(values[j])
+        }
+      }
     }
   }
 
@@ -620,13 +477,6 @@ export function snapshot<T>(
     return value
   }
 
-  // Fast path: when no external snapshots cache is provided (standalone usage),
-  // use eager finalization that avoids Map/Proxy allocations entirely.
-  if (!snapshots && isDraft(value) && (value as any) === (draft as any)) {
-    return finalizeDraft(draft) as T
-  }
-
-  // Slow path: model system with structural sharing via snapshots map.
   const draftSnapshot = takeSnapshotFromDraft(draft, snapshots)
   return createSnapshotProxy(value, draftSnapshot)
 }
