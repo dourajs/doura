@@ -258,14 +258,24 @@ function handleValue(
   }
   handled.add(target)
 
+  // Helper: resolve a draft proxy and recurse into the resolved value.
+  // The resolved value (copy ?? base) may itself contain nested draft
+  // proxies (e.g. in slow path where callbacks don't pre-resolve layers).
+  const resolve = (childState: DraftState): any => {
+    const resolved = childState.copy ?? childState.base
+    if (typeof resolved === 'object' && resolved !== null) {
+      handleValue(resolved, handled, remaining)
+    }
+    return resolved
+  }
+
   if (isArray(target)) {
     for (let i = 0; i < target.length; i++) {
       const val = target[i]
       if (val !== null && typeof val === 'object') {
         if (val[ReactiveFlags.STATE]) {
-          const childState = val[ReactiveFlags.STATE] as DraftState
-          target[i] = childState.copy ?? childState.base
-          if (--remaining.count <= 0) return
+          target[i] = resolve(val[ReactiveFlags.STATE] as DraftState)
+          if (remaining.count <= 0) return
         } else {
           handleValue(val, handled, remaining)
           if (remaining.count <= 0) return
@@ -277,9 +287,7 @@ function handleValue(
       if (remaining.count <= 0) return
       if (val !== null && typeof val === 'object') {
         if (val[ReactiveFlags.STATE]) {
-          const childState = val[ReactiveFlags.STATE] as DraftState
-          target.set(key, childState.copy ?? childState.base)
-          remaining.count--
+          target.set(key, resolve(val[ReactiveFlags.STATE] as DraftState))
         } else {
           handleValue(val, handled, remaining)
         }
@@ -291,9 +299,10 @@ function handleValue(
       if (remaining.count <= 0) return
       if (val !== null && typeof val === 'object') {
         if (val[ReactiveFlags.STATE]) {
-          const childState = val[ReactiveFlags.STATE] as DraftState
-          replacements.push([val, childState.copy ?? childState.base])
-          remaining.count--
+          replacements.push([
+            val,
+            resolve(val[ReactiveFlags.STATE] as DraftState),
+          ])
         } else {
           handleValue(val, handled, remaining)
         }
@@ -314,9 +323,8 @@ function handleValue(
         const val = desc.value
         if (val !== null && typeof val === 'object') {
           if (val[ReactiveFlags.STATE]) {
-            const childState = val[ReactiveFlags.STATE] as DraftState
-            target[keys[i]] = childState.copy ?? childState.base
-            if (--remaining.count <= 0) return
+            target[keys[i]] = resolve(val[ReactiveFlags.STATE] as DraftState)
+            if (remaining.count <= 0) return
           } else {
             handleValue(val, handled, remaining)
             if (remaining.count <= 0) return
