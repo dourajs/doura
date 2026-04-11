@@ -1,11 +1,21 @@
 // @ts-nocheck
 /**
- * Benchmark: single element mutation on array of objects — slow path (snapshot Proxy).
+ * Benchmark: single element mutation on array of objects — fast path vs slow path.
  *
- * Mirrors array.ts but uses the ModelInternal pattern:
- * long-lived draft + snapshot with snapshots Map + property read.
+ * Both entries use a long-lived draft (ModelInternal pattern).
+ * The only variable is whether snapshot() receives a snapshots Map (slow path)
+ * or not (fast path / finalizeDraft).
  */
 import { runBenchmark } from './runner'
+
+const douraSetup = `
+  const { draft, snapshot } = require('./packages/doura');
+  const STATE = '__r_state';
+  let lastBaseState;
+  let stateRef;
+  let lastDraftToSnapshot;
+  let __iter = 0;
+`
 
 runBenchmark({
   getData: `(size) => Array(size).fill(1).map((_, key) => ({ value: key }))`,
@@ -19,25 +29,22 @@ runBenchmark({
   ].sort((a, b) => a - b),
   libs: [
     {
-      name: 'Mutative',
-      setup: `const { create } = require('mutative');`,
-      fn: `const snap = create(baseState, (draft) => { draft[0].value = i }); const _ = snap[0].value;`,
-    },
-    {
-      name: 'Immer',
-      setup: `const { produce } = require('immer');`,
-      fn: `const snap = produce(baseState, (draft) => { draft[0].value = i }); const _ = snap[0].value;`,
-    },
-    {
-      name: 'Doura',
-      setup: `
-        const { draft, snapshot } = require('./packages/doura');
-        const STATE = '__r_state';
-        let lastBaseState;
-        let stateRef;
-        let lastDraftToSnapshot;
-        let __iter = 0;
+      name: 'Doura (fast)',
+      setup: douraSetup,
+      fn: `
+        if (baseState !== lastBaseState) {
+          lastBaseState = baseState;
+          stateRef = draft({ value: baseState });
+        }
+        stateRef.value[0].value = ++__iter;
+        const snap = snapshot(stateRef.value, stateRef.value);
+        const _ = snap[0].value;
+        stateRef[STATE].modified = false;
       `,
+    },
+    {
+      name: 'Doura (slow)',
+      setup: douraSetup,
       fn: `
         if (baseState !== lastBaseState) {
           lastBaseState = baseState;
