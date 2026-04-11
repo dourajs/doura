@@ -94,7 +94,6 @@ function get(this: AnyMap & Drafted, key: unknown) {
         parentCopy.set(key, childState.base)
       }
     })
-    state.root.childDraftStates!.push(childState)
   }
 
   trackDraft(value)

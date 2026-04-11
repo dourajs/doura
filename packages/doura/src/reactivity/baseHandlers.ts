@@ -149,7 +149,6 @@ function createGetter(): ProxyGetter {
           parentCopy[prop as any] = childState.base
         }
       })
-      state.root.childDraftStates!.push(childState)
     }
 
     trackDraft(value)
