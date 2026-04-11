@@ -85,15 +85,6 @@ function get(this: AnyMap & Drafted, key: unknown) {
     prepareCopy(state)
     value = draft(value, state, key)
     state.copy!.set(key, value)
-    // Register flat finalization callback for this Map child.
-    const childProxy = value
-    const childState: DraftState = childProxy[ReactiveFlags.STATE]
-    state.root.finalities!.push(() => {
-      const parentCopy = state.copy ? state.copy : state.base
-      if (parentCopy.get(key) === childProxy) {
-        parentCopy.set(key, childState.base)
-      }
-    })
   }
 
   trackDraft(value)
@@ -121,11 +112,8 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
     state.copy!.set(key, value)
     // Track new child draft
     if (value && isDraft(value as any)) {
-      const childState = (value as any)[ReactiveFlags.STATE] as DraftState
-      addChildRef(state, childState)
-      childState.key = key
+      addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
     } else if (isObject(value as any)) {
-      // @deprecated — kept until finalizeDraft is rewritten (Task 6).
       state.root.hasDraftableAssignment = true
     }
     // Track this key as user-assigned for finalization.
