@@ -52,11 +52,21 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   hasDraftableAssignment?: boolean
   // listener (lazy: only allocated when watch() is called)
   listeners: Array<() => void> | null
+  // Monotonically increasing counter on the root state, incremented on
+  // every mutation (in trigger()). Used by model views to detect whether
+  // the state tree changed since the last snapshot, replacing the
+  // mightChange/trackDraft/triggerDraft subsystem.
+  version: number
   // Child draft states reachable from this state's copy.
   // Simple array for fast push — stale entries (from overwritten properties)
   // are harmless because BFS skips them via the modified=false check.
   // (lazy: only allocated when first child is added)
   children: DraftState[] | null
+  // Child draft proxies created by read-only property access (GET trap).
+  // Stored separately from `copy` so that reading nested properties does
+  // NOT trigger prepareCopy (a shallowCopy of the parent). Lazily allocated
+  // on first child draft creation.
+  childDrafts: Map<any, Drafted> | null
 }
 
 export interface ObjectDraftState extends DraftStateBase<AnyObject> {
@@ -101,6 +111,7 @@ export function resetDraftChildren(draft: Drafted) {
       s.children = null
     }
     s.copy = null
+    s.childDrafts = null
   }
 }
 
@@ -142,7 +153,9 @@ export function draft<T extends Objectish>(
     disposed: false,
     assignedMap: null, // lazy, created on first set/delete
     listeners: null,
+    version: 0,
     children: null,
+    childDrafts: null, // lazy, created on first child draft in GET trap
   }
   let proxyTarget: DraftState = state
   let proxyHandlers: ProxyHandler<any> = mutableHandlers
@@ -213,6 +226,10 @@ export function watch(draft: any, cb: () => void): () => void {
 function stealAndReset(state: DraftState): any {
   // Steal copy or shallow-copy base (when modified via bubble-up only)
   const value = state.copy ? state.copy : shallowCopy(state.base)
+  // NOTE: childDrafts are NOT merged into the stolen value.
+  // DraftState identity is preserved via state.childDrafts — the GET trap
+  // checks childDrafts first, so it doesn't need draft proxy refs in state.base.
+  // This allows us to resolve draft proxies in-place below (no second clone).
   state.base = value as any
   state.copy = null
   state.modified = false
@@ -315,48 +332,77 @@ function resolveValue(
 }
 
 /**
- * Build resolved clones for modified states. Each clone is a shallow copy
- * of the stolen copy with draft proxy refs replaced by resolved values.
- * The stolen copies themselves are NOT modified — draft proxies remain
- * for DraftState identity reuse on next action.
+ * Resolve draft proxy refs IN-PLACE in stolen copies for modified states.
+ * Since DraftState identity is now preserved via state.childDrafts (the GET
+ * trap checks childDrafts first), we no longer need to keep draft proxy refs
+ * in state.base. This allows in-place resolution — no second shallowCopy.
  *
- * Processes leaf-first so child clones are available when resolving parents.
+ * Processes leaf-first so child bases are available when resolving parents.
  */
-function buildClones(
+function resolveStates(
   modified: DraftState[],
   hasDraftableAssignment: boolean,
   cache: Map<any, any> | null
 ): Map<DraftState, any> {
-  const clones = new Map<DraftState, any>()
+  const resolved = new Map<DraftState, any>()
   const seen = new Set<any>()
 
   for (let i = modified.length - 1; i >= 0; i--) {
     const state = modified[i]
-    const stolenCopy = state.base // after stealAndReset
+    // state.base is the stolen copy — resolve draft refs IN-PLACE.
+    const target = state.base
 
-    // Shallow clone — draft proxy refs are copied as-is initially
-    const clone = shallowCopy(stolenCopy)
-
-    // Resolve child draft proxies at their creation-time keys
+    // Resolve child draft proxies from childDrafts map.
+    // The stolen copy may have the draft proxy (if prepareCopy transferred it)
+    // or the original plain object (if no SET on this parent). Either way,
+    // replace with the child's resolved base.
+    if (state.childDrafts) {
+      if (target instanceof Map) {
+        state.childDrafts.forEach((childProxy, key) => {
+          const childState = childProxy[ReactiveFlags.STATE] as DraftState
+          if (!childState) return
+          const res =
+            resolved.get(childState) ||
+            (cache && cache.get(childProxy)) ||
+            childState.base
+          target.set(key, res)
+        })
+      } else if (!(target instanceof Set)) {
+        state.childDrafts.forEach((childProxy, key) => {
+          const childState = childProxy[ReactiveFlags.STATE] as DraftState
+          if (!childState) return
+          const res =
+            resolved.get(childState) ||
+            (cache && cache.get(childProxy)) ||
+            childState.base
+          target[key as any] = res
+        })
+      }
+    }
+    // Also resolve children stored in copy via SET trap (e.g. draft.foo = draft.bar).
+    // These are tracked in state.children but NOT in childDrafts.
     if (state.children) {
-      if (clone instanceof Map) {
+      if (target instanceof Map) {
         for (let j = 0; j < state.children.length; j++) {
           const child = state.children[j]
-          if (child.key !== NO_KEY && clone.get(child.key) === child.proxy) {
-            clone.set(
+          if (child.key !== NO_KEY && target.get(child.key) === child.proxy) {
+            target.set(
               child.key,
-              clones.get(child) ||
+              resolved.get(child) ||
                 (cache && cache.get(child.proxy)) ||
                 child.base
             )
           }
         }
-      } else if (!(clone instanceof Set)) {
+      } else if (!(target instanceof Set)) {
         for (let j = 0; j < state.children.length; j++) {
           const child = state.children[j]
-          if (child.key !== NO_KEY && clone[child.key as any] === child.proxy) {
-            clone[child.key as any] =
-              clones.get(child) ||
+          if (
+            child.key !== NO_KEY &&
+            target[child.key as any] === child.proxy
+          ) {
+            target[child.key as any] =
+              resolved.get(child) ||
               (cache && cache.get(child.proxy)) ||
               child.base
           }
@@ -369,38 +415,34 @@ function buildClones(
     if (state.assignedMap) {
       state.assignedMap.forEach((assigned, key) => {
         if (!assigned) return
-        const val = clone instanceof Map ? clone.get(key) : (clone as any)[key]
+        const val =
+          target instanceof Map ? target.get(key) : (target as any)[key]
         if (val === null || typeof val !== 'object') return
         if (val[ReactiveFlags.STATE]) {
-          // Draft proxy at assigned key — resolve to clone or copy/base
           const cs = val[ReactiveFlags.STATE] as DraftState
-          let resolved = clones.get(cs)
-          if (!resolved) {
-            resolved = cs.copy ?? cs.base
-            // Orphan/foreign: resolve nested drafts via copy-on-write
-            resolved = resolveValue(resolved, clones, null, seen)
+          let res = resolved.get(cs)
+          if (!res) {
+            res = cs.copy ?? cs.base
+            res = resolveValue(res, resolved, null, seen)
           }
-          if (clone instanceof Map) clone.set(key, resolved)
-          else (clone as any)[key] = resolved
+          if (target instanceof Map) target.set(key, res)
+          else (target as any)[key] = res
         } else if (hasDraftableAssignment) {
-          // Non-draft draftable — resolve nested drafts via copy-on-write
-          const resolved = resolveValue(val, clones, null, seen)
-          if (resolved !== val) {
-            if (clone instanceof Map) clone.set(key, resolved)
-            else (clone as any)[key] = resolved
+          const res = resolveValue(val, resolved, null, seen)
+          if (res !== val) {
+            if (target instanceof Map) target.set(key, res)
+            else (target as any)[key] = res
           }
         }
       })
     }
 
-    // Resolve Set draft proxies: replace original values with their
-    // drafted-then-stolen values (via state.drafts map) and replace
-    // direct draft proxies (added via Set.add(draftProxy)) with base values.
+    // Resolve Set draft proxies.
     if (state.type === DraftType.Set) {
       const setState = state as any as SetDraftState
       const draftsMap = setState.drafts?.size > 0 ? setState.drafts : undefined
-      const setClone = clone as any as Set<any>
-      const values = Array.from(setClone)
+      const setTarget = target as any as Set<any>
+      const values = Array.from(setTarget)
       let changed = false
       for (let j = 0; j < values.length; j++) {
         const v = values[j]
@@ -418,18 +460,18 @@ function buildClones(
         }
       }
       if (changed) {
-        setClone.clear()
+        setTarget.clear()
         for (let j = 0; j < values.length; j++) {
-          setClone.add(values[j])
+          setTarget.add(values[j])
         }
       }
     }
 
-    clones.set(state, clone)
-    if (cache) cache.set(state.proxy, clone)
+    resolved.set(state, target)
+    if (cache) cache.set(state.proxy, target)
   }
 
-  return clones
+  return resolved
 }
 
 export function snapshot<T>(
@@ -473,15 +515,15 @@ export function snapshot<T>(
     }
   }
 
-  // Build resolved clones (plain objects, no proxies)
-  const clones = buildClones(
+  // Resolve draft proxy refs in-place in stolen copies (no second shallowCopy)
+  const resolved = resolveStates(
     modified,
     !!rootState.root.hasDraftableAssignment,
     snapshots || null
   )
 
-  // Resolve the requested value using cache for structural sharing
-  return resolveValue(value, clones, snapshots || null, new Set()) as T
+  // Resolve the requested value using resolved map for structural sharing
+  return resolveValue(value, resolved, snapshots || null, new Set()) as T
 }
 
 export function addChildRef(parent: DraftState, child: DraftState) {
