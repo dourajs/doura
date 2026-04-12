@@ -261,15 +261,17 @@ interface DraftState {
   root: DraftState              // root of the draft tree
   parent?: DraftState           // parent state
   key: any                      // creation-time key in parent
-  base: any                     // current base value (after steal: the stolen copy)
+  base: any                     // current base value (after steal: resolved plain values)
   proxy: any                    // the Proxy object
-  copy: any | null              // lazy shallow copy for current action
+  copy: any | null              // lazy shallow copy for current action (only created by SET/DELETE)
   modified: boolean             // has been mutated (bubbles up via markChanged)
   disposed: boolean             // after dispose
   assignedMap: Map<any, boolean> | null  // user SET/DELETE tracking
   hasDraftableAssignment?: boolean  // flag on root: a non-draft draftable was assigned
   listeners: Array<() => void> | null  // watch() callbacks
+  version: number               // root only: incremented on every mutation in trigger()
   children: DraftState[] | null   // child draft states (for BFS in snapshot)
+  childDrafts: Map<any, Drafted> | null  // child draft proxies from GET (separate from copy)
   // Set-specific:
   type: DraftType.Object | DraftType.Map | DraftType.Set
   drafts?: Map<any, Drafted>    // Set only: original → draft mapping
@@ -279,6 +281,7 @@ interface DraftState {
 Key differences from Mutative's `ProxyDraft`:
 - **No `finalities`** — Doura does not use callback-based finalization. Instead, it uses BFS over `children` + `assignedMap` in the `snapshot()` function.
 - **`children` array** — explicitly tracks parent→child relationships for BFS traversal during snapshot.
+- **`childDrafts` map** — stores child draft proxies created by read-only GET access, separate from `copy`. This avoids triggering `prepareCopy` (shallowCopy) for read-only property traversals. The GET trap checks `childDrafts` first for existing child drafts before creating new ones.
 - **`listeners`** — supports `watch(draft, callback)` for change notification.
 - **`root` reference** — every state knows its root, used for `hasDraftableAssignment` flag.
 - **`modified` flag** — boolean, bubbles up via `markChanged()`. Mutative uses `operated` only on the node itself (not bubbled).
@@ -291,25 +294,34 @@ GET(state, prop):
   1. Handle ReactiveFlags (STATE, IS_REACTIVE, SKIP)
   2. Read value = latest(state)[prop]       ← latest = state.copy ?? state.base
   3. track(state, GET, prop)                ← Vue-style dep tracking
-  4. If value is an object and matches base:
-     - prepareCopy(state)                   ← Mutative-style lazy copy
-     - state.copy[prop] = draft(value, state, prop)  ← create child draft proxy
+  4. If value is a non-draft object:
+     - Check state.childDrafts.get(prop)    ← reuse existing child draft (no copy!)
+     - If no existing child draft:
+       - draft(value, state, prop)          ← create new child draft proxy
+       - state.childDrafts.set(prop, child) ← store in separate map, NOT in copy
      - trackDraft(childDraft)               ← track whole-draft identity for views
   5. Return value (draft proxy for objects, raw for primitives)
 ```
+
+**Key optimization**: The GET trap does **NOT** call `prepareCopy`. Child drafts are stored in the separate `childDrafts` Map, avoiding a shallowCopy of the parent for read-only access. A traversal like `this.a.b.c.d` produces 0 shallowCopy operations.
 
 **Proxy handler SET trap**:
 ```
 SET(state, prop, value):
   1. If value unchanged (Object.is): no-op
-  2. prepareCopy(state)                     ← lazy shallow copy on first write
-  3. markChanged(state)                     ← set modified=true, bubble up to parent
-  4. state.copy[prop] = value
-  5. Manage children refs (removeChildRef old, addChildRef new if draft)
-  6. Update assignedMap
-  7. trigger(state, SET/ADD, prop, value)   ← Vue-style reactivity notification
-  8. triggerDraft(state)                    ← walk up parent chain, set mightChange on views
+  2. If value is the childDraft for this key (d.x = d.x): no-op
+  3. prepareCopy(state)                     ← lazy shallow copy on first write
+     - Also transfers childDrafts entries into copy for consistency
+  4. markChanged(state) if not already      ← set modified=true, bubble up to parent
+  5. state.copy[prop] = value
+  6. Invalidate childDrafts entry for overwritten key
+  7. Manage children refs (removeChildRef old, addChildRef new if draft)
+  8. Update assignedMap
+  9. trigger(state, SET/ADD, prop, value)   ← Vue-style reactivity notification
+  10. triggerDraft(state)                   ← walk up parent chain, set mightChange on views
 ```
+
+**Note**: `prepareCopy` is only called in SET/DELETE traps (actual mutations). When called, it transfers any existing entries from `childDrafts` into the newly created copy so that subsequent reads via `latest(state)` = `state.copy` find the child draft proxies.
 
 ### 3.3 Snapshot System
 
@@ -317,41 +329,61 @@ The snapshot system converts the mutable draft tree into immutable plain values 
 
 **`snapshot(value, draft, cache?)`**:
 ```
-1. If root is not modified → resolveValue(value, emptyClones, cache) and return
+1. If root is not modified → resolveValue(value, emptyMap, cache) and return
 2. BFS: collect all modified states starting from root, traversing children arrays
 3. Leaf-first stealAndReset:
    - For each modified state (bottom-up):
      - Steal: state.base = state.copy ?? shallowCopy(state.base)
+     - childDrafts are NOT merged into stolen value
      - Reset: state.copy = null, state.modified = false
 4. Clear cache entries for modified states
-5. buildClones(modifiedStates, hasDraftableAssignment, cache):
-   - For each modified state (leaf-first):
-     a. Shallow clone the stolen copy (state.base)
+5. resolveStates(modifiedStates, hasDraftableAssignment, cache):
+   - For each modified state (leaf-first), resolve IN-PLACE in state.base:
+     a. Resolve childDrafts: for each entry in state.childDrafts,
+        replace state.base[key] with child's resolved base or cache
      b. Resolve children: for each child in state.children,
-        if clone[child.key] === child.proxy → replace with child's clone or cache or base
+        if state.base[child.key] === child.proxy → replace with resolved value
      c. Resolve assignedMap: for each assigned=true key,
-        if value is a draft proxy → resolve to clone/copy/base
+        if value is a draft proxy → resolve to resolved/copy/base
         if value is plain draftable and hasDraftableAssignment → resolveValue recursively
      d. Resolve Set drafts: replace draft proxies with base values
-     e. Store: clones.set(state, clone), cache.set(state.proxy, clone)
-6. resolveValue(value, clones, cache):
+     e. Store: resolved.set(state, state.base), cache.set(state.proxy, state.base)
+6. resolveValue(value, resolved, cache):
    - Copy-on-write resolution of the requested value
-   - Draft proxies → look up in clones map or cache
+   - Draft proxies → look up in resolved map, then cache, then state.copy (orphan fallback), then state.base
    - Plain objects → recurse into properties, clone only if a property needed resolution
    - Returns original reference if no resolution needed (zero allocation)
 7. Return resolved value
 ```
 
-**Critical invariant: stolen copies retain draft proxy references.**
+**Key optimization: no second shallowCopy.** The old `buildClones` step created a separate clone per modified state to avoid modifying the stolen copy (which needed to retain draft proxy refs for DraftState identity). With `childDrafts`, DraftState identity is preserved via the `childDrafts` Map — the GET trap checks it first. So `state.base` no longer needs draft proxy refs, and `resolveStates` resolves in-place.
 
-After `stealAndReset`, `state.base` contains the stolen copy which still has draft proxies as property values. Only the clones (returned to consumers) have proxies resolved to plain values.
+**DraftState identity preservation via childDrafts:**
 
-Why: The next action's GET trap reads from `latest(state)` which is `state.copy ?? state.base`. Since `state.copy` was cleared, it reads from `state.base`. When it finds a draft proxy at `state.base[prop]`, it returns it directly (the `value === peek(base, prop)` check triggers lazy drafting only for non-draft values). This preserves DraftState identity, which preserves the entries in `targetMap`, which preserves dependency chains across actions.
+After `stealAndReset` + `resolveStates`, `state.base` contains plain resolved values (no draft proxies). On the next action's GET trap:
+1. `latest(state)` = `state.base` (copy is null) → reads a plain object at `state.base[prop]`
+2. `!value[ReactiveFlags.STATE]` → true (it's a plain object)
+3. `state.childDrafts.get(prop)` → finds the existing child draft proxy → returns it
+4. DraftState identity preserved → `targetMap` entries preserved → dependency chains intact
+
+**Orphan draft handling:**
+
+Orphan drafts (not found by BFS — e.g., draft proxies nested in new plain objects, or cross-root foreign drafts) are NOT collected by BFS and NOT processed by `resolveStates`. They are handled lazily by `resolveValue`'s fallback chain:
+
+```ts
+const resolved = clones.get(state) || state.copy || state.base
+```
+
+- `clones.get(state)` → undefined (orphan not in resolved map)
+- `state.copy` → the orphan's modified copy (stealAndReset was never called on it)
+- `state.base` → original value (fallback for unmodified orphans)
+
+This lazy approach avoids the cost of eagerly scanning plain objects for nested draft proxies during BFS. After snapshot, orphan drafts are unreachable from the state tree (their proxy refs were resolved to plain values) and are garbage collected.
 
 **Structural sharing via cache:**
 
 The `cache` parameter (`_lastDraftToSnapshot` in the model) maps `draftProxy → resolvedPlainValue`:
-- Modified states: old cache entry deleted, new clone stored
+- Modified states: old cache entry deleted, new resolved value stored
 - Unmodified states: cache returns previous resolved value (same reference)
 - This enables `snapshot1.settings === snapshot2.settings` when settings was not modified between actions → React skips re-render
 
@@ -396,33 +428,34 @@ This avoids unnecessary `snapshot()` calls for views whose tracked draft sub-tre
 
 ```
 Action execution:
-  ┌─ Writes go to draft proxy ─┐
-  │  SET trap:                  │
-  │    prepareCopy (COW)        │── Mutative path: build up modified copy tree
-  │    markChanged (bubble up)  │
-  │                             │
-  │    trigger(state, SET, key) │── Vue path: notify effects of per-key change
-  │    triggerDraft(state)      │── Vue path: notify views of sub-tree change
-  └─────────────────────────────┘
+  ┌─ Reads go to draft proxy ───┐
+  │  GET trap:                   │
+  │    track(state, GET, key)    │── Vue path: record per-key dependency
+  │    childDrafts.get(key)      │── check existing child draft (no copy!)
+  │    OR draft(value) + store   │── Mutative path: create child draft, store in childDrafts
+  │    trackDraft(child)         │── Vue path: record whole-draft dependency for views
+  └──────────────────────────────┘
 
-  ┌─ Reads go to draft proxy ──┐
-  │  GET trap:                  │
-  │    track(state, GET, key)   │── Vue path: record per-key dependency
-  │    lazy child drafting      │── Mutative path: create child draft on first access
-  │    trackDraft(child)        │── Vue path: record whole-draft dependency for views
-  └─────────────────────────────┘
+  ┌─ Writes go to draft proxy ──┐
+  │  SET trap:                   │
+  │    prepareCopy (COW)         │── Mutative path: shallowCopy + transfer childDrafts
+  │    markChanged (bubble up)   │
+  │                              │
+  │    trigger(state, SET, key)  │── Vue path: notify effects of per-key change
+  │    triggerDraft(state)       │── Vue path: notify views of sub-tree change
+  └──────────────────────────────┘
 
 After action (depth=0):
   snapshot():
-    1. Steal copies from draft tree (Mutative path: finalize COW)
-    2. Build clones with resolved plain values (Mutative path: structural sharing)
-    3. resolveValue with cache (Mutative path: cross-snapshot structural sharing)
+    1. Steal copies from draft tree (COW finalize: 1 shallowCopy per modified node)
+    2. Resolve draft refs in-place in stolen copies (no second shallowCopy)
+    3. resolveValue with cache (cross-snapshot structural sharing)
     → Immutable snapshot ready for React consumption
 
 React consumption:
   useSyncExternalStore(subscribe, getSnapshot):
     getSnapshot reads view.value → triggers effect → tracks deps (Vue path)
-    Returns snapshot value (Mutative path: structurally shared plain value)
+    Returns snapshot value (structurally shared plain value)
     Reference equality check → bailout if unchanged
 ```
 
@@ -669,11 +702,13 @@ Dispatches based on arguments:
 
 These are the critical rules that the system must maintain for correctness.
 
-### 7.1 Stolen Copies Retain Draft Proxy Refs
+### 7.1 DraftState Identity Preserved via childDrafts
 
-After `stealAndReset`, `state.base` contains draft proxies as property values. Only clones (returned to consumers) have proxies resolved. This preserves DraftState identity across actions, which preserves `targetMap` entries, which preserves dependency chains.
+DraftState identity across actions is preserved via the `childDrafts` Map on each DraftState, NOT via draft proxy refs in `state.base`. After `stealAndReset` + `resolveStates`, `state.base` contains resolved plain values (no draft proxies). The GET trap checks `state.childDrafts.get(prop)` first — if found, returns the existing child draft proxy, preserving DraftState identity and `targetMap` entries.
 
-**If violated**: Views stop reacting to changes because their tracked DraftState objects are no longer the same objects in `targetMap`.
+**If violated**: If `childDrafts` is lost or corrupted, the GET trap creates new DraftStates for the same properties, losing dependency chain continuity in `targetMap`. Views stop reacting to changes on those properties.
+
+**Cleanup**: `childDrafts` entries are invalidated by SET/DELETE on the same key (`childDrafts.delete(prop)`). `resetDraftChildren` (called by `replace()`) clears `childDrafts` entirely. Size is bounded by the number of object-typed properties accessed on the node.
 
 ### 7.2 Snapshot Contains No Draft Proxies
 
@@ -699,8 +734,12 @@ When an action completes at depth 0, `_update()` runs synchronously (not deferre
 
 **If violated**: Views return stale snapshots (false negative: missed change) or regenerate snapshots unnecessarily (false positive: wasted work, but not incorrect).
 
-### 7.6 Children Array Completeness
+### 7.6 Children Array and childDrafts Consistency
 
-Every child DraftState created via lazy drafting in GET trap must be registered in `parent.children`. Every removed/overwritten child must be unregistered via `removeChildRef`.
+Every child DraftState created via lazy drafting in GET trap must be registered in both `parent.children` (via `addChildRef` in `draft()`) and `parent.childDrafts` (via `childDrafts.set(prop, child)` in the GET trap). Every removed/overwritten child must be unregistered: `removeChildRef` for `children`, `childDrafts.delete(prop)` for `childDrafts`.
 
-**If violated**: BFS in `snapshot()` misses modified children → draft proxies leak into snapshot (violates 7.2). Children keep acummulated, cause memory leak.
+**If `children` violated**: BFS in `snapshot()` misses modified children → `resolveStates` doesn't resolve them → draft proxies leak into snapshot (violates 7.2).
+
+**If `childDrafts` violated**: GET trap creates duplicate DraftStates for the same property → DraftState identity fragmented → dependency chains in `targetMap` split across multiple DraftStates → views may miss changes or track stale deps.
+
+**Note**: `childDrafts` stores entries by property key (Map key → draft proxy). `children` stores entries by DraftState reference (array of DraftState). Both track the same child drafts but serve different purposes: `childDrafts` for GET trap reuse + snapshot resolution by key, `children` for BFS traversal of modified tree.
