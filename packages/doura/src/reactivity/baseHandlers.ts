@@ -43,9 +43,16 @@ const builtInSymbols = new Set(
     .filter(isSymbol)
 )
 
-function prepareCopy(state: { base: any; copy: any }) {
+function prepareCopy(state: ObjectDraftState) {
   if (!state.copy) {
     state.copy = shallowCopy(state.base)
+    // Transfer child drafts created by read-only GET into the copy
+    // so that SET/DELETE operate on a consistent view.
+    if (state.childDrafts) {
+      state.childDrafts.forEach((childProxy, key) => {
+        state.copy![key as any] = childProxy
+      })
+    }
   }
 }
 
@@ -135,8 +142,15 @@ function createGetter(): ProxyGetter {
     // Fast inline isDraft: we already know value is a non-null object
     // (checked by isObject above), so skip the null guard.
     if (!value[ReactiveFlags.STATE]) {
-      prepareCopy(state)
-      value = state.copy![prop as any] = draft(value, state, prop)
+      // Check childDrafts first — a previous read may have already created
+      // a draft for this key without triggering prepareCopy.
+      let childDraft = state.childDrafts && state.childDrafts.get(prop)
+      if (!childDraft) {
+        childDraft = draft(value, state, prop)
+        if (!state.childDrafts) state.childDrafts = new Map()
+        state.childDrafts.set(prop, childDraft)
+      }
+      value = childDraft
     }
 
     trackDraft(value)
@@ -168,9 +182,18 @@ function createSetter() {
       // special case, if we assigning the original value to a draft, we can ignore the assignment
       const currentState: ObjectDraftState = current?.[ReactiveFlags.STATE]
       if (currentState && currentState.base === value) {
-        state.copy![prop] = value
+        // Assigning the original value back to a child draft — no-op.
+        // If copy exists (from a prior SET), update it. Otherwise the
+        // base already has the original, so no action needed.
+        if (state.copy) state.copy[prop] = value
         return true
       }
+
+      // Check if value is the child draft proxy for this key (d.x = d.x no-op).
+      // With childDrafts optimization, `current` is the plain base value while
+      // `value` is the draft proxy. They're not Object.is equal, but it's a no-op.
+      if (state.childDrafts && state.childDrafts.get(prop) === value)
+        return true
 
       // we need to be able to distinguish setting a non-existing to undefined (which is a change)
       // from setting an existing property with value undefined to undefined (which is not a change)
@@ -179,10 +202,12 @@ function createSetter() {
         (value !== undefined || hasOwn(state.base, prop))
       )
         return true
-
-      prepareCopy(state)
-      markChanged(state)
     }
+
+    // Ensure copy exists. With childDrafts optimization, copy may be null
+    // even when modified=true (markChanged bubbles up from children).
+    prepareCopy(state)
+    if (!state.modified) markChanged(state)
 
     if (
       is(state.copy![prop], value) &&
@@ -210,6 +235,10 @@ function createSetter() {
     }
 
     state.copy![prop] = value
+
+    // Invalidate childDrafts entry for overwritten key — the old child
+    // draft is no longer reachable at this key.
+    if (state.childDrafts) state.childDrafts.delete(prop)
 
     // Track this key as user-assigned for finalization.
     if (hasOwn(state.base, prop) && is(value, (state.base as any)[prop])) {
@@ -242,7 +271,7 @@ function deleteProperty(state: ObjectDraftState, prop: string): boolean {
   // The `undefined` check is a fast path for pre-existing keys.
   if (current !== undefined || prop in state.base) {
     prepareCopy(state)
-    markChanged(state)
+    if (!state.modified) markChanged(state)
   }
 
   if (state.copy) {
@@ -254,6 +283,8 @@ function deleteProperty(state: ObjectDraftState, prop: string): boolean {
 
     const result = delete state.copy[prop]
     if (result && hadKey) {
+      // Invalidate childDrafts entry for deleted key.
+      if (state.childDrafts) state.childDrafts.delete(prop)
       // Track this key as deleted for finalization.
       if (!state.assignedMap) state.assignedMap = new Map()
       state.assignedMap.set(prop, false)
