@@ -1,4 +1,5 @@
 import { isDraft } from '../../reactivity'
+import { nextTick } from '../scheduler'
 import { defineModel, modelManager, use } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -152,6 +153,58 @@ describe('defineModel', () => {
         depDouble: 4,
       })
       expect(store.all).toBe(v)
+    })
+
+    it('should work under nested models with actions', async () => {
+      const cModel = defineModel({
+        state: { id: 'c', v: 0, t: 0 },
+        actions: {
+          add(p: number) {
+            this.v += p
+          },
+          addT(p: number) {
+            this.t += p
+          },
+        },
+      })
+      const bModel = defineModel(() => {
+        const c = use('c', cModel)
+        return {
+          state: { id: 'b', v: 0, m: { n: {} as Record<string, number> } },
+          actions: {
+            add(key: string, p: number) {
+              this.v += p
+              this.m.n[key] = p
+              c.addT(p)
+            },
+          },
+        }
+      })
+      const aModel = defineModel(() => {
+        const b = use('b', bModel)
+        const c = use('c', cModel)
+        return {
+          state: { v: 0 },
+          actions: {
+            add(key: string, p: number) {
+              this.v += p
+              c.add(p)
+              b.add(key, p)
+            },
+          },
+        }
+      })
+
+      const aStore = modelMgr.getModel('a', aModel)
+      const bStore = modelMgr.getModel('b', bModel)
+      const cStore = modelMgr.getModel('c', cModel)
+
+      aStore.add('a', 1)
+      expect(aStore.v).toBe(1)
+      expect(bStore.v).toBe(1)
+      expect(bStore.m.n['a']).toBe(1)
+      expect(cStore.v).toBe(1)
+      expect(cStore.t).toBe(1)
     })
   })
 
