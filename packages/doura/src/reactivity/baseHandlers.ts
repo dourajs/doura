@@ -135,7 +135,7 @@ function createGetter(): ProxyGetter {
       return value
     }
 
-    if (state.disposed || !isObject(value)) {
+    if (!isObject(value)) {
       return value
     }
 

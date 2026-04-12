@@ -8,7 +8,7 @@ import {
 } from './common'
 import { mutableHandlers } from './baseHandlers'
 import { mutableCollectionHandlers } from './collectionHandlers'
-import { NOOP, isObject, isArray, shallowCopy } from '../utils'
+import { isObject, isArray, shallowCopy } from '../utils'
 import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
 export type PatchPath = (string | number)[]
@@ -37,8 +37,6 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   copy: T | null
   // True for both shallow and deep changes.
   modified: boolean
-  // True after being disposed
-  disposed: boolean
   // Tracks which keys were user-assigned (true) or deleted (false).
   // Lazily created on first set/delete. Used by finalization to know
   // which keys need handleValue scanning.
@@ -80,11 +78,6 @@ export interface SetDraftState extends DraftStateBase<AnySet> {
 }
 
 export type DraftState = ObjectDraftState | MapDraftState | SetDraftState
-
-export function disposeDraft(draft: Drafted) {
-  const state: DraftState = draft[ReactiveFlags.STATE]
-  state.disposed = true
-}
 
 /**
  * Discard orphaned child drafts from the draft tree.
@@ -147,7 +140,6 @@ export function draft<T extends Objectish>(
     proxy: null as any, // set below
     copy: null,
     modified: false,
-    disposed: false,
     assignedMap: null, // lazy, created on first set/delete
     listeners: null,
     version: 0,
@@ -193,9 +185,6 @@ export function draft<T extends Objectish>(
 
 export function watch(draft: any, cb: () => void): () => void {
   const state: DraftState = draft[ReactiveFlags.STATE]
-  if (state.disposed) {
-    return NOOP
-  }
 
   if (!state.listeners) {
     state.listeners = []
