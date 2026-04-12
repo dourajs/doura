@@ -13,9 +13,6 @@ import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
 export type PatchPath = (string | number)[]
 
-/** @deprecated kept for backward compatibility - use state.proxy directly */
-export const draftMap = new WeakMap<any, any>()
-
 export const enum DraftType {
   Object,
   Map,
