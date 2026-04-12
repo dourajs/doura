@@ -3,6 +3,7 @@ import type { Plugin } from './core'
 
 const reduxDevTools: Plugin = function () {
   if (
+    !__DEV__ ||
     typeof window === 'undefined' ||
     !(window as any).__REDUX_DEVTOOLS_EXTENSION__
   ) {
