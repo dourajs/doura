@@ -271,6 +271,9 @@ async function publishPackage(pkgRoot, version) {
       {
         cwd: pkgRoot,
         stdio: 'pipe',
+        env: {
+          COREPACK_ENABLE_STRICT: 0,
+        },
       }
     )
     console.log(chalk.green(`Successfully published ${pkgName}@${version}`))
