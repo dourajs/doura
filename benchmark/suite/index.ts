@@ -12,6 +12,10 @@ async function runTsFilesSequentially() {
   )
 
   for (const file of tsFiles) {
+    if (file === 'runner.ts') {
+      continue
+    }
+
     console.log(`\nRunning: ${file}`)
     console.log('='.repeat(60))
     const env = { ...process.env, NODE_ENV: 'production' }
