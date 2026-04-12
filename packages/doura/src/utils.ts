@@ -1,4 +1,4 @@
-import { AnyObject, Objectish } from './types'
+import { AnyObject } from './types'
 
 export const NOOP = () => {
   // do nothing
@@ -25,17 +25,10 @@ export const isMap = (val: unknown): val is Map<any, any> =>
 export const isSet = (val: unknown): val is Set<any> =>
   toTypeString(val) === '[object Set]'
 
-export const isFunction = (val: unknown): val is Function =>
-  typeof val === 'function'
 export const isString = (val: unknown): val is string => typeof val === 'string'
 export const isSymbol = (val: unknown): val is symbol => typeof val === 'symbol'
 export const isObject = (val: unknown): val is Record<any, any> =>
   val !== null && typeof val === 'object'
-
-export const toRawType = (value: unknown): string => {
-  // extract "RawType" from strings like "[object RawType]"
-  return toTypeString(value).slice(8, -1)
-}
 
 export const isPlainObject = (val: unknown): val is AnyObject =>
   toTypeString(val) === '[object Object]'
@@ -146,27 +139,3 @@ export const ownKeys: (target: object) => PropertyKey[] =
           Object.getOwnPropertySymbols(obj) as any
         )
     : /* istanbul ignore next */ Object.getOwnPropertyNames
-
-export function each<T extends Objectish>(
-  obj: T,
-  iter: (key: string | number, value: any, source: T) => void,
-  enumerableOnly?: boolean
-): void
-export function each(obj: any, iter: any, enumerableOnly = false) {
-  if (isPlainObject(obj)) {
-    ;(enumerableOnly ? Object.keys : ownKeys)(obj).forEach((key) => {
-      if (!enumerableOnly || typeof key !== 'symbol')
-        iter(key, obj[key as any], obj)
-    })
-  } else {
-    obj.forEach((entry: any, index: any) => iter(index, entry, obj))
-  }
-}
-
-export function set(thing: any, propOrOldValue: PropertyKey, value: any) {
-  if (isMap(thing)) thing.set(propOrOldValue, value)
-  else if (isSet(thing)) {
-    thing.delete(propOrOldValue)
-    thing.add(value)
-  } else thing[propOrOldValue] = value
-}

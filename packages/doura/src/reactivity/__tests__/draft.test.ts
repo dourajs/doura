@@ -1,6 +1,17 @@
 import { draft, snapshot } from '../draft'
 import { isModified, isDraft, markRaw, markStrict } from '../common'
-import { each } from '../../utils'
+import { isPlainObject } from '../../utils'
+
+function each(obj: any, iter: any, enumerableOnly = false) {
+  if (isPlainObject(obj)) {
+    ;(enumerableOnly ? Object.keys : Reflect.ownKeys)(obj).forEach((key) => {
+      if (!enumerableOnly || typeof key !== 'symbol')
+        iter(key, obj[key as any], obj)
+    })
+  } else {
+    obj.forEach((entry: any, index: any) => iter(index, entry, obj))
+  }
+}
 
 const produce = <T extends any = any>(value: T, cb: (v: T) => void) => {
   const obj = draft(value as any)
@@ -15,7 +26,7 @@ const produce = <T extends any = any>(value: T, cb: (v: T) => void) => {
 
 function enumerableOnly(x: any) {
   const copy = Array.isArray(x) ? x.slice() : Object.assign({}, x)
-  each(copy, (prop, value) => {
+  each(copy, (prop: any, value: any) => {
     if (value && typeof value === 'object') {
       copy[prop] = enumerableOnly(value)
     }
