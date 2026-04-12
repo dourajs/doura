@@ -458,7 +458,7 @@ describe(`reactivity/draft`, () => {
       expect(res.a).not.toBe(res.b)
       expect(res.a.z).toBeTruthy()
       // res.b is unmodified — should still reflect original value
-      expect(res.b).toEqual({ foo: 'bar' })
+      expect(res.b).toBe(obj)
     })
 
     it('supports a base state with deep level multiple references to an object No access same references', () => {
