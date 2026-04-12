@@ -1,4 +1,4 @@
-export * from './utils'
+export { hasOwn } from './utils'
 
 export type {
   State,
