@@ -1,10 +1,5 @@
 import { invariant } from './utils'
 import type { Plugin } from './core'
-import { Doura } from './doura'
-
-function applyState(_newState: any, _doura: Doura) {
-  // todo
-}
 
 const reduxDevTools: Plugin = function () {
   if (
@@ -50,16 +45,6 @@ const reduxDevTools: Plugin = function () {
                   return devTools.init(doura.getState())
 
                 case 'ROLLBACK':
-                  try {
-                    const state = JSON.parse(message.state)
-                    applyState(state, doura)
-                    return devTools.init(state)
-                  } catch {
-                    console.warn(
-                      `[Doura Devtool] Could not parse the received json.`
-                    )
-                  }
-
                   return devTools.init(doura.getState())
                 case 'JUMP_TO_STATE':
                 case 'JUMP_TO_ACTION':
