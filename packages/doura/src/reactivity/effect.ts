@@ -33,32 +33,12 @@ export let trackOpBit = 1
  */
 const maxMarkerBits = 30
 
-export interface AccessRecord {
-  type: TrackOpTypes | TriggerOpTypes
-  value: any
-}
-
-export type KeyAccessNode = {
-  parent: KeyAccessNode | null
-  record: Map<any, AccessRecord>
-  modified: boolean
-  target: object
-}
-
-export type TargetRecord = Map<any, KeyAccessNode>
-
-export type DraftMap = Map<any, any>
-
-export type OriginMap = Map<any, any>
-
 export type EffectScheduler = (...args: any[]) => any
 
 export let activeEffect: ReactiveEffect | undefined
 
 export const ITERATE_KEY = Symbol(__DEV__ ? 'iterate' : '')
 export const MAP_KEY_ITERATE_KEY = Symbol(__DEV__ ? 'Map key iterate' : '')
-
-export const NODE_DELETE = Symbol('delete')
 
 let uid = 0
 export class ReactiveEffect<T = any> {
@@ -205,11 +185,6 @@ const trackStack: boolean[] = []
 export function pauseTracking() {
   trackStack.push(shouldTrack)
   shouldTrack = false
-}
-
-export function enableTracking() {
-  trackStack.push(shouldTrack)
-  shouldTrack = true
 }
 
 export function resetTracking() {
