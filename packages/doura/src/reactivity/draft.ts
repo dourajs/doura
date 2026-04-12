@@ -47,11 +47,6 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   hasDraftableAssignment?: boolean
   // listener (lazy: only allocated when watch() is called)
   listeners: Array<() => void> | null
-  // Monotonically increasing counter on the root state, incremented on
-  // every mutation (in trigger()). Used by model views to detect whether
-  // the state tree changed since the last snapshot, replacing the
-  // mightChange/trackDraft/triggerDraft subsystem.
-  version: number
   // Child draft states reachable from this state's copy.
   // Simple array for fast push — stale entries (from overwritten properties)
   // are harmless because BFS skips them via the modified=false check.
@@ -142,7 +137,6 @@ export function draft<T extends Objectish>(
     modified: false,
     assignedMap: null, // lazy, created on first set/delete
     listeners: null,
-    version: 0,
     children: null,
     childDrafts: null, // lazy, created on first child draft in GET trap
   }
