@@ -11,8 +11,6 @@ import { mutableCollectionHandlers } from './collectionHandlers'
 import { isObject, isArray, shallowCopy } from '../utils'
 import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
-export type PatchPath = (string | number)[]
-
 export const enum DraftType {
   Object,
   Map,

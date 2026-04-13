@@ -2,15 +2,11 @@ import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn } from '../utils'
 
-export type StateObject = {
+export type State = {
   [x: string]: any
 }
 
-export type State = StateObject
-
 export type ActionOptions = Record<string, Function>
-
-export type Params = any
 
 export type ViewOptions<State = any> = Record<
   string,
@@ -70,9 +66,7 @@ export interface FunctionModel<
 export type ModelOptions<
   S extends State,
   A extends ActionOptions,
-  V extends ViewOptions,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  P extends Params
+  V extends ViewOptions
 > = ObjectModel<S, A, V> | FunctionModel<S, A, V>
 
 export type AnyObjectModel = ObjectModel<any, any, any>
@@ -81,30 +75,15 @@ export type AnyFunctionModel = FunctionModel<any, any, any>
 
 export type AnyModel = AnyObjectModel | AnyFunctionModel
 
-export type ModelState<Model> = Model extends ModelOptions<
-  infer S,
-  any,
-  any,
-  any
->
+export type ModelState<Model> = Model extends ModelOptions<infer S, any, any>
   ? { [K in keyof S]: S[K] }
   : never
 
-export type ModelActions<Model> = Model extends ModelOptions<
-  any,
-  infer A,
-  any,
-  any
->
+export type ModelActions<Model> = Model extends ModelOptions<any, infer A, any>
   ? Actions<A>
   : never
 
-export type ModelViews<Model> = Model extends ModelOptions<
-  any,
-  any,
-  infer V,
-  any
->
+export type ModelViews<Model> = Model extends ModelOptions<any, any, infer V>
   ? Views<V>
   : never
 

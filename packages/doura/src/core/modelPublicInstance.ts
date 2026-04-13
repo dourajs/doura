@@ -19,7 +19,7 @@ import {
 } from './modelOptions'
 import { createView, Selector, ModelView } from './view'
 
-export const isReservedPrefix = (key: string) => key === '_' || key === '$'
+const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $name: string
@@ -39,7 +39,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   ModelViews<IModel> &
   ModelActions<IModel>
 
-export const publicPropertiesMap: PublicPropertiesMap =
+const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
   // due to type annotation
   /*#__PURE__*/ assign(

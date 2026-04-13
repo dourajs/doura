@@ -27,9 +27,7 @@ import {
   shallowCopy,
 } from '../utils'
 
-export type ProxyGetterHandler = ProxyHandler<object>['get']
-
-export type ProxyGetter = ProxyGetterHandler
+type ProxyGetter = ProxyHandler<object>['get']
 
 const isNonTrackableKeys = new Set<any>([`__proto__`])
 
