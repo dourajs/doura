@@ -207,7 +207,7 @@ describe('reactivity/createDraft', () => {
   test('should not observe objects with __v_skip', () => {
     const original = {
       foo: 1,
-      __r_skip: true,
+      __r_raw: true,
     }
     const observed = draft(original)
     expect(isDraft(observed)).toBe(false)

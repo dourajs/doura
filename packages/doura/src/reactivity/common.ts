@@ -10,15 +10,14 @@ import {
 export declare const RawSymbol: unique symbol
 
 export const enum ReactiveFlags {
-  SKIP = '__r_skip',
+  RAW = '__r_raw',
   STRICT = '__r_strict',
   IS_REACTIVE = '__r_isReactive',
-  RAW = '__r_raw',
   STATE = '__r_state',
 }
 
 export interface Target {
-  [ReactiveFlags.SKIP]?: boolean
+  [ReactiveFlags.RAW]?: boolean
   [ReactiveFlags.IS_REACTIVE]?: boolean
   [ReactiveFlags.STATE]?: DraftState
 }
@@ -55,7 +54,7 @@ export function getTargetType(value: any) {
 export function markRaw<T extends object>(
   value: T
 ): T & { [RawSymbol]?: true } {
-  def(value, ReactiveFlags.SKIP, true)
+  def(value, ReactiveFlags.RAW, true)
   return value
 }
 

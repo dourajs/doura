@@ -148,7 +148,7 @@ export function draft<T extends Objectish>(
     return target as any
   }
 
-  if (target[ReactiveFlags.SKIP] || !Object.isExtensible(target)) {
+  if (target[ReactiveFlags.RAW] || !Object.isExtensible(target)) {
     return target as any
   }
 
@@ -286,7 +286,7 @@ function resolveValue(
     return resolved
   }
 
-  if (value[ReactiveFlags.SKIP] || Object.isFrozen(value) || seen.has(value)) {
+  if (value[ReactiveFlags.RAW] || Object.isFrozen(value) || seen.has(value)) {
     return value
   }
   seen.add(value)
