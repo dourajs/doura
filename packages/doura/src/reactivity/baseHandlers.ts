@@ -6,7 +6,14 @@ import {
   removeChildRef,
 } from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
-import { ReactiveFlags, toBase, toState, latest, markChanged } from './common'
+import {
+  ReactiveFlags,
+  Drafted,
+  toBase,
+  toState,
+  latest,
+  markChanged,
+} from './common'
 import {
   track,
   trackDraft,
@@ -216,7 +223,7 @@ function createSetter() {
     )
       return true
 
-    // Maintain children tracking: remove old draft child, add new one.
+    // Maintain children and childDrafts tracking.
     // Only needed when old/new values are objects (drafts).
     const oldCopyValue = state.copy![prop]
     if (isObject(oldCopyValue) || isObject(value)) {
@@ -229,16 +236,22 @@ function createSetter() {
       }
       if (newChildState) {
         addChildRef(state, newChildState)
-      } else if (isObject(value)) {
-        state.root.hasDraftableAssignment = true
+        // Record draft at this key so resolveStates can resolve it
+        // across snapshots (handles draft aliases like this.ref = this.nested).
+        if (!state.childDrafts) state.childDrafts = new Map()
+        state.childDrafts.set(prop, value as Drafted)
+      } else {
+        if (isObject(value)) {
+          state.root.hasDraftableAssignment = true
+        }
+        if (state.childDrafts) state.childDrafts.delete(prop)
       }
+    } else if (state.childDrafts) {
+      // Primitive value — invalidate any stale childDraft entry.
+      state.childDrafts.delete(prop)
     }
 
     state.copy![prop] = value
-
-    // Invalidate childDrafts entry for overwritten key — the old child
-    // draft is no longer reachable at this key.
-    if (state.childDrafts) state.childDrafts.delete(prop)
 
     // Track this key as user-assigned for finalization.
     if (hasOwn(state.base, prop) && is(value, (state.base as any)[prop])) {

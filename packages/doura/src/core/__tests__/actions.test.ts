@@ -486,7 +486,7 @@ describe('defineModel/actions', () => {
       expect(snap1.nested).toEqual({ a: 2 })
     })
 
-    it('direct draft alias (no plain object): also stale after second snapshot', () => {
+    it('direct draft alias: ref tracks nested across multiple snapshots', () => {
       const model = defineModel({
         state: {
           nested: { a: 1 },
@@ -511,21 +511,16 @@ describe('defineModel/actions', () => {
       expect(snap1.ref).toEqual({ a: 2 })
       expect(snap1.ref).toBe(snap1.nested)
 
-      // action 2: only mutate nested
+      // action 2: only mutate nested — ref should follow
       store.updateNested()
       const snap2 = store.$rawState
       expect(snap2.nested).toEqual({ a: 3 })
+      expect(snap2.ref).toEqual({ a: 3 })
+      expect(snap2.ref).toBe(snap2.nested)
 
-      // BUG: same stale behavior as with plain object wrapping.
-      // Root cause: resolveStates in-place replaces draft proxy → plain value
-      // in stolen copy. Next snapshot's stealAndReset(shallowCopy(base)) produces
-      // target with plain value at "ref". Three resolution paths all fail:
-      //   1. childDrafts: key is "nested", not "ref"
-      //   2. children: nestedState.key is "nested", checks target["nested"] not target["ref"]
-      //   3. assignedMap: val is plain {a:2}, not a draft proxy;
-      //      hasDraftableAssignment=false (no plain object was assigned), so skipped
-      expect(snap2.ref).toEqual({ a: 2 }) // ideally should be {a: 3}
-      expect(snap2.ref).not.toBe(snap2.nested)
+      // snap1 immutability
+      expect(snap1.nested).toEqual({ a: 2 })
+      expect(snap1.ref).toEqual({ a: 2 })
     })
 
     it('unmodified subtrees share reference between consecutive snapshots', () => {
