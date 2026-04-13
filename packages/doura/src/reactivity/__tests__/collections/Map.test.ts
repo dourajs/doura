@@ -450,10 +450,10 @@ describe('reactivity/collections', () => {
       expect(spy).toBeCalledTimes(1)
     })
 
-    it('should trigger Map.clear only once for non-draft keys', () => {
+    it('should not call base clear when clearing empty Map', () => {
       const [proxy, spy] = coverCollectionFn(new Map(), 'clear')
       proxy.clear()
-      expect(spy).toBeCalledTimes(1)
+      expect(spy).toBeCalledTimes(0)
     })
 
     it('should return proxy from Map.set call', () => {

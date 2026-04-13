@@ -469,10 +469,10 @@ describe('reactivity/collections', () => {
       expect(spy).toBeCalledTimes(1)
     })
 
-    it('should trigger Set.clear only once for non-draft keys', () => {
+    it('should not call base clear when clearing empty Set', () => {
       const [proxy, spy] = coverCollectionFn(new Set(), 'clear')
       proxy.clear()
-      expect(spy).toBeCalledTimes(1)
+      expect(spy).toBeCalledTimes(0)
     })
 
     it('should return proxy from Set.add call', () => {

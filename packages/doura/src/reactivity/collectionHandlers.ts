@@ -229,8 +229,6 @@ function clear(this: CollectionTypes & Drafted) {
   const state = this[ReactiveFlags.STATE] as CollectionState
   const target = latest(state)
   const hadItems = target.size !== 0
-  // forward the operation before queueing reactions
-  const result = target.clear()
   if (hadItems) {
     prepareCopy(state)
     markChanged(state)
@@ -239,7 +237,6 @@ function clear(this: CollectionTypes & Drafted) {
     ;(state.copy as any).clear()
     trigger(state, TriggerOpTypes.CLEAR, undefined, undefined)
   }
-  return result
 }
 
 function setForEach(
