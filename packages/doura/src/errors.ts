@@ -14,7 +14,7 @@ export function error(err: unknown, type: ErrorCodes, ...args: any[]) {
   if (__DEV__) {
     const e = Errors[type] as any
     const info = !e
-      ? 'unknown error nr: ' + error
+      ? 'unknown error nr: ' + err
       : typeof e === 'function'
       ? e.apply(null, args as any)
       : e
