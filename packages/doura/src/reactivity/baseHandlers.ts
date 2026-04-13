@@ -1,10 +1,4 @@
-import {
-  ObjectDraftState,
-  DraftState,
-  draft,
-  addChildRef,
-  removeChildRef,
-} from './draft'
+import { ObjectDraftState, DraftState, draft } from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import {
   ReactiveFlags,
@@ -151,11 +145,10 @@ function createGetter(): ProxyGetter {
     if (!value[ReactiveFlags.STATE]) {
       // Check childDrafts first — a previous read may have already created
       // a draft for this key without triggering prepareCopy.
+      // draft() auto-writes to parent.childDrafts when key is provided.
       let childDraft = state.childDrafts && state.childDrafts.get(prop)
       if (!childDraft) {
         childDraft = draft(value, state, prop)
-        if (!state.childDrafts) state.childDrafts = new Map()
-        state.childDrafts.set(prop, childDraft)
       }
       value = childDraft
     }
@@ -227,17 +220,10 @@ function createSetter() {
     // Only needed when old/new values are objects (drafts).
     const oldCopyValue = state.copy![prop]
     if (isObject(oldCopyValue) || isObject(value)) {
-      const oldChildState: DraftState | undefined =
-        oldCopyValue && oldCopyValue[ReactiveFlags.STATE]
       const newChildState: DraftState | undefined =
         value && (value as any)[ReactiveFlags.STATE]
-      if (oldChildState) {
-        removeChildRef(state, oldChildState)
-      }
       if (newChildState) {
-        addChildRef(state, newChildState)
-        // Record draft at this key so resolveStates can resolve it
-        // across snapshots (handles draft aliases like this.ref = this.nested).
+        // Record draft at this key for DFS traversal and resolution.
         if (!state.childDrafts) state.childDrafts = new Map()
         state.childDrafts.set(prop, value as Drafted)
       } else {
@@ -288,12 +274,6 @@ function deleteProperty(state: ObjectDraftState, prop: string): boolean {
   }
 
   if (state.copy) {
-    // Decrement refcount for the deleted child draft
-    const oldCopyValue = state.copy[prop]
-    if (oldCopyValue && oldCopyValue[ReactiveFlags.STATE]) {
-      removeChildRef(state, oldCopyValue[ReactiveFlags.STATE] as DraftState)
-    }
-
     const result = delete state.copy[prop]
     if (result && hadKey) {
       // Invalidate childDrafts entry for deleted key.

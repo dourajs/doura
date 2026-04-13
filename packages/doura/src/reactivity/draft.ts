@@ -47,15 +47,9 @@ interface DraftStateBase<T extends AnyObject = AnyObject> {
   hasDraftableAssignment?: boolean
   // listener (lazy: only allocated when watch() is called)
   listeners: Array<() => void> | null
-  // Child draft states reachable from this state's copy.
-  // Simple array for fast push — stale entries (from overwritten properties)
-  // are harmless because BFS skips them via the modified=false check.
-  // (lazy: only allocated when first child is added)
-  children: DraftState[] | null
-  // Child draft proxies created by read-only property access (GET trap).
-  // Stored separately from `copy` so that reading nested properties does
-  // NOT trigger prepareCopy (a shallowCopy of the parent). Lazily allocated
-  // on first child draft creation.
+  // Child draft proxies keyed by property/map key.
+  // Serves as both a GET trap cache (avoids re-creating drafts) and the
+  // tree structure for DFS traversal during snapshot. Lazily allocated.
   childDrafts: Map<any, Drafted> | null
 }
 
@@ -76,27 +70,38 @@ export type DraftState = ObjectDraftState | MapDraftState | SetDraftState
 
 /**
  * Discard orphaned child drafts from the draft tree.
- * Clears children arrays and resets copy on all descendant states,
+ * Clears childDrafts and resets copy on all descendant states,
  * so the next property access rebuilds from the current base/copy.
  * Used after replace() to prevent accumulation from previous state trees.
  */
 export function resetDraftChildren(draft: Drafted) {
   const root: DraftState = draft[ReactiveFlags.STATE]
-  if (!root.children) return
-  // BFS: clear all children but keep root's own copy intact
-  // (root copy holds the just-assigned new value)
-  const queue: DraftState[] = root.children.slice()
-  root.children = null
+  if (!root.childDrafts) return
+  const queue: DraftState[] = []
+  root.childDrafts.forEach((childProxy) => {
+    const s: DraftState | undefined = childProxy[ReactiveFlags.STATE]
+    if (s) queue.push(s)
+  })
+  root.childDrafts = null
   while (queue.length) {
     const s = queue.pop()!
-    if (s.children) {
-      for (let i = 0; i < s.children.length; i++) {
-        queue.push(s.children[i])
+    if (s.childDrafts) {
+      s.childDrafts.forEach((childProxy) => {
+        const cs: DraftState | undefined = childProxy[ReactiveFlags.STATE]
+        if (cs) queue.push(cs)
+      })
+      s.childDrafts = null
+    }
+    if (s.type === DraftType.Set) {
+      const setState = s as any as SetDraftState
+      if (setState.drafts && setState.drafts.size > 0) {
+        setState.drafts.forEach((draftProxy) => {
+          const ds: DraftState | undefined = draftProxy[ReactiveFlags.STATE]
+          if (ds) queue.push(ds)
+        })
       }
-      s.children = null
     }
     s.copy = null
-    s.childDrafts = null
   }
 }
 
@@ -129,7 +134,6 @@ function initDraftState(
   target.modified = false
   target.assignedMap = null
   target.listeners = null
-  target.children = null
   target.childDrafts = null
 }
 
@@ -188,7 +192,6 @@ export function draft<T extends Objectish>(
       modified: false,
       assignedMap: null,
       listeners: null,
-      children: null,
       childDrafts: null,
     }
     proxyHandlers = mutableHandlers
@@ -198,7 +201,12 @@ export function draft<T extends Objectish>(
   proxyTarget.proxy = proxy
   if (parent) {
     proxyTarget.root = parent.root
-    addChildRef(parent, proxyTarget)
+    // Register in parent's childDrafts for DFS traversal and resolution.
+    // Set elements (keyValue === NO_KEY) are tracked via SetDraftState.drafts instead.
+    if (keyValue !== NO_KEY) {
+      if (!parent.childDrafts) parent.childDrafts = new Map()
+      parent.childDrafts.set(keyValue, proxy)
+    }
   } else {
     proxyTarget.root = proxyTarget
   }
@@ -342,7 +350,7 @@ function resolveValue(
 
 /**
  * Resolve draft proxy refs IN-PLACE in stolen copies for modified states.
- * Since DraftState identity is now preserved via state.childDrafts (the GET
+ * Since DraftState identity is preserved via state.childDrafts (the GET
  * trap checks childDrafts first), we no longer need to keep draft proxy refs
  * in state.base. This allows in-place resolution — no second shallowCopy.
  *
@@ -356,7 +364,8 @@ function resolveStates(
   const resolved = new Map<DraftState, any>()
   const seen = new Set<any>()
 
-  for (let i = modified.length - 1; i >= 0; i--) {
+  // modified is in DFS post-order (leaf-first), iterate forward.
+  for (let i = 0; i < modified.length; i++) {
     const state = modified[i]
     // state.base is the stolen copy — resolve draft refs IN-PLACE.
     const target = state.base
@@ -386,36 +395,6 @@ function resolveStates(
             childState.base
           target[key as any] = res
         })
-      }
-    }
-    // Also resolve children stored in copy via SET trap (e.g. draft.foo = draft.bar).
-    // These are tracked in state.children but NOT in childDrafts.
-    if (state.children) {
-      if (target instanceof Map) {
-        for (let j = 0; j < state.children.length; j++) {
-          const child = state.children[j]
-          if (child.key !== NO_KEY && target.get(child.key) === child.proxy) {
-            target.set(
-              child.key,
-              resolved.get(child) ||
-                (cache && cache.get(child.proxy)) ||
-                child.base
-            )
-          }
-        }
-      } else if (!(target instanceof Set)) {
-        for (let j = 0; j < state.children.length; j++) {
-          const child = state.children[j]
-          if (
-            child.key !== NO_KEY &&
-            target[child.key as any] === child.proxy
-          ) {
-            target[child.key as any] =
-              resolved.get(child) ||
-              (cache && cache.get(child.proxy)) ||
-              child.base
-          }
-        }
       }
     }
 
@@ -483,6 +462,45 @@ function resolveStates(
   return resolved
 }
 
+/**
+ * DFS post-order collection of modified states via childDrafts.
+ * Post-order ensures children appear before parents in the result,
+ * so stealAndReset and resolveStates process leaves first.
+ */
+function collectModified(
+  state: DraftState,
+  result: DraftState[],
+  visited: Set<DraftState>
+) {
+  if (visited.has(state)) return
+  visited.add(state)
+
+  // Traverse children via childDrafts
+  if (state.childDrafts) {
+    state.childDrafts.forEach((proxy) => {
+      const childState: DraftState | undefined = proxy[ReactiveFlags.STATE]
+      if (childState && childState.modified) {
+        collectModified(childState, result, visited)
+      }
+    })
+  }
+
+  // For Sets: also traverse state.drafts for element drafts
+  if (state.type === DraftType.Set) {
+    const setState = state as any as SetDraftState
+    if (setState.drafts && setState.drafts.size > 0) {
+      setState.drafts.forEach((draftProxy) => {
+        const ds: DraftState | undefined = draftProxy[ReactiveFlags.STATE]
+        if (ds && ds.modified) {
+          collectModified(ds, result, visited)
+        }
+      })
+    }
+  }
+
+  result.push(state) // post-order: children already pushed
+}
+
 export function snapshot<T>(
   value: T,
   draft: Drafted,
@@ -499,21 +517,13 @@ export function snapshot<T>(
     return resolveValue(value, new Map(), snapshots || null, new Set()) as T
   }
 
-  // BFS: collect and steal modified states
-  const modified: DraftState[] = [rootState]
-  let idx = 0
-  while (idx < modified.length) {
-    const s = modified[idx++]
-    if (s.children) {
-      for (let i = 0; i < s.children.length; i++) {
-        const child = s.children[i]
-        if (child.modified) {
-          modified.push(child)
-        }
-      }
-    }
-  }
-  for (let i = modified.length - 1; i >= 0; i--) {
+  // DFS post-order: collect modified states (leaf-first)
+  const modified: DraftState[] = []
+  const visited = new Set<DraftState>()
+  collectModified(rootState, modified, visited)
+
+  // Steal all (already in leaf-first order from DFS post-order)
+  for (let i = 0; i < modified.length; i++) {
     stealAndReset(modified[i])
   }
 
@@ -533,22 +543,4 @@ export function snapshot<T>(
 
   // Resolve the requested value using resolved map for structural sharing
   return resolveValue(value, resolved, snapshots || null, new Set()) as T
-}
-
-export function addChildRef(parent: DraftState, child: DraftState) {
-  if (!parent.children) {
-    parent.children = []
-  }
-  parent.children.push(child)
-}
-
-export function removeChildRef(parent: DraftState, child: DraftState) {
-  if (!parent.children) return
-  // Array duplicates serve as the refcount: each addChildRef pushes one
-  // entry, each removeChildRef removes one. indexOf + splice is O(n)
-  // but removal is rare (only on delete/overwrite of draft-valued props).
-  const idx = parent.children.indexOf(child)
-  if (idx !== -1) {
-    parent.children.splice(idx, 1)
-  }
 }

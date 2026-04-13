@@ -16,12 +16,22 @@ function markUnchanged(d: any) {
 
 function resetDraftChildren(d: any) {
   const root = d[STATE]
-  const q = [...root.children.keys()]
-  root.children = new Map()
-  while (q.length) {
-    const s = q.pop()
-    for (const [child] of s.children) q.push(child)
-    s.children = new Map()
+  if (!root.childDrafts) return
+  const queue: any[] = []
+  root.childDrafts.forEach((proxy: any) => {
+    const s = proxy[STATE]
+    if (s) queue.push(s)
+  })
+  root.childDrafts = null
+  while (queue.length) {
+    const s = queue.pop()
+    if (s.childDrafts) {
+      s.childDrafts.forEach((proxy: any) => {
+        const cs = proxy[STATE]
+        if (cs) queue.push(cs)
+      })
+      s.childDrafts = null
+    }
     s.copy = null
   }
 }
@@ -33,7 +43,12 @@ function getChildrenCount(d: any): number {
   while (queue.length) {
     const s = queue.pop()!
     count++
-    for (const [c] of s.children) queue.push(c)
+    if (s.childDrafts) {
+      s.childDrafts.forEach((proxy: any) => {
+        const cs = proxy[STATE]
+        if (cs) queue.push(cs)
+      })
+    }
   }
   return count
 }

@@ -790,14 +790,17 @@ describe(`reactivity/draft`, () => {
       const state = d['__r_state']
       let count = 0
       const queue = [state]
+      const visited = new Set()
       while (queue.length) {
         const s = queue.pop()!
+        if (visited.has(s)) continue
+        visited.add(s)
         count++
-        // children is lazily allocated (null when no children)
-        if (s.children) {
-          for (const child of s.children) {
-            queue.push(child)
-          }
+        if (s.childDrafts) {
+          s.childDrafts.forEach((childProxy: any) => {
+            const cs = childProxy['__r_state']
+            if (cs) queue.push(cs)
+          })
         }
       }
       return count

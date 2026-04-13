@@ -4,8 +4,6 @@ import {
   SetDraftState,
   DraftType,
   DraftState,
-  removeChildRef,
-  addChildRef,
 } from './draft'
 import { ReactiveFlags, latest, markChanged, isDraft, Drafted } from './common'
 import {
@@ -102,19 +100,16 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
   const _doSet = () => {
     prepareCopy(state)
     markChanged(state)
-    // Decrement refcount for old child draft when overwriting
-    if (hadKey) {
-      const oldCopy = state.copy!.get(key)
-      if (oldCopy && isDraft(oldCopy)) {
-        removeChildRef(state, oldCopy[ReactiveFlags.STATE] as DraftState)
-      }
-    }
     state.copy!.set(key, value)
-    // Track new child draft
+    // Track child draft in childDrafts for DFS traversal and resolution
     if (value && isDraft(value as any)) {
-      addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
-    } else if (isObject(value as any)) {
-      state.root.hasDraftableAssignment = true
+      if (!state.childDrafts) state.childDrafts = new Map()
+      state.childDrafts.set(key, value as Drafted)
+    } else {
+      if (state.childDrafts) state.childDrafts.delete(key)
+      if (isObject(value as any)) {
+        state.root.hasDraftableAssignment = true
+      }
     }
     // Track this key as user-assigned for finalization.
     if (hadKey && state.base.has(key) && is(value, state.base.get(key))) {
@@ -145,9 +140,7 @@ function add(this: AnySet & Drafted, value: unknown) {
     prepareSetCopy(state)
     markChanged(state)
     state.copy!.add(value)
-    if (value && isDraft(value as any)) {
-      addChildRef(state, (value as any)[ReactiveFlags.STATE] as DraftState)
-    }
+    // Set elements are discovered via state.drafts during DFS, not childDrafts.
     // Track this value as assigned for finalization.
     if (!state.assignedMap) state.assignedMap = new Map()
     state.assignedMap.set(value, true)
@@ -206,19 +199,13 @@ function deleteEntry(this: CollectionTypes & Drafted, key: unknown) {
   // forward the operation before queueing reactions
   prepareCopy(state)
   markChanged(state)
-  // Decrement refcount for deleted child draft
-  if (state.type === DraftType.Map) {
-    const oldValue = state.copy!.get(key)
-    if (oldValue && isDraft(oldValue)) {
-      removeChildRef(state, oldValue[ReactiveFlags.STATE] as DraftState)
-    }
+  // Clean up childDrafts for deleted Map key
+  if (state.type === DraftType.Map && state.childDrafts) {
+    state.childDrafts.delete(key)
   }
   let result = state.copy!.delete(key)
   if (state.type === DraftType.Set && !result && state.drafts.has(key)) {
     const drafted = state.drafts.get(key)
-    if (drafted && drafted[ReactiveFlags.STATE]) {
-      removeChildRef(state, drafted[ReactiveFlags.STATE] as DraftState)
-    }
     result = state.copy!.delete(drafted)
     state.drafts.delete(key)
   }
@@ -241,7 +228,7 @@ function clear(this: CollectionTypes & Drafted) {
     prepareCopy(state)
     markChanged(state)
     // Remove all child drafts since the collection is being emptied
-    state.children = null
+    state.childDrafts = null
     ;(state.copy as any).clear()
     trigger(state, TriggerOpTypes.CLEAR, undefined, undefined)
   }
