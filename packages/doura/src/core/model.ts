@@ -570,7 +570,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const viewFn = views[viewName]
         const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
-        const viewWithState = view as ViewExt
         if (hasExternalArgs && __DEV__) {
           warn(
             `The ${viewName} in the views is using additional parameters. This feature will no longer be supported in the future, please make changes as soon as possible.`
@@ -579,7 +578,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const getResult = hasExternalArgs
           ? () =>
               (...args: any[]) => {
-                const oldArgs = viewWithState.__externalArgs
+                const oldArgs = view.__externalArgs
                 if (!oldArgs) {
                   markViewShouldRun(view)
                 } else if (oldArgs.length !== args.length) {
@@ -592,7 +591,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
                     }
                   }
                 }
-                viewWithState.__externalArgs = args
+                view.__externalArgs = args
                 return view.getSnapshot()
               }
           : view.getSnapshot

@@ -16,58 +16,44 @@ const reduxDevTools: Plugin = function () {
   return {
     onInit(_ctx, { doura }) {
       ;(window as any).__doura = doura
-      if (
-        typeof window !== 'undefined' &&
-        (window as any).__REDUX_DEVTOOLS_EXTENSION__
-      ) {
-        devTools = (window as any).__REDUX_DEVTOOLS_EXTENSION__!.connect({
-          name: `doura${id === 0 ? '' : id}`,
-        })
-        id = id + 1
-        devTools.init(doura.getState())
+      devTools = (window as any).__REDUX_DEVTOOLS_EXTENSION__!.connect({
+        name: `doura${id === 0 ? '' : id}`,
+      })
+      id = id + 1
+      devTools.init(doura.getState())
 
-        const fn = (message: any) => {
-          switch (message.type) {
-            case 'ACTION':
-              invariant(
-                typeof message.payload === 'string',
-                'Unsupported action format'
-              )
-              // do nothing
-              return
+      const fn = (message: any) => {
+        switch (message.type) {
+          case 'ACTION':
+            invariant(
+              typeof message.payload === 'string',
+              'Unsupported action format'
+            )
+            // do nothing
+            return
 
-            case 'DISPATCH':
-              switch (message.payload.type) {
-                case 'RESET':
-                  // todo: model.reset()
-                  return devTools.init(doura.getState())
+          case 'DISPATCH':
+            switch (message.payload.type) {
+              case 'RESET':
+                // todo: model.reset()
+                return devTools.init(doura.getState())
 
-                case 'COMMIT':
-                  return devTools.init(doura.getState())
+              case 'COMMIT':
+                return devTools.init(doura.getState())
 
-                case 'ROLLBACK':
-                  return devTools.init(doura.getState())
-                case 'JUMP_TO_STATE':
-                case 'JUMP_TO_ACTION':
-                  // try {
-                  //   const state = JSON.parse(message.state)
-                  //   // apply state
-                  // } catch {
-                  //   console.warn(
-                  //     `[Doura Devtool] Could not parse the received json.`
-                  //   )
-                  // }
-                  return
-              }
-          }
+              case 'ROLLBACK':
+                return devTools.init(doura.getState())
+              case 'JUMP_TO_STATE':
+              case 'JUMP_TO_ACTION':
+                return
+            }
         }
-        unsubscribeSet.add(devTools.subscribe(fn))
       }
+      unsubscribeSet.add(devTools.subscribe(fn))
     },
     onModelInstance(instance, { doura }) {
       instance.$subscribe(({ type, model, ...args }) => {
         const state = doura.getState()
-        delete state._
         devTools.send(
           {
             type: `${model.$name || 'anonymous'}@${type}`,

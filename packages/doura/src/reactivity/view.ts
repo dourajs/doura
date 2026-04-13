@@ -17,8 +17,6 @@ export interface ViewOptions {
 
 export type ViewGetter<T> = (...args: any[]) => T
 
-// export type onViewInvalidate = (fn: () => void) => () => void
-
 export class ViewImpl<T> {
   public dep?: Dep = undefined
 
