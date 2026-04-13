@@ -770,6 +770,99 @@ describe('defineModel/views', () => {
       expect(numberOfCalls).toBe(2)
     })
   })
+
+  // ---------------------------------------------------------------
+  // Known limitation: stale view snapshot after moving a draft
+  // across parent keys.
+  //
+  // ## Root cause
+  // DraftState.parent is set once at creation time and never updated.
+  // When a draft proxy is assigned to a different parent via SET trap,
+  // `addChildRef` / `removeChildRef` correctly maintain `children`
+  // (used by BFS in snapshot()), but the child's `parent` pointer
+  // still refers to the original parent.
+  //
+  // Two propagation paths depend on `parent`:
+  //
+  //   1. markChanged(state)  — bubbles `modified = true` up the
+  //      parent chain. After the move, mutations inside the child
+  //      bubble toward the OLD parent. Because both old and new
+  //      parents share the same root, `root.modified` is still set
+  //      correctly, so the root snapshot is fine.
+  //
+  //   2. triggerDraft(state) — walks up the parent chain setting
+  //      `view.mightChange = true` on views that called trackDraft()
+  //      at each level. After the move, the walk goes through the OLD
+  //      parent chain, so views tracking the NEW parent never receive
+  //      `mightChange = true`.  Their `getSnapshot()` returns the
+  //      cached (stale) snapshot.
+  //
+  // ## Why this is not fixed yet
+  // Updating `parent` in the SET trap is not trivial because a single
+  // draft can be assigned to multiple keys (aliasing: `this.x = this.y
+  // = someDraft`). `parent` is a single pointer, so it cannot
+  // represent multiple parents.  A correct fix would need either:
+  //
+  //   a) Replace `parent` with a Set<DraftState> of parents, and walk
+  //      ALL parent chains in markChanged / triggerDraft.
+  //   b) Decouple the upward propagation from the `parent` pointer
+  //      entirely — e.g. use the `children` graph (already correct)
+  //      to build a reverse index, or propagate via a different
+  //      mechanism (root-level dirty set).
+  //   c) Forbid cross-key draft proxy assignment at the API level
+  //      (too restrictive; breaks legitimate patterns like
+  //      `this.selected = this.items[i]`).
+  //
+  // The scope of the fix and the rarity of the pattern in real-world
+  // code (most actions assign plain values, not draft proxies) means
+  // this is documented as a known limitation for now.
+  // ---------------------------------------------------------------
+  it('known limitation: view returns stale snapshot after draft is moved to a different parent', () => {
+    const model = defineModel({
+      state: {
+        a: { nested: { x: 1 } },
+        b: {} as any,
+      },
+      views: {
+        // View only reads `this.b` — tracks b_state via trackDraft,
+        // does NOT track any deeper child state.
+        bSubtree() {
+          return this.b
+        },
+      },
+      actions: {
+        // Move a.nested → b.nested by assigning the draft proxy.
+        move() {
+          this.b.nested = this.a.nested // assigns nested_draft_proxy
+          delete (this.a as any).nested
+        },
+        // Mutate the already-moved nested object.
+        mutateNested() {
+          this.b.nested.x = 2
+        },
+      },
+    })
+
+    const store = modelMgr.getModel('test', model)
+
+    // After move(), the view correctly picks up the new subtree.
+    store.move()
+    expect(store.bSubtree).toEqual({ nested: { x: 1 } })
+
+    // Root state is always correct (markChanged reaches root).
+    store.mutateNested()
+    expect(store.$state.b.nested.x).toBe(2) // root snapshot: correct
+
+    // View snapshot is stale: triggerDraft walked
+    //   nested_state → a_state (old parent) → root_state
+    // instead of
+    //   nested_state → b_state → root_state
+    // so the view tracking b_state never got mightChange = true.
+    //
+    // When this limitation is fixed, change the assertion below to:
+    //   expect(store.bSubtree.nested.x).toBe(2)
+    expect(store.bSubtree.nested.x).toBe(1) // stale — known limitation
+  })
 })
 
 describe('createView', () => {
