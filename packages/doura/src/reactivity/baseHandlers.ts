@@ -243,12 +243,21 @@ function createSetter() {
 
     state.copy![prop] = value
 
-    // Track this key as user-assigned for finalization.
-    if (hasOwn(state.base, prop) && is(value, (state.base as any)[prop])) {
-      if (state.assignedMap) state.assignedMap.delete(prop)
-    } else {
-      if (!state.assignedMap) state.assignedMap = new Map()
-      state.assignedMap.set(prop, true)
+    // Track user-assigned keys for finalization (resolveStates).
+    // Only object values need tracking — they may contain draft proxies
+    // that resolveStates must resolve. Primitive assignments are invisible
+    // to resolveStates (it bails on `typeof val !== 'object'`), so
+    // skipping them avoids a Map allocation per modified child state.
+    if (isObject(value)) {
+      if (hasOwn(state.base, prop) && is(value, (state.base as any)[prop])) {
+        if (state.assignedMap) state.assignedMap.delete(prop)
+      } else {
+        if (!state.assignedMap) state.assignedMap = new Map()
+        state.assignedMap.set(prop, true)
+      }
+    } else if (state.assignedMap) {
+      // Primitive replacing a previously-tracked object — clean up.
+      state.assignedMap.delete(prop)
     }
 
     // don't trigger if target is something up in the prototype chain of original.
