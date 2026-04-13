@@ -1,4 +1,4 @@
-## Nested Draft
+## Draft nested in plain objeect
 ### Orpha draft
 当作plain object, 确保 snapshot 不泄漏draft proxy
 

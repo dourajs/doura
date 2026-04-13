@@ -54,7 +54,7 @@ describe('defineModel/views', () => {
   })
 
   // fixme: this test is not working
-  it.skip('should receive external params', () => {
+  it('receive external params - return same ref when params does not change', () => {
     const count = defineModel({
       state: {
         count: 1,
@@ -68,9 +68,9 @@ describe('defineModel/views', () => {
     const store = modelMgr.getModel('test', count)
 
     expect(typeof store.double).toBe('function')
-    let a = store.double(2)
-    let b = store.double(3)
+    const a = store.double(2)
     expect(store.double(2)).toBe(a)
+    const b = store.double(3)
     expect(store.double(3)).toBe(b)
     expect(
       'The double in the views is using additional parameters.'

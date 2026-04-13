@@ -160,7 +160,7 @@ describe('model', () => {
         state: 1,
       })
 
-      // @ts-expect-error
+      // @ts-expect-error patch argument should be an object
       count.patch(2)
       expect('patch argument should be an object').toHaveBeenWarned()
     })

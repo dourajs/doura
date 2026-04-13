@@ -777,19 +777,6 @@ describe(`reactivity/draft`, () => {
     })
   })
 
-  describe.skip('edge case', () => {
-    it.only('supports modifying nested objects', () => {
-      const baseState = [{ a: 1 }, {}] as any
-      const nextState = produce(baseState, (s) => {
-        s[0].a++
-        s[0].b = { c: s[0] }
-      })
-      expect(nextState).not.toBe(baseState)
-      expect(nextState[0].a).toBe(2)
-      expect(nextState[0].b.c.a).toBe(2)
-    })
-  })
-
   it('should skip objects that have been returned by markRaw', () => {
     const obj = {
       foo: 1,
@@ -968,7 +955,7 @@ describe(`reactivity/snapshot`, () => {
   })
 })
 
-describe('rename (move + delete)', () => {
+describe('draft renamed (move + delete)', () => {
   it('object rename (no changes)', () => {
     const state = { obj: {} } as any
     const drafted = draft(state)
@@ -1031,7 +1018,7 @@ describe('multi-reference (same draft at multiple keys)', () => {
   })
 })
 
-describe('orphan draft (nested in plain object, original deleted)', () => {
+describe('draft nested in plain object', () => {
   it('unmodified draft in new object', () => {
     const baseState: any = { obj: {} }
     const obj = baseState.obj
@@ -1054,6 +1041,17 @@ describe('orphan draft (nested in plain object, original deleted)', () => {
     const snap = snapshot(drafted, drafted, new Map())
     expect(snap.foo.bar).toEqual({ a: true, c: true })
     expect(isDraft(snap.foo.bar)).toBe(false)
+  })
+
+  it('modified draft in new array', () => {
+    const baseState = [{ a: 1 }, {}] as any
+    const nextState = produce(baseState, (s) => {
+      s[0].a++
+      s[0].b = { c: s[0] }
+    })
+    expect(nextState).not.toBe(baseState)
+    expect(nextState[0].a).toBe(2)
+    expect(nextState[0].b.c.a).toBe(2)
   })
 
   it('deep nesting in plain objects', () => {

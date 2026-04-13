@@ -374,6 +374,160 @@ describe('defineModel/actions', () => {
       expect(snapshot2.anArr).not.toBe(snapshot1.anArr)
     })
 
+    it('draft nested in plain object: subsequent action updates are reflected', () => {
+      const model = defineModel({
+        state: {
+          nested: { a: 1 },
+          wrapper: null as any,
+        },
+        actions: {
+          wrapNested() {
+            // wrap a draft reference inside a plain object
+            this.wrapper = { inner: this.nested }
+          },
+          updateNested() {
+            this.nested.a += 1
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+
+      // action 1: wrap draft in plain object
+      store.wrapNested()
+      const snap1 = store.$rawState
+      expect(snap1.nested).toEqual({ a: 1 })
+      expect(snap1.wrapper.inner).toEqual({ a: 1 })
+      // wrapper.inner should resolve to the same object as nested
+      expect(snap1.wrapper.inner).toBe(snap1.nested)
+
+      // action 2: mutate nested
+      store.updateNested()
+      const snap2 = store.$rawState
+      expect(snap2.nested).toEqual({ a: 2 })
+      // wrapper was not reassigned — it keeps the snapshot-time value from action 1
+      expect(snap2.wrapper.inner).toEqual({ a: 1 })
+      // snap1 immutability: not affected by action 2
+      expect(snap1.nested).toEqual({ a: 1 })
+    })
+
+    it('draft nested in plain object with re-wrap: picks up new value', () => {
+      const model = defineModel({
+        state: {
+          nested: { a: 1 },
+          wrapper: null as any,
+        },
+        actions: {
+          wrapNested() {
+            this.wrapper = { inner: this.nested }
+          },
+          updateNestedAndReWrap() {
+            this.nested.a += 1
+            this.wrapper = { inner: this.nested }
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+
+      store.wrapNested()
+      const snap1 = store.$rawState
+      expect(snap1.wrapper.inner).toEqual({ a: 1 })
+
+      // action 2: mutate nested AND re-wrap
+      store.updateNestedAndReWrap()
+      const snap2 = store.$rawState
+      expect(snap2.nested).toEqual({ a: 2 })
+      // re-wrapped — wrapper.inner should reflect the update
+      expect(snap2.wrapper.inner).toEqual({ a: 2 })
+      expect(snap2.wrapper.inner).toBe(snap2.nested)
+      // snap1 immutability
+      expect(snap1.wrapper.inner).toEqual({ a: 1 })
+      expect(snap1.nested).toEqual({ a: 1 })
+    })
+
+    it('draft referenced by multiple props in root: all resolve correctly in first snapshot', () => {
+      const model = defineModel({
+        state: {
+          nested: { a: 1 },
+          ref: null as any,
+          wrapper: null as any,
+        },
+        actions: {
+          setup() {
+            this.nested.a = 2
+            this.wrapper = { inner: this.nested }
+          },
+          updateNested() {
+            this.nested.a = 3
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+
+      // action 1: multiple references to same draft
+      store.setup()
+      const snap1 = store.$rawState
+      expect(snap1.nested).toEqual({ a: 2 })
+      expect(snap1.wrapper.inner).toEqual({ a: 2 })
+      // all point to the same resolved object
+      expect(snap1.wrapper.inner).toBe(snap1.nested)
+
+      // action 2: only mutate nested — ref and wrapper.inner are NOT re-assigned
+      store.updateNested()
+      const snap2 = store.$rawState
+      expect(snap2.nested).toEqual({ a: 3 })
+
+      // wrapper.inner is inside a plain object — frozen at action 1 snapshot value
+      expect(snap2.wrapper.inner).toEqual({ a: 2 })
+
+      // snap1 immutability
+      expect(snap1.nested).toEqual({ a: 2 })
+    })
+
+    it('direct draft alias (no plain object): also stale after second snapshot', () => {
+      const model = defineModel({
+        state: {
+          nested: { a: 1 },
+          ref: null as any,
+        },
+        actions: {
+          setup() {
+            this.nested.a = 2
+            this.ref = this.nested // direct draft-to-draft alias, no plain object
+          },
+          updateNested() {
+            this.nested.a = 3
+          },
+        },
+      })
+
+      const store = modelMgr.getModel('test', model)
+
+      store.setup()
+      const snap1 = store.$rawState
+      expect(snap1.nested).toEqual({ a: 2 })
+      expect(snap1.ref).toEqual({ a: 2 })
+      expect(snap1.ref).toBe(snap1.nested)
+
+      // action 2: only mutate nested
+      store.updateNested()
+      const snap2 = store.$rawState
+      expect(snap2.nested).toEqual({ a: 3 })
+
+      // BUG: same stale behavior as with plain object wrapping.
+      // Root cause: resolveStates in-place replaces draft proxy → plain value
+      // in stolen copy. Next snapshot's stealAndReset(shallowCopy(base)) produces
+      // target with plain value at "ref". Three resolution paths all fail:
+      //   1. childDrafts: key is "nested", not "ref"
+      //   2. children: nestedState.key is "nested", checks target["nested"] not target["ref"]
+      //   3. assignedMap: val is plain {a:2}, not a draft proxy;
+      //      hasDraftableAssignment=false (no plain object was assigned), so skipped
+      expect(snap2.ref).toEqual({ a: 2 }) // ideally should be {a: 3}
+      expect(snap2.ref).not.toBe(snap2.nested)
+    })
+
     it('unmodified subtrees share reference between consecutive snapshots', () => {
       const model = defineModel({
         state: {
