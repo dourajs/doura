@@ -35,7 +35,7 @@ Log action and state
 ### Example
 
 ```ts
-import log form 'doura-plugin-log';
+import log from 'doura-plugin-log';
 doura({
   plugins: [[log]],
 })
@@ -69,7 +69,7 @@ export interface PersistOptions {
 ### Example
 
 ```js
-import persist, { createWebStorage } form 'doura-plugin-persist';
+import persist, { createWebStorage } from 'doura-plugin-persist';
 doura({
   plugins: [
     [ persist,

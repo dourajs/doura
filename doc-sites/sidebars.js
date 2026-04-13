@@ -81,7 +81,12 @@ const sidebars = {
     {
       type: 'category',
       label: 'Guides',
-      items: ['guides/compose-model', 'guides/optimize-views', 'guides/hmr'],
+      items: [
+        'guides/compose-model',
+        'guides/optimize-views',
+        'guides/typescript',
+        'guides/hmr',
+      ],
       collapsed: true,
       collapsible: true,
     },

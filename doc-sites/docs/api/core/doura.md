@@ -21,6 +21,29 @@ type StateObject = {
 type ActionOptions = Record<string, Function>
 ```
 
+### Action Semantics
+
+Actions can modify state in three ways, each producing a different action type:
+
+- **Modify** — Directly mutate state properties via `this`. This is the most common pattern.
+  ```ts
+  increment() {
+    this.count += 1  // triggers a MODIFY action
+  }
+  ```
+- **Replace** — Assign a new value to `this.$state` to completely replace the model's state.
+  ```ts
+  reset() {
+    this.$state = { count: 0 }  // triggers a REPLACE action
+  }
+  ```
+- **Patch** — Return a plain object from the action to deep-merge it into the current state.
+  ```ts
+  patch() {
+    return { count: 2 }  // triggers a PATCH action (deep merge)
+  }
+  ```
+
 ### Example
 
 ```tsx
@@ -158,18 +181,23 @@ const model = defineModel(() => {
 
 ## `doura`
 
-For create a modelManager.
+Creates a store (`Doura` instance) that manages model instances.
 
 ### Types
 
 ```ts
-function doura({ initialState, plugins = [] }): Doura
+function doura(options?: DouraOptions): Doura
+
+interface DouraOptions {
+  initialState?: Record<string, any>
+  plugins?: [Plugin, any?][]
+}
 ```
 
 ### Example
 
 ```ts
-const store = doure({
+const store = doura({
   initialState: {
     counter: {
       count: 100,
@@ -206,4 +234,131 @@ const modelInstance = store.getModel('test', model)
 modelInstance.$state // { value: 0 }
 modelInstance.actionOne() // undefined
 modelInstance.viewOne // undefined
+```
+
+## `Doura`
+
+The store object returned by `doura()`. Manages named and detached model instances.
+
+### Types
+
+```ts
+interface Doura {
+  getState(): Record<string, State>
+  getModel<IModel extends AnyModel>(name: string, model: IModel): ModelPublicInstance<IModel>
+  getDetachedModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  subscribe(fn: () => any): () => void
+  destroy(): void
+}
+```
+
+### Methods
+
+- **`getState()`** — Returns a snapshot of all named models' state, keyed by model name.
+- **`getModel(name, model)`** — Retrieves or creates a named model instance. Repeated calls with the same name return the same instance.
+- **`getDetachedModel(model)`** — Creates an anonymous model instance that is not registered in the store and not included in `getState()`.
+- **`subscribe(fn)`** — Registers a listener that fires whenever any named model's state changes (batched via microtask). Returns an unsubscribe function.
+- **`destroy()`** — Destroys the store: calls `onDestroy` on all plugin hooks, destroys all model instances, and clears subscribers.
+
+### Example
+
+```ts
+const store = doura()
+const counter = store.getModel('counter', counterModel)
+
+// subscribe to any model change
+const unsubscribe = store.subscribe(() => {
+  console.log('state changed:', store.getState())
+})
+
+counter.increment()
+
+// cleanup
+unsubscribe()
+store.destroy()
+```
+
+## `$isolate`
+
+Executes the given function in a scope where reactive values can be read, but they cannot cause the caller's reactive scope to re-evaluated when they change. Useful for optimizing views that read nested objects.
+
+### Types
+
+```ts
+$isolate: <T>(fn: (state: ModelState<IModel>) => T) => T
+```
+
+### Example
+
+```ts
+const userModel = defineModel({
+  state: {
+    user: { name: 'alice', age: 18 },
+  },
+  views: {
+    userName() {
+      // without $isolate, changes to user.age would also invalidate this view
+      const user = this.$isolate((state) => state.user)
+      return user.name  // only re-evaluates when user.name changes
+    },
+  },
+})
+```
+
+See also: [Optimizing Views](../../guides/optimize-views.md)
+
+## `markRaw`
+
+Marks an object so that it will never be wrapped in a reactive draft proxy. The object is returned as-is from the reactivity system. Useful for third-party class instances, immutable data structures, or objects that should not be tracked.
+
+### Types
+
+```ts
+function markRaw<T extends object>(value: T): T
+```
+
+### Example
+
+```ts
+import { markRaw, defineModel } from 'doura'
+
+class SomeExternalLib {
+  // ...
+}
+
+const model = defineModel({
+  state: {
+    lib: markRaw(new SomeExternalLib()),  // will not be made reactive
+    count: 0,
+  },
+})
+```
+
+## `markStrict`
+
+Marks a plain object so that when the reactivity system shallow-copies it, all property descriptors (including non-enumerable and symbol properties) are preserved. By default, plain objects are copied using only `Object.keys` (fast path).
+
+### Types
+
+```ts
+function markStrict<T extends object>(value: T): T
+```
+
+### Example
+
+```ts
+import { markStrict, defineModel } from 'doura'
+
+const obj = markStrict(
+  Object.defineProperty({}, 'hidden', {
+    value: 42,
+    enumerable: false,
+  })
+)
+
+const model = defineModel({
+  state: {
+    data: obj,  // non-enumerable 'hidden' property will be preserved during copy-on-write
+  },
+})
 ```

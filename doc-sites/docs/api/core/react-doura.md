@@ -146,6 +146,10 @@ const App = () => {
 
 Provider context for `useModel` and `useStaticModel`.
 
+:::info
+In development mode (`__DEV__`), `DouraRoot` automatically enables the `devtool` plugin, which connects to the [Redux DevTools Extension](https://github.com/reduxjs/redux-devtools) for state inspection and action tracking. No extra configuration is needed.
+:::
+
 ### Types
 
 ```ts
@@ -207,7 +211,9 @@ const App = () => {
 ## useStaticModel
 
 :::caution
-State change will not trigger render.
+State changes will **not** trigger re-renders. The returned object is a snapshot from `$getApi()` at the time of the hook call.
+
+In development mode, the returned object is wrapped in a read-only Proxy — directly mutating its properties will log a warning.
 :::
 
 ### Types

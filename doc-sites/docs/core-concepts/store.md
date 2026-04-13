@@ -21,7 +21,7 @@ export const counterModel = defineModel({
   },
 })
 
-const store = doure()
+const store = doura()
 
 const modelInstance = store.getModel('counter', counterModel)
 
@@ -60,8 +60,8 @@ console.log(modelInstance.count) // 100
 A model can be used in multi store, they will have independent state.
 
 ```js
-const storeA = doure()
-const storeB = doure()
+const storeA = doura()
+const storeB = doura()
 
 const counterA = storeA.getModel('counter', counterModel)
 const counterB = storeB.getModel('counter', counterModel)

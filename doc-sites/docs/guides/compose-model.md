@@ -4,7 +4,11 @@ title: Composing Models
 ---
 
 To use other models when define a model, we need to use **function** to define
-the model.
+the model. The `use()` function from `doura` allows you to compose models together.
+
+:::caution
+`use()` can **only** be called inside the body of a function-form `defineModel`. Calling it outside will throw an error because it relies on an internal model context that is only set during function model evaluation.
+:::
 
 ```ts
 import { use } from 'doura';

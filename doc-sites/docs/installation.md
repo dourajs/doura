@@ -6,6 +6,8 @@ title: Installation
 Install doura with your favorite package manager:
 
 ```bash
+pnpm add doura
+# or with yarn
 yarn add doura
 # or with npm
 npm install doura
@@ -54,12 +56,12 @@ import { count } from './models/count';
 const storeA = doura();
 const storeB = doura();
 
-const modelInstanceA = storeA.getModel(count)
+const modelInstanceA = storeA.getModel('count', count)
 
 // model will only be inited once within a store
-console.log(storeA.getModel(count) === modelInstanceA) // true
+console.log(storeA.getModel('count', count) === modelInstanceA) // true
 
-const modelInstanceB = storeB.getModel(count)
+const modelInstanceB = storeB.getModel('count', count)
 
 console.log(modelInstanceA.count) // 0
 console.log(modelInstanceA.isZero) // true
