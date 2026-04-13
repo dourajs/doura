@@ -369,9 +369,7 @@ function createInstrumentationGetter() {
   const instrumentations = mutableInstrumentations
 
   return (state: CollectionState, key: string | symbol, receiver: any) => {
-    if (key === ReactiveFlags.IS_REACTIVE) {
-      return true
-    } else if (key === ReactiveFlags.STATE) {
+    if (key === ReactiveFlags.STATE) {
       return state
     }
 

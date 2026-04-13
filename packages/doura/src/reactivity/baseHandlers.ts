@@ -111,9 +111,7 @@ function createGetter(): ProxyGetter {
     receiver: object
   ) {
     const target = latest(state)
-    if (prop === ReactiveFlags.IS_REACTIVE) {
-      return true
-    } else if (prop === ReactiveFlags.STATE && receiver === state.proxy) {
+    if (prop === ReactiveFlags.STATE && receiver === state.proxy) {
       return state
     }
 

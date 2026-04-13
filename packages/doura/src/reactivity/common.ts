@@ -12,13 +12,11 @@ export declare const RawSymbol: unique symbol
 export const enum ReactiveFlags {
   RAW = '__r_raw',
   STRICT = '__r_strict',
-  IS_REACTIVE = '__r_isReactive',
   STATE = '__r_state',
 }
 
 export interface Target {
   [ReactiveFlags.RAW]?: boolean
-  [ReactiveFlags.IS_REACTIVE]?: boolean
   [ReactiveFlags.STATE]?: DraftState
 }
 
