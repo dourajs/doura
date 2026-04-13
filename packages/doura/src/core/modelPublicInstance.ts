@@ -43,7 +43,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
   // due to type annotation
   /*#__PURE__*/ assign(
-    (Object.create(null),
+    Object.create(null) as PublicPropertiesMap,
     {
       $name: (i) => i.name,
       $rawState: (i) => i.getState(),
@@ -56,7 +56,7 @@ export const publicPropertiesMap: PublicPropertiesMap =
       $isolate: (i) => i.isolate,
       $getApi: (i) => i.getApi,
       $createView: (i) => createView.bind(null, i),
-    } as PublicPropertiesMap)
+    } as PublicPropertiesMap
   )
 
 const createGetter =
