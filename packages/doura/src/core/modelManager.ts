@@ -34,37 +34,6 @@ export interface DouraSubscriptionCallback {
   (): any
 }
 
-interface MapHelper {
-  get(key: string): ModelInternal | undefined
-  set(key: string, model: ModelInternal): void
-  each(fn: (item: ModelInternal, key: string) => void): void
-  clear(): void
-}
-
-const createMapHelper = (): MapHelper => {
-  const models = new Map<string, ModelInternal>()
-
-  const self: MapHelper = {
-    get(key: string) {
-      return models.get(key)
-    },
-    set(key: string, model: ModelInternal) {
-      models.set(key, model)
-    },
-    each(fn) {
-      for (const [key, model] of models.entries()) {
-        fn(model, key)
-      }
-    },
-    clear() {
-      self.each((m) => m.destroy())
-      models.clear()
-    },
-  }
-
-  return self
-}
-
 export interface ModelContext {
   manager: ModelManagerInternal
   model: ModelProxy
@@ -84,13 +53,12 @@ export function setCurrentModelContext(ctx: ModelContext | null) {
 class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
-  private _models: MapHelper
+  private _models = new Map<string, ModelInternal>()
   private _subscribers: Set<DouraSubscriptionCallback> = new Set()
   private _onModelChange: DouraSubscriptionCallback
 
   constructor(initialState = emptyObject, plugins: [Plugin, any?][] = []) {
     this._initialState = initialState
-    this._models = createMapHelper()
     const emitChange: SchedulerJob = () => {
       for (const listener of this._subscribers) {
         listener()
@@ -150,7 +118,7 @@ class ModelManagerInternal implements ModelManager {
   getState() {
     const allState = {} as ReturnType<ModelManager['getState']>
 
-    this._models.each((m, key) => {
+    this._models.forEach((m, key) => {
       allState[key] = m.getState()
     })
 
@@ -166,6 +134,7 @@ class ModelManagerInternal implements ModelManager {
 
   destroy() {
     this._hooks.map((hook) => hook.onDestroy?.())
+    this._models.forEach((m) => m.destroy())
     this._models.clear()
     this._subscribers.clear()
     this._initialState = emptyObject
