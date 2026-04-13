@@ -256,14 +256,11 @@ async function publishPackage(pkgRoot, version) {
 
   step(`Publishing ${pkgName}...`)
   try {
-    // note: use of yarn is intentional here as we rely on its publishing
-    // behavior.
     await runIfNotDry(
-      'yarn',
+      'pnpm',
       [
         'publish',
-        '--new-version',
-        version,
+        '--no-git-checks',
         ...(releaseTag ? ['--tag', releaseTag] : []),
         '--access',
         'public',
@@ -271,9 +268,6 @@ async function publishPackage(pkgRoot, version) {
       {
         cwd: pkgRoot,
         stdio: 'pipe',
-        env: {
-          COREPACK_ENABLE_STRICT: 0,
-        },
       }
     )
     console.log(chalk.green(`Successfully published ${pkgName}@${version}`))
