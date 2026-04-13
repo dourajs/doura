@@ -101,10 +101,17 @@ function set(this: AnyMap & Drafted, key: any, value: unknown) {
     prepareCopy(state)
     markChanged(state)
     state.copy!.set(key, value)
-    // Track child draft in childDrafts for DFS traversal and resolution
+    // Track child draft in childDrafts for DFS traversal and resolution.
+    // Foreign drafts (different root) are not tracked — they freeze after
+    // the first snapshot via assignedMap resolution.
     if (value && isDraft(value as any)) {
-      if (!state.childDrafts) state.childDrafts = new Map()
-      state.childDrafts.set(key, value as Drafted)
+      const childState = (value as any)[ReactiveFlags.STATE] as DraftState
+      if (childState.root === state.root) {
+        if (!state.childDrafts) state.childDrafts = new Map()
+        state.childDrafts.set(key, value as Drafted)
+      } else {
+        if (state.childDrafts) state.childDrafts.delete(key)
+      }
     } else {
       if (state.childDrafts) state.childDrafts.delete(key)
       if (isObject(value as any)) {

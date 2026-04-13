@@ -410,7 +410,10 @@ function resolveStates(
           const cs = val[ReactiveFlags.STATE] as DraftState
           let res = resolved.get(cs)
           if (!res) {
-            res = cs.copy ?? cs.base
+            // copy is a live mutable object — shallowCopy to detach so
+            // future writes to the foreign draft don't pollute this snapshot.
+            // base is safe (future writes go to a new copy via prepareCopy).
+            res = cs.copy ? shallowCopy(cs.copy) : cs.base
             res = resolveValue(res, resolved, null, seen)
           }
           if (target instanceof Map) target.set(key, res)

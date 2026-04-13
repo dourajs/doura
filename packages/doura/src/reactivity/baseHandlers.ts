@@ -222,10 +222,14 @@ function createSetter() {
     if (isObject(oldCopyValue) || isObject(value)) {
       const newChildState: DraftState | undefined =
         value && (value as any)[ReactiveFlags.STATE]
-      if (newChildState) {
-        // Record draft at this key for DFS traversal and resolution.
+      if (newChildState && newChildState.root === state.root) {
+        // Same-root draft: track in childDrafts for DFS traversal and resolution.
         if (!state.childDrafts) state.childDrafts = new Map()
         state.childDrafts.set(prop, value as Drafted)
+      } else if (newChildState) {
+        // Foreign draft (different root): don't track in childDrafts.
+        // First snapshot resolves it via assignedMap, then it's frozen in base.
+        if (state.childDrafts) state.childDrafts.delete(prop)
       } else {
         if (isObject(value)) {
           state.root.hasDraftableAssignment = true

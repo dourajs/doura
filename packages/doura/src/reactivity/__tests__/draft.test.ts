@@ -1112,3 +1112,145 @@ describe('draft nested in plain object', () => {
     expect(isDraft(snap.data.ref)).toBe(false)
   })
 })
+
+describe('foreign draft freezing', () => {
+  function markUnchanged(d: any) {
+    const state = d['__r_state']
+    if (state) state.modified = false
+  }
+
+  it('foreign draft resolves correctly in first snapshot', () => {
+    const root1 = draft({ nested: { a: 1 } } as any)
+    const root2 = draft({ ref: null } as any)
+
+    root1.nested.a = 2
+    root2.ref = root1.nested
+
+    const cache = new Map()
+    const snap = snapshot(root2, root2, cache)
+    expect(snap.ref).toEqual({ a: 2 })
+    expect(isDraft(snap.ref)).toBe(false)
+  })
+
+  it('foreign draft frozen — modification via foreign root does not leak', () => {
+    const root1 = draft({ nested: { a: 1 } } as any)
+    const root2 = draft({ ref: null } as any)
+
+    root2.ref = root1.nested
+
+    // First snapshot before any modification
+    const cache2 = new Map()
+    const snap1 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap1.ref).toEqual({ a: 1 })
+
+    // Now modify via root1
+    root1.nested.a = 99
+    snapshot(root1, root1, new Map())
+    markUnchanged(root1)
+
+    // Trigger root2 snapshot
+    root2.x = 1
+    const snap2 = snapshot(root2, root2, cache2)
+    expect(snap2.ref).toEqual({ a: 1 }) // frozen at original value
+  })
+
+  it('foreign draft frozen — modified before assignment, then modified again after snapshot', () => {
+    const root1 = draft({ nested: { a: 1 } } as any)
+    const root2 = draft({ ref: null } as any)
+
+    root1.nested.a = 2
+    root2.ref = root1.nested
+
+    const cache2 = new Map()
+    const snap1 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap1.ref).toEqual({ a: 2 })
+
+    // Modify via root1 after root2's snapshot
+    root1.nested.a = 3
+    snapshot(root1, root1, new Map())
+    markUnchanged(root1)
+
+    root2.other = 'trigger'
+    const snap2 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap2.ref).toEqual({ a: 2 }) // frozen at first-snapshot value
+  })
+
+  it('foreign draft frozen — sibling modified does not affect frozen value', () => {
+    const root1 = draft({ nested: { a: 1 } } as any)
+    const root2 = draft({ ref: null, count: 0 } as any)
+
+    root1.nested.a = 2
+    root2.ref = root1.nested
+
+    const cache2 = new Map()
+    snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+
+    root1.nested.a = 3
+    snapshot(root1, root1, new Map())
+    markUnchanged(root1)
+
+    // Modify own property to trigger snapshot
+    root2.count = 1
+    const snap2 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap2.ref).toEqual({ a: 2 }) // frozen
+    expect(snap2.count).toBe(1)
+  })
+
+  it('foreign draft frozen — multiple snapshots all see frozen value', () => {
+    const root1 = draft({ nested: { a: 1 } } as any)
+    const root2 = draft({ ref: null } as any)
+
+    root2.ref = root1.nested
+
+    const cache2 = new Map()
+    const snap1 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap1.ref).toEqual({ a: 1 })
+
+    // Modify and snapshot root1 multiple times
+    root1.nested.a = 10
+    snapshot(root1, root1, new Map())
+    markUnchanged(root1)
+
+    root1.nested.a = 20
+    snapshot(root1, root1, new Map())
+    markUnchanged(root1)
+
+    // Each root2 snapshot should see frozen value
+    root2.x = 1
+    const snap2 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap2.ref).toEqual({ a: 1 })
+
+    root2.y = 2
+    const snap3 = snapshot(root2, root2, cache2)
+    markUnchanged(root2)
+    expect(snap3.ref).toEqual({ a: 1 })
+  })
+
+  it('same-root draft alias still tracks updates (not frozen)', () => {
+    const root = draft({ nested: { a: 1 }, ref: null } as any)
+
+    root.nested.a = 2
+    root.ref = root.nested
+
+    const cache = new Map()
+    const snap1 = snapshot(root, root, cache)
+    markUnchanged(root)
+    expect(snap1.ref).toEqual({ a: 2 })
+    expect(snap1.ref).toBe(snap1.nested)
+
+    // Same-root alias should track updates
+    root.nested.a = 3
+    const snap2 = snapshot(root, root, cache)
+    markUnchanged(root)
+    expect(snap2.nested).toEqual({ a: 3 })
+    expect(snap2.ref).toEqual({ a: 3 })
+    expect(snap2.ref).toBe(snap2.nested)
+  })
+})
