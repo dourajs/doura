@@ -1,5 +1,4 @@
 export type Objectish = AnyObject | AnyArray | AnyMap | AnySet
-export type ObjectishNoSet = AnyObject | AnyArray | AnyMap
 
 export type AnyObject = { [key: string]: any }
 export type AnyArray = Array<any>
@@ -13,10 +12,5 @@ export interface Iterable {
 }
 
 export interface Iterator {
-  next(value?: any): IterationResult
-}
-
-export interface IterationResult {
-  value: any
-  done?: boolean
+  next(value?: any): { value: any; done?: boolean }
 }
