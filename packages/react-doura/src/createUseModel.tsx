@@ -1,4 +1,4 @@
-import { useDebugValue, useMemo, useRef } from 'react'
+import { useDebugValue, useMemo, useRef, useSyncExternalStore } from 'react'
 import {
   Doura,
   AnyModel,
@@ -8,8 +8,6 @@ import {
   hasOwn,
   ModelAPI,
 } from 'doura'
-import { useSyncExternalStore } from 'use-sync-external-store/shim'
-import { createBatchManager } from './batchManager'
 
 type SubscribeFn = (onStoreChange: () => void) => () => void
 
@@ -80,8 +78,7 @@ function useModelWithSelector<
 function useModelInstance<IModel extends AnyModel>(
   name: string,
   model: IModel,
-  doura: Doura,
-  batchManager: ReturnType<typeof createBatchManager>
+  doura: Doura
 ) {
   const { modelInstance, subscribe } = useMemo(
     () => {
@@ -89,7 +86,7 @@ function useModelInstance<IModel extends AnyModel>(
       return {
         modelInstance,
         subscribe: (onModelChange: () => void) =>
-          batchManager.addSubscribe(modelInstance, onModelChange),
+          modelInstance.$subscribe(() => onModelChange()),
       }
     },
     // ignore model's change
@@ -103,7 +100,7 @@ function useModelInstance<IModel extends AnyModel>(
 }
 
 export const createUseModel =
-  (doura: Doura, batchManager: ReturnType<typeof createBatchManager>) =>
+  (doura: Doura) =>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
     model: IModel,
@@ -111,12 +108,7 @@ export const createUseModel =
     depends?: any[]
   ) => {
     const hasSelector = useRef(selector)
-    const { modelInstance, subscribe } = useModelInstance(
-      name,
-      model,
-      doura,
-      batchManager
-    )
+    const { modelInstance, subscribe } = useModelInstance(name, model, doura)
 
     // todo: warn when hasSelector changes
     if (hasSelector.current) {

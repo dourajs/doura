@@ -1,6 +1,5 @@
 import { useMemo, useRef } from 'react'
 import { doura, AnyModel, Selector, Doura } from 'doura'
-import { createBatchManager } from './batchManager'
 import { createUseModel } from './createUseModel'
 import { UseAnonymousModel, UseModel, UseStaticModel } from './types'
 import { DouraRoot, useRootModel, useRootStaticModel } from './global'
@@ -19,24 +18,19 @@ const useAnonymousModel: UseAnonymousModel = <
   // useRef can keep context
   const context = useRef<{
     douraStore: Doura
-    batchManager: ReturnType<typeof createBatchManager>
   } | null>(null)
 
   if (!context.current) {
     context.current = {
       douraStore: doura(),
-      batchManager: createBatchManager(),
     }
   }
 
   return useMemo(
     function () {
-      return createUseModel(
-        context.current!.douraStore,
-        context.current!.batchManager
-      )
+      return createUseModel(context.current!.douraStore)
     },
-    [context.current.douraStore, context.current.batchManager]
+    [context.current.douraStore]
   )(ANONYMOUS_MODEL_NAME, model, selector, depends)
 }
 

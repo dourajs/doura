@@ -8,7 +8,6 @@ import React, {
 } from 'react'
 import { Doura, AnyModel, DouraOptions, Selector, doura } from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
-import { createBatchManager } from './batchManager'
 import { UseNamedModel, UseStaticModel } from './types'
 
 function checkName(name: any) {
@@ -20,7 +19,6 @@ function checkName(name: any) {
 const createContainer = function (options?: DouraOptions) {
   const Context = createContext<{
     store: Doura
-    batchManager: ReturnType<typeof createBatchManager>
   }>(null as any)
   function Provider(props: PropsWithChildren<{ store?: Doura }>) {
     const { children, store: propsStore } = props
@@ -33,11 +31,8 @@ const createContainer = function (options?: DouraOptions) {
         } else {
           store = doura(options)
         }
-        const batchManager = createBatchManager()
-
         return {
           store,
-          batchManager,
         }
       },
       [propsStore]
@@ -79,11 +74,13 @@ const createContainer = function (options?: DouraOptions) {
       checkName(name)
     }
 
-    const { store, batchManager } = useDouraContext()
-    return useMemo(
-      () => createUseModel(store, batchManager),
-      [store, batchManager]
-    )(name, model, selector, depends)
+    const { store } = useDouraContext()
+    return useMemo(() => createUseModel(store), [store])(
+      name,
+      model,
+      selector,
+      depends
+    )
   }
 
   const useStaticModel: UseStaticModel = <IModel extends AnyModel>(

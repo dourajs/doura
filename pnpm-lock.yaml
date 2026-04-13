@@ -336,10 +336,6 @@ importers:
         version: link:../doura
 
   packages/react-doura:
-    dependencies:
-      use-sync-external-store:
-        specifier: 1.2.0
-        version: 1.2.0(react@18.1.0)
     devDependencies:
       '@testing-library/react':
         specifier: ^13.3.0
@@ -350,9 +346,6 @@ importers:
       '@types/react-dom':
         specifier: ^18.0.5
         version: 18.3.7(@types/react@18.3.28)
-      '@types/use-sync-external-store':
-        specifier: 0.0.3
-        version: 0.0.3
       doura:
         specifier: workspace:*
         version: link:../doura
@@ -2791,9 +2784,6 @@ packages:
 
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
-
-  '@types/use-sync-external-store@0.0.3':
-    resolution: {integrity: sha512-EwmlvuaxPNej9+T4v5AuBPJa2x2UOJVdjCtDHgcDqitUeOtjnJKJ+apYjVcAoBEMjKW1VVFGZLUb5+qqa09XFA==}
 
   '@types/webpack-sources@3.2.3':
     resolution: {integrity: sha512-4nZOdMwSPHZ4pTEZzSp0AsTM4K7Qmu40UKW4tJDiOVs20UzYF9l+qUe4s0ftfN0pin06n+5cWWDJXH+sbhAiDw==}
@@ -12140,11 +12130,6 @@ packages:
       '@types/react':
         optional: true
 
-  use-sync-external-store@1.2.0:
-    resolution: {integrity: sha512-eEgnFxGQ1Ife9bzYs6VLi8/4X6CObHMw9Qr9tPY43iKwsPw8xE8+EFsf/2cFZ5S3esXgpWgtSCtLNS41F+sKPA==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-
   use@3.1.1:
     resolution: {integrity: sha512-cwESVXlO3url9YWlFW/TA9cshCEhtu7IKJ/p5soJ/gGpj7vbvFrAY/eIioQ6Dw23KjZhYgiIo8HOs1nQ2vr/oQ==}
     engines: {node: '>=0.10.0'}
@@ -18260,8 +18245,6 @@ snapshots:
       source-map: 0.6.1
 
   '@types/unist@2.0.11': {}
-
-  '@types/use-sync-external-store@0.0.3': {}
 
   '@types/webpack-sources@3.2.3':
     dependencies:
@@ -31508,10 +31491,6 @@ snapshots:
       use-isomorphic-layout-effect: 1.2.1(@types/react@18.3.28)(react@17.0.2)
     optionalDependencies:
       '@types/react': 18.3.28
-
-  use-sync-external-store@1.2.0(react@18.1.0):
-    dependencies:
-      react: 18.1.0
 
   use@3.1.1: {}
 

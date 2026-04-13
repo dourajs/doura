@@ -10,13 +10,11 @@ import {
   nextTick,
   use,
 } from 'doura'
-import { createBatchManager } from '../src/batchManager'
 import { UseNamedModel, UseStaticModel } from '../src/types'
 import { createUseModel, createUseStaticModel } from '../src/createUseModel'
 import { countModel } from './models/index'
 
 let douraStore: ReturnType<typeof doura>
-let batchManager: ReturnType<typeof createBatchManager>
 let useTestModel: UseNamedModel
 let useTestStaticModel: UseStaticModel
 
@@ -24,26 +22,27 @@ beforeEach(() => {
   process.env.NODE_ENV === 'development'
   jest.useFakeTimers()
   douraStore = doura()
-  batchManager = createBatchManager()
   useTestModel = <IModel extends AnyModel, S extends Selector<IModel>>(
     name: string,
     model: IModel,
     selector?: S,
     depends?: any[]
   ) => {
-    return useMemo(
-      () => createUseModel(douraStore, batchManager),
-      [douraStore, batchManager]
-    )(name, model, selector, depends)
+    return useMemo(() => createUseModel(douraStore), [douraStore])(
+      name,
+      model,
+      selector,
+      depends
+    )
   }
   useTestStaticModel = <IModel extends AnyModel>(
     name: string,
     model: IModel
   ) => {
-    return useMemo(
-      () => createUseStaticModel(douraStore),
-      [douraStore, batchManager]
-    )(name, model)
+    return useMemo(() => createUseStaticModel(douraStore), [douraStore])(
+      name,
+      model
+    )
   }
 })
 
@@ -632,6 +631,51 @@ describe('createUseModel', () => {
     })
 
     expect(AppRenderCount).toBe(2)
+  })
+
+  test('render should be batched when update occurs out of react lifecycle', async () => {
+    let renderCount = 0
+
+    const App = () => {
+      renderCount++
+      const [index, setIndex] = React.useState(0)
+      const [index1, setIndex1] = React.useState(0)
+      const modelInstance = douraStore.getModel('count', countModel)
+
+      React.useEffect(() => {
+        const unsub1 = modelInstance.$subscribe(() => {
+          setIndex(1)
+        })
+        const unsub2 = modelInstance.$subscribe(() => {
+          setIndex1(1)
+        })
+        return () => {
+          unsub1()
+          unsub2()
+        }
+      }, [modelInstance])
+
+      return (
+        <>
+          <div id="value">{index}</div>
+          <div id="value1">{index1}</div>
+        </>
+      )
+    }
+
+    const { container } = render(<App />)
+
+    expect(renderCount).toBe(1)
+    expect(container.querySelector('#value')?.innerHTML).toEqual('0')
+    expect(container.querySelector('#value1')?.innerHTML).toEqual('0')
+    await act(async () => {
+      douraStore.getModel('count', countModel).add()
+      await nextTick()
+    })
+    // Both setState calls should be batched into a single re-render by React 18
+    expect(renderCount).toBe(2)
+    expect(container.querySelector('#value')?.innerHTML).toEqual('1')
+    expect(container.querySelector('#value1')?.innerHTML).toEqual('1')
   })
 
   test('should render with newest state even update state during render', async () => {
