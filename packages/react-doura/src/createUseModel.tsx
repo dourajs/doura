@@ -62,7 +62,7 @@ function useModelWithSelector<
   const view = useMemo(() => {
     const preMv: ModelView | undefined = selectorRef.current
     if (preMv) {
-      preMv.destory()
+      preMv.destroy()
     }
 
     const mv = (selectorRef.current = model.$createView(selector))

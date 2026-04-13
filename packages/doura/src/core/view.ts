@@ -9,7 +9,7 @@ export type Selector<Model extends AnyModel, TReturn = any> = (
 
 export interface ModelView<T extends (...args: any[]) => any = any> {
   (): ReturnType<T>
-  destory(): void
+  destroy(): void
 }
 
 export function createView<IModel extends AnyObjectModel, TReturn>(
@@ -23,7 +23,7 @@ export function createView<IModel extends AnyObjectModel, TReturn>(
   })
 
   const res = view.getSnapshot as ModelView<Selector<IModel, TReturn>>
-  res.destory = function () {
+  res.destroy = function () {
     view.effect.stop()
     const index = instance.effectScope.effects.indexOf(view.effect)
     if (index >= 0) {
