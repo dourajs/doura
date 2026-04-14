@@ -4,6 +4,7 @@ import React, {
   PropsWithChildren,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { Doura, AnyModel, DouraOptions, Selector, doura } from 'doura'
@@ -22,6 +23,7 @@ const createContainer = function (options?: DouraOptions) {
   }>(null as any)
   function Provider(props: PropsWithChildren<{ store?: Doura }>) {
     const { children, store: propsStore } = props
+    const internalStoreRef = useRef<Doura | null>(null)
 
     const memoContext = useMemo(
       function () {
@@ -30,6 +32,7 @@ const createContainer = function (options?: DouraOptions) {
           store = propsStore
         } else {
           store = doura(options)
+          internalStoreRef.current = store
         }
         return {
           store,
@@ -45,6 +48,16 @@ const createContainer = function (options?: DouraOptions) {
         setContextValue(memoContext)
       },
       [propsStore]
+    )
+
+    useEffect(
+      function () {
+        return function () {
+          internalStoreRef.current?.destroy()
+          internalStoreRef.current = null
+        }
+      },
+      [memoContext]
     )
 
     return <Context.Provider value={contextValue}>{children}</Context.Provider>

@@ -1,9 +1,16 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { render, act } from '@testing-library/react'
 import { doura, Plugin, nextTick } from 'doura'
 import { createContainer } from '../src/index'
 
 import { countModel } from './models/index'
+
+/**
+ * Access the ModelManagerInternal for a store to inspect internal state.
+ */
+function getModelsMap(store: ReturnType<typeof doura>): Map<string, any> {
+  return (store as any)._models
+}
 
 jest.useFakeTimers()
 
@@ -383,5 +390,209 @@ describe('createContainer', () => {
       await nextTick()
     })
     expect(container.querySelector('#state')?.innerHTML).toEqual('2')
+  })
+
+  test('Provider with internal store should work after remount', async () => {
+    const { Provider, useSharedModel } = createContainer()
+
+    const SubApp = () => {
+      const counter = useSharedModel('count', countModel)
+      return (
+        <>
+          <div id="state">{counter.value}</div>
+          <button id="button" type="button" onClick={() => counter.add()}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    const App = () => {
+      const [show, setShow] = React.useState(true)
+      return (
+        <>
+          <button id="toggle" onClick={() => setShow((s) => !s)}>
+            toggle
+          </button>
+          {show && (
+            <Provider>
+              <SubApp />
+            </Provider>
+          )}
+        </>
+      )
+    }
+
+    const { container } = render(<App />)
+
+    // Initial mount — internal store created, state is 1
+    expect(container.querySelector('#state')?.innerHTML).toEqual('1')
+    await act(async () => {
+      container
+        .querySelector('#button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#state')?.innerHTML).toEqual('2')
+
+    // Unmount Provider
+    await act(async () => {
+      container
+        .querySelector('#toggle')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#state')).toBeNull()
+
+    // Remount Provider — a fresh internal store should be created
+    await act(async () => {
+      container
+        .querySelector('#toggle')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    // Fresh store means state resets to initial value
+    expect(container.querySelector('#state')?.innerHTML).toEqual('1')
+
+    // Should be fully functional
+    await act(async () => {
+      container
+        .querySelector('#button')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#state')?.innerHTML).toEqual('2')
+  })
+
+  describe('Provider should destroy internally-created store', () => {
+    test('should destroy internal store when Provider unmounts', async () => {
+      const onDestroy = jest.fn()
+      const plugin: Plugin = () => ({ onDestroy })
+      const { Provider, useSharedModel } = createContainer({
+        plugins: [[plugin]],
+      })
+
+      const SubApp = () => {
+        const counter = useSharedModel('count', countModel)
+        return <div id="state">{counter.value}</div>
+      }
+
+      const App = () => {
+        const [show, setShow] = useState(true)
+        return (
+          <>
+            <button id="toggle" onClick={() => setShow((s) => !s)}>
+              toggle
+            </button>
+            {show && (
+              <Provider>
+                <SubApp />
+              </Provider>
+            )}
+          </>
+        )
+      }
+
+      const { container } = render(<App />)
+      expect(container.querySelector('#state')?.innerHTML).toEqual('1')
+      expect(onDestroy).not.toHaveBeenCalled()
+
+      // Unmount Provider — internal store should be destroyed
+      await act(async () => {
+        container
+          .querySelector('#toggle')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+
+      expect(onDestroy).toHaveBeenCalledTimes(1)
+    })
+
+    test('should NOT destroy externally-provided store when Provider unmounts', async () => {
+      const onDestroy = jest.fn()
+      const plugin: Plugin = () => ({ onDestroy })
+      const externalStore = doura({ plugins: [[plugin]] })
+      const { Provider, useSharedModel } = createContainer()
+
+      const SubApp = () => {
+        const counter = useSharedModel('count', countModel)
+        return <div id="state">{counter.value}</div>
+      }
+
+      const App = () => {
+        const [show, setShow] = useState(true)
+        return (
+          <>
+            <button id="toggle" onClick={() => setShow((s) => !s)}>
+              toggle
+            </button>
+            {show && (
+              <Provider store={externalStore}>
+                <SubApp />
+              </Provider>
+            )}
+          </>
+        )
+      }
+
+      const { container } = render(<App />)
+      expect(container.querySelector('#state')?.innerHTML).toEqual('1')
+
+      // Unmount Provider — external store must NOT be destroyed
+      await act(async () => {
+        container
+          .querySelector('#toggle')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+
+      expect(onDestroy).not.toHaveBeenCalled()
+      // External store should still be usable
+      externalStore.getModel('count', countModel).add(1)
+    })
+
+    test('should destroy old internal store when switching to external store', async () => {
+      const onDestroy = jest.fn()
+      const plugin: Plugin = () => ({ onDestroy })
+      const { Provider, useSharedModel } = createContainer({
+        plugins: [[plugin]],
+      })
+
+      const externalStore = doura()
+
+      const SubApp = () => {
+        const counter = useSharedModel('count', countModel)
+        return <div id="state">{counter.value}</div>
+      }
+
+      const App = () => {
+        const [useExternal, setUseExternal] = useState(false)
+        return (
+          <>
+            <button id="switch" onClick={() => setUseExternal(true)}>
+              switch
+            </button>
+            <Provider store={useExternal ? externalStore : undefined}>
+              <SubApp />
+            </Provider>
+          </>
+        )
+      }
+
+      const { container } = render(<App />)
+      expect(container.querySelector('#state')?.innerHTML).toEqual('1')
+      expect(onDestroy).not.toHaveBeenCalled()
+
+      // Switch from internal store to external store
+      await act(async () => {
+        container
+          .querySelector('#switch')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+
+      // The old internally-created store should be destroyed
+      expect(onDestroy).toHaveBeenCalledTimes(1)
+    })
   })
 })
