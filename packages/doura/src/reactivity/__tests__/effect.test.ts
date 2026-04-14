@@ -783,6 +783,69 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe(1)
   })
 
+  describe('Dep lifecycle after effect cleanup', () => {
+    it('should reuse the same Dep object across create/stop cycles', () => {
+      const obj = draft({ value: 1 })
+
+      // First effect: captures its Dep references
+      const runner1 = effect(() => {
+        void obj.value
+      })
+      const deps1 = [...runner1.effect.deps]
+      expect(deps1.length).toBeGreaterThan(0)
+
+      stop(runner1)
+      // After stop, the effect's deps are cleared
+      expect(runner1.effect.deps.length).toBe(0)
+      // But the Dep objects themselves still exist (retained in targetMap)
+
+      // Second effect tracking the same key: should get the SAME Dep objects
+      const runner2 = effect(() => {
+        void obj.value
+      })
+      const deps2 = [...runner2.effect.deps]
+
+      // Dep objects are reused, not re-created
+      for (let i = 0; i < deps1.length; i++) {
+        expect(deps2[i]).toBe(deps1[i])
+      }
+
+      stop(runner2)
+    })
+
+    it('should not accumulate Dep objects across many create/stop cycles', () => {
+      const obj = draft({ value: 1 })
+
+      // Run one effect to establish the Dep objects
+      const first = effect(() => {
+        void obj.value
+      })
+      const depRefs = [...first.effect.deps]
+      stop(first)
+
+      // Run 100 create/stop cycles on the same key
+      for (let i = 0; i < 100; i++) {
+        const runner = effect(() => {
+          void obj.value
+        })
+        // Each cycle uses the same Dep objects
+        for (let j = 0; j < depRefs.length; j++) {
+          expect(runner.effect.deps[j]).toBe(depRefs[j])
+        }
+        // Dep size should be 1 (only this effect)
+        for (const dep of runner.effect.deps) {
+          expect(dep.size).toBe(1)
+        }
+        stop(runner)
+      }
+
+      // After all cycles, Deps are empty but still the same objects
+      for (const dep of depRefs) {
+        expect(dep.size).toBe(0)
+      }
+    })
+  })
+
   it('should not be triggered when the value and the old value both are NaN', () => {
     const obj = draft({
       foo: NaN,

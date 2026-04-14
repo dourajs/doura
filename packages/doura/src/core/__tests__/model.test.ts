@@ -340,4 +340,55 @@ describe('model', () => {
       expect((parent as any)._depListenersHandlers.length).toBe(1)
     })
   })
+
+  describe('_lastDraftToSnapshot cache', () => {
+    it('should use WeakMap so orphaned draft proxies can be GC-ed', () => {
+      const model = createModel({
+        state: { data: { value: 1 } },
+        actions: {
+          modify() {
+            this.data.value += 1
+          },
+          replaceData(n: number) {
+            this.data = { value: n }
+          },
+        },
+      })
+
+      const cache = (model as any)._lastDraftToSnapshot
+      // Must be a WeakMap so orphaned draft proxy keys are reclaimable by GC
+      expect(cache).toBeInstanceOf(WeakMap)
+    })
+
+    it('should preserve structural sharing after sub-tree replacement cycles', () => {
+      const model = createModel({
+        state: { data: { value: 1 }, stable: { x: 'unchanged' } },
+        actions: {
+          modify() {
+            this.data.value += 1
+          },
+          replaceData(n: number) {
+            this.data = { value: n }
+          },
+        },
+      })
+
+      // Trigger initial snapshot via modify
+      ;(model.actions as any).modify()
+      const stableRef1 = model.getState().stable
+
+      // 50 cycles of modify→replace to stress the cache
+      for (let i = 0; i < 50; i++) {
+        ;(model.actions as any).modify()
+        ;(model.actions as any).replaceData(i + 100)
+      }
+
+      // Structural sharing: unmodified 'stable' subtree should keep the same reference
+      const stableRef2 = model.getState().stable
+      expect(stableRef2).toBe(stableRef1)
+
+      // Value correctness: data should reflect the last replacement
+      expect(model.getState().data).toEqual({ value: 149 })
+    })
+  })
 })

@@ -17,6 +17,16 @@ export const enum DraftType {
   Set,
 }
 
+/**
+ * Minimal cache interface for snapshot structural sharing.
+ * Compatible with both Map and WeakMap.
+ */
+export interface SnapshotCache {
+  get(key: object): any
+  set(key: object, value: any): any
+  delete(key: object): boolean
+}
+
 interface DraftStateBase<T extends AnyObject = AnyObject> {
   id: number
   // The root state.
@@ -264,7 +274,7 @@ function stealAndReset(state: DraftState): any {
 function resolveValue(
   value: any,
   clones: Map<DraftState, any>,
-  cache: Map<any, any> | null,
+  cache: SnapshotCache | null,
   seen: Set<any>
 ): any {
   if (!isObject(value)) return value
@@ -357,7 +367,7 @@ function resolveValue(
 function resolveStates(
   modified: DraftState[],
   hasDraftableAssignment: boolean,
-  cache: Map<any, any> | null
+  cache: SnapshotCache | null
 ): Map<DraftState, any> {
   const resolved = new Map<DraftState, any>()
   const seen = new Set<any>()
@@ -505,7 +515,7 @@ function collectModified(
 export function snapshot<T>(
   value: T,
   draft: Drafted,
-  snapshots?: Map<any, any>
+  snapshots?: SnapshotCache
 ): T {
   if (!isObject(value)) {
     return value

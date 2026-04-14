@@ -202,7 +202,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
   private _destroyed: boolean = false
-  private _lastDraftToSnapshot: Map<any, any> = new Map()
+  private _lastDraftToSnapshot: WeakMap<object, any> = new WeakMap()
 
   constructor(model: IModel, { name, initState }: ModelInternalOptions) {
     this.patch = this.patch.bind(this)
@@ -297,7 +297,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       view.effect.scheduler!()
     }
 
-    this._lastDraftToSnapshot.clear()
+    this._lastDraftToSnapshot = new WeakMap()
 
     this.dispatch({
       type: ActionType.REPLACE,
@@ -447,8 +447,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     switch (action.type) {
       case ActionType.MODIFY:
       case ActionType.PATCH: {
-        const draftToSnapshot = new Map(this._lastDraftToSnapshot)
-        this._lastDraftToSnapshot = draftToSnapshot
         return snapshot(
           this.stateRef.value,
           this.stateRef.value,
@@ -504,7 +502,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // reset props
     this._destroyed = true
     this._api = null
-    this._lastDraftToSnapshot.clear()
+    this._lastDraftToSnapshot = new WeakMap()
 
     this._currentState = null
     this.stateRef = {
