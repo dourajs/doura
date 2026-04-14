@@ -157,7 +157,16 @@ export const createUseModel =
     const hasSelector = useRef(selector)
     const { modelInstance, subscribe } = useModelInstance(name, model, doura)
 
-    // todo: warn when hasSelector changes
+    if (__DEV__) {
+      if (!!selector !== !!hasSelector.current) {
+        console.warn(
+          `[react-doura] useModel selector presence changed between renders. ` +
+            `A component should always use a selector or never use one. ` +
+            `Mixing both patterns in the same component is not supported.`
+        )
+      }
+    }
+
     if (hasSelector.current) {
       return useModelWithSelector(modelInstance, subscribe, selector!, depends)
     } else {

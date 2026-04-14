@@ -799,6 +799,29 @@ describe('createUseStaticModel', () => {
   })
 })
 
+describe('dynamic selector presence', () => {
+  test('should warn in dev when selector presence changes between renders', () => {
+    const model = defineModel({
+      state: { value: 1 },
+      actions: {},
+    })
+
+    const App = ({ sel }: { sel?: (s: any) => any }) => {
+      ;(useTestModel as any)('test', model, sel, sel ? [] : undefined)
+      return <div />
+    }
+
+    // First render: no selector
+    const { rerender } = render(<App />)
+
+    // Second render: with selector — presence changed, should warn
+    rerender(<App sel={(s: any) => s.value} />)
+    expect(
+      'useModel selector presence changed between renders. A component should always use a selector or never use one.'
+    ).toHaveBeenWarned()
+  })
+})
+
 describe('selector depends stability', () => {
   test('should recreate ModelView when depends values change', async () => {
     const model = defineModel({
