@@ -798,3 +798,76 @@ describe('createUseStaticModel', () => {
     expect(container.querySelector('#value')!.textContent).toEqual('2')
   })
 })
+
+describe('selector depends stability', () => {
+  test('should recreate ModelView when depends values change', async () => {
+    const model = defineModel({
+      state: {
+        items: { a: 1, b: 2, c: 3 },
+      },
+      actions: {
+        set(key: string, value: number) {
+          ;(this.items as any)[key] = value
+        },
+      },
+    })
+
+    const App = ({ filterKey }: { filterKey: string }) => {
+      const data = useTestModel(
+        'test',
+        model,
+        (s) => {
+          return (s.items as any)[filterKey]
+        },
+        [filterKey]
+      )
+
+      return <div id="value">{data}</div>
+    }
+
+    const { container, rerender } = render(<App filterKey="a" />)
+    expect(container.querySelector('#value')!.textContent).toEqual('1')
+
+    // Change the depends value — selector should re-create with new filterKey
+    rerender(<App filterKey="b" />)
+    expect(container.querySelector('#value')!.textContent).toEqual('2')
+
+    // Change again
+    rerender(<App filterKey="c" />)
+    expect(container.querySelector('#value')!.textContent).toEqual('3')
+  })
+
+  test('should handle depends array length change without crashing', async () => {
+    const model = defineModel({
+      state: { x: 1, y: 2 },
+      actions: {},
+    })
+
+    const App = ({ keys }: { keys: string[] }) => {
+      const data = useTestModel(
+        'test',
+        model,
+        (s) => {
+          return keys.map((k) => (s as any)[k]).join(',')
+        },
+        keys
+      )
+
+      return <div id="value">{data}</div>
+    }
+
+    // Start with 1 dep
+    const { container, rerender } = render(<App keys={['x']} />)
+    expect(container.querySelector('#value')!.textContent).toEqual('1')
+
+    // Change to 2 deps — different length!
+    // With the bug: useMemo deps length changes, behavior is unpredictable
+    // Without the bug: selector should correctly re-create with new deps
+    rerender(<App keys={['x', 'y']} />)
+    expect(container.querySelector('#value')!.textContent).toEqual('1,2')
+
+    // Back to 1 dep
+    rerender(<App keys={['y']} />)
+    expect(container.querySelector('#value')!.textContent).toEqual('2')
+  })
+})

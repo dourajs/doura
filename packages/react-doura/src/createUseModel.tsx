@@ -17,6 +17,18 @@ import {
 
 type SubscribeFn = (onStoreChange: () => void) => () => void
 
+function shallowArrayEqual(
+  a: any[] | undefined,
+  b: any[] | undefined
+): boolean {
+  if (a === b) return true
+  if (!a || !b || a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (!Object.is(a[i], b[i])) return false
+  }
+  return true
+}
+
 function readonlyModel(model: ModelPublicInstance<AnyModel>) {
   return new Proxy(model, {
     get(target: ModelPublicInstance<AnyModel>, key: string | symbol): any {
@@ -63,6 +75,29 @@ function useModelWithSelector<
 ) {
   const selectorRef = useRef<undefined | ModelView>(undefined)
 
+  // Track depends/selector changes via a version counter so that
+  // useMemo always receives a fixed-length deps array ([model, version]).
+  // This avoids spreading user-provided `depends` into useMemo deps,
+  // which would violate React's requirement for constant deps length.
+  const prevRef = useRef<{
+    depends: any[] | undefined
+    selector: S
+    version: number
+  }>({ depends, selector, version: 0 })
+
+  const prev = prevRef.current
+  let { version } = prev
+  if (depends !== undefined) {
+    if (!shallowArrayEqual(prev.depends, depends)) {
+      version = prev.version + 1
+    }
+  } else {
+    if (prev.selector !== selector) {
+      version = prev.version + 1
+    }
+  }
+  prevRef.current = { depends, selector, version }
+
   const view = useMemo(() => {
     const preMv: ModelView | undefined = selectorRef.current
     if (preMv) {
@@ -72,7 +107,7 @@ function useModelWithSelector<
     const mv = (selectorRef.current = model.$createView(selector))
 
     return mv
-  }, [model, ...(depends ? depends : [selector])])
+  }, [model, version])
 
   useEffect(() => {
     return () => {
