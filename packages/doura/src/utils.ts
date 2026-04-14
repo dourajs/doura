@@ -129,6 +129,18 @@ export function shallowCopy(base: any) {
   return strictCopy(base)
 }
 
+/**
+ * O(1) removal from an unordered array via swap-with-last + pop.
+ */
+export function removeUnordered<T>(arr: T[], item: T): void {
+  const index = arr.indexOf(item)
+  if (index < 0) return
+  const last = arr.pop()!
+  if (index < arr.length) {
+    arr[index] = last
+  }
+}
+
 const ownKeys: (target: object) => PropertyKey[] =
   typeof Reflect !== 'undefined' && Reflect.ownKeys
     ? Reflect.ownKeys

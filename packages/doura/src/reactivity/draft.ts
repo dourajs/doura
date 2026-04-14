@@ -8,7 +8,7 @@ import {
 } from './common'
 import { mutableHandlers } from './baseHandlers'
 import { mutableCollectionHandlers } from './collectionHandlers'
-import { isObject, isArray, shallowCopy } from '../utils'
+import { isObject, isArray, shallowCopy, removeUnordered } from '../utils'
 import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
 export const enum DraftType {
@@ -231,12 +231,8 @@ export function watch(draft: any, cb: () => void): () => void {
   state.listeners.push(cb)
 
   return () => {
-    const listeners = state.listeners
-    if (listeners) {
-      const index = listeners.indexOf(cb)
-      if (index >= 0) {
-        listeners.splice(index, 1)
-      }
+    if (state.listeners) {
+      removeUnordered(state.listeners, cb)
     }
   }
 }

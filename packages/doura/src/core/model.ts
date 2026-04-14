@@ -1,4 +1,11 @@
-import { isPlainObject, hasOwn, isObject, def, emptyArray } from '../utils'
+import {
+  isPlainObject,
+  hasOwn,
+  isObject,
+  def,
+  emptyArray,
+  removeUnordered,
+} from '../utils'
 import { warn } from '../warning'
 import {
   view as reactiveView,
@@ -385,10 +392,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // When child is destroyed before parent, clean up the stale handler
     // so the parent doesn't hold references to the destroyed child.
     dep._onDestroyHandlers.push(() => {
-      const idx = this._depListenersHandlers.indexOf(unsub)
-      if (idx >= 0) {
-        this._depListenersHandlers.splice(idx, 1)
-      }
+      removeUnordered(this._depListenersHandlers, unsub)
     })
   }
 

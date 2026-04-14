@@ -1,6 +1,7 @@
 import { AnyModel, AnyObjectModel, ModelActions } from './modelOptions'
 import { ModelInternal, ModelAPI } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
+import { removeUnordered } from '../utils'
 
 export type Selector<Model extends AnyModel, TReturn = any> = (
   api: ModelAPI<Model>,
@@ -25,14 +26,8 @@ export function createView<IModel extends AnyObjectModel, TReturn>(
   const res = view.getSnapshot as ModelView<Selector<IModel, TReturn>>
   res.destroy = function () {
     view.effect.stop()
-    const effectIndex = instance.effectScope.effects.indexOf(view.effect)
-    if (effectIndex >= 0) {
-      instance.effectScope.effects.splice(effectIndex, 1)
-    }
-    const viewIndex = instance.viewInstances.indexOf(view as any)
-    if (viewIndex >= 0) {
-      instance.viewInstances.splice(viewIndex, 1)
-    }
+    removeUnordered(instance.effectScope.effects, view.effect)
+    removeUnordered(instance.viewInstances, view as any)
   }
 
   return res
