@@ -201,8 +201,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _actionsApi: string[] | null = null
   private _initState: ModelState<IModel>
   private _currentState: any
-  private _actionListeners: Set<ActionListener> = new Set()
-  private _subscribers: Set<SubscriptionCallback> = new Set()
+  private _actionListeners: ActionListener[] = []
+  private _subscribers: SubscriptionCallback[] = []
   private _depListenersHandlers: UnSubscribe[] = []
   private _onDestroyHandlers: (() => void)[] = []
   private _isDispatching: boolean
@@ -359,19 +359,18 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   onAction(listener: (action: ModelAction) => any) {
-    this._actionListeners.add(listener)
+    this._actionListeners.push(listener)
 
     return () => {
-      this._actionListeners.delete(listener)
+      removeUnordered(this._actionListeners, listener)
     }
   }
 
   subscribe(listener: SubscriptionCallback): UnSubscribe {
-    const subs = this._subscribers
-    subs.add(listener)
+    this._subscribers.push(listener)
 
     return () => {
-      subs.delete(listener)
+      removeUnordered(this._subscribers, listener)
     }
   }
 
@@ -520,7 +519,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.stateRef = {
       value: null,
     }
-    this._subscribers.clear()
+    this._subscribers.length = 0
     this.effectScope.stop()
 
     // clear subscriptions
@@ -554,8 +553,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   private _triggerListener(event: ModelChangeEvent) {
-    for (const listener of this._subscribers) {
-      listener(event)
+    // Snapshot to prevent mid-iteration subscribe/unsubscribe from
+    // adding phantom notifications or skipping existing subscribers.
+    const listeners = this._subscribers.slice()
+    for (let i = 0; i < listeners.length; i++) {
+      listeners[i](event)
     }
   }
 
@@ -586,8 +588,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
             this._actionDepth++
             let res: any
             try {
-              for (const listener of this._actionListeners) {
-                listener({
+              const actionListeners = this._actionListeners.slice()
+              for (let i = 0; i < actionListeners.length; i++) {
+                actionListeners[i]({
                   name: actionName,
                   args,
                 })

@@ -152,6 +152,35 @@ describe('model', () => {
         type: ActionType.MODIFY,
       })
     })
+
+    it('should not skip a subscriber when another subscriber unsubscribes it during notification', async () => {
+      const model = createModel({
+        state: { value: 0 },
+        actions: {
+          inc() {
+            this.value += 1
+          },
+        },
+      })
+
+      const listenerB = jest.fn()
+      let unsubB: () => void
+
+      // A is subscribed first, so it's visited first during iteration.
+      // When A fires, it unsubscribes B.
+      const listenerA = jest.fn(() => {
+        unsubB()
+      })
+
+      model.subscribe(listenerA)
+      unsubB = model.subscribe(listenerB)
+      ;(model.actions as any).inc()
+
+      // Both listeners should be called — A's unsubscription of B during
+      // iteration should not prevent B from receiving the current event.
+      expect(listenerA).toHaveBeenCalledTimes(1)
+      expect(listenerB).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('patch()', () => {

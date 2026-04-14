@@ -8,7 +8,7 @@ import { createModelInstance, ModelInternal, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
-import { emptyObject } from '../utils'
+import { emptyObject, removeUnordered } from '../utils'
 
 export type ModelManagerOptions = {
   initialState?: Record<string, any>
@@ -54,14 +54,15 @@ class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models = new Map<string, ModelInternal>()
-  private _subscribers: Set<DouraSubscriptionCallback> = new Set()
+  private _subscribers: DouraSubscriptionCallback[] = []
   private _onModelChange: DouraSubscriptionCallback
 
   constructor(initialState = emptyObject, plugins: [Plugin, any?][] = []) {
     this._initialState = initialState
     const emitChange: SchedulerJob = () => {
-      for (const listener of this._subscribers) {
-        listener()
+      const listeners = this._subscribers.slice()
+      for (let i = 0; i < listeners.length; i++) {
+        listeners[i]()
       }
     }
     this._onModelChange = () => {
@@ -126,9 +127,9 @@ class ModelManagerInternal implements ModelManager {
   }
 
   subscribe(listener: DouraSubscriptionCallback): UnSubscribe {
-    this._subscribers.add(listener)
+    this._subscribers.push(listener)
     return () => {
-      this._subscribers.delete(listener)
+      removeUnordered(this._subscribers, listener)
     }
   }
 
@@ -136,7 +137,7 @@ class ModelManagerInternal implements ModelManager {
     this._hooks.map((hook) => hook.onDestroy?.())
     this._models.forEach((m) => m.destroy())
     this._models.clear()
-    this._subscribers.clear()
+    this._subscribers.length = 0
     this._initialState = emptyObject
   }
 
