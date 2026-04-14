@@ -877,4 +877,44 @@ describe('createView', () => {
     const view = store.$createView((s) => s.a)
     expect(isDraft(view())).toBeFalsy()
   })
+
+  describe('getApi() cache invalidation with cross-model dependencies', () => {
+    test('parent $getApi() should reflect child state changes', async () => {
+      const childModel = defineModel({
+        state: { count: 0 },
+        actions: {
+          inc() {
+            this.count += 1
+          },
+        },
+      })
+
+      const parentModel = defineModel(() => {
+        const child = use('child', childModel)
+        return {
+          state: { value: 1 },
+          views: {
+            childCount() {
+              return child.count
+            },
+          },
+        }
+      })
+
+      const child = modelMgr.getModel('child', childModel)
+      const parent = modelMgr.getModel('parent', parentModel)
+
+      // Initial: parent view reads child.count = 0
+      const api1 = parent.$getApi()
+      expect(api1.childCount).toBe(0)
+
+      // Mutate child
+      child.inc()
+      await nextTick()
+
+      // Parent's $getApi() should return updated view reflecting child.count = 1
+      const api2 = parent.$getApi()
+      expect(api2.childCount).toBe(1)
+    })
+  })
 })

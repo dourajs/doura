@@ -180,6 +180,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   actions: ModelActions<IModel>
   views: Views<ModelViews<IModel>>
   viewInstances: ViewExt[] = []
+  private _modelViews: ViewExt[] = []
   accessContext: AccessContext
 
   stateRef: {
@@ -190,6 +191,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   private _actionDepth = 0
   private _api: ModelAPI<IModel> | null = null
+  private _actionsApi: string[] | null = null
   private _initState: ModelState<IModel>
   private _currentState: any
   private _actionListeners: Set<ActionListener> = new Set()
@@ -308,13 +310,33 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   getApi() {
+    // Invalidate cache if any model-defined view is dirty (e.g. from
+    // cross-model dependency changes that bypass _setState).
+    if (this._api !== null) {
+      for (let i = 0; i < this._modelViews.length; i++) {
+        if (this._modelViews[i].dirty) {
+          this._api = null
+          break
+        }
+      }
+    }
+
     if (this._api === null) {
       const data = (this._api = {
         ...this._currentState,
         ...this.views,
       })
-      for (const action of Object.keys(this.actions)) {
-        def(data, action, (this.actions as any)[action])
+
+      // Actions are immutable over the model's lifetime — cache the keys.
+      if (this._actionsApi === null) {
+        this._actionsApi = Object.keys(this.actions)
+      }
+      for (let i = 0; i < this._actionsApi.length; i++) {
+        def(
+          data,
+          this._actionsApi[i],
+          (this.actions as any)[this._actionsApi[i]]
+        )
       }
     }
 
@@ -586,6 +608,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         const viewFn = views[viewName]
         const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
+        this._modelViews.push(view)
         if (hasExternalArgs && __DEV__) {
           warn(
             `The ${viewName} in the views is using additional parameters. This feature will no longer be supported in the future, please make changes as soon as possible.`
