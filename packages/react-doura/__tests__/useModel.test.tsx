@@ -1,8 +1,19 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { render, act } from '@testing-library/react'
-import { doura, defineModel, nextTick } from 'doura'
+import { doura, defineModel, nextTick, AnyModel, Selector } from 'doura'
 import { DouraRoot, useModel, useStaticModel } from '../src/useModel'
+import { createContainer } from '../src/createContainer'
+import { createUseModel } from '../src/createUseModel'
 import { countModel } from './models'
+
+/**
+ * Access the ModelInternal for a named model from the store.
+ * Uses runtime access to TS-private _models map — acceptable for
+ * white-box leak verification.
+ */
+function getInternal(store: ReturnType<typeof doura>, name: string): any {
+  return (store as any)._models.get(name)
+}
 
 beforeEach(() => {
   jest.useFakeTimers()
@@ -246,6 +257,116 @@ describe('useModel (without name)', () => {
       ).toHaveBeenWarned()
       expect(container.querySelector('#v')?.innerHTML).toEqual('1')
       expect(container.querySelector('#t')?.innerHTML).toEqual('2')
+    })
+
+    describe('ModelView cleanup on unmount', () => {
+      // Anonymous useModel creates a per-component doura() store internally.
+      // We simulate this by creating our own store + createUseModel, which is
+      // the exact same code path useAnonymousModel takes.
+      const ANONYMOUS_MODEL_NAME = 'anonymous model'
+
+      function makeAnonymousHook(store: ReturnType<typeof doura>) {
+        return <IModel extends AnyModel, S extends Selector<IModel>>(
+          model: IModel,
+          selector?: S,
+          depends?: any[]
+        ) => {
+          return React.useMemo(() => createUseModel(store), [store])(
+            ANONYMOUS_MODEL_NAME,
+            model,
+            selector,
+            depends
+          )
+        }
+      }
+
+      test('should destroy selector ModelView when component unmounts', async () => {
+        const localStore = doura()
+
+        const Child = () => {
+          const data = makeAnonymousHook(localStore)(
+            countModel,
+            (s, actions) => ({ value: s.value, add: actions.add }),
+            []
+          )
+          return <div>{data.value}</div>
+        }
+
+        const App = () => {
+          const [show, setShow] = useState(false)
+          return (
+            <>
+              <button id="toggle" onClick={() => setShow((s) => !s)}>
+                toggle
+              </button>
+              {show && <Child />}
+            </>
+          )
+        }
+
+        // Pre-create model to capture baseline effects
+        localStore.getModel(ANONYMOUS_MODEL_NAME, countModel)
+        const internal = getInternal(localStore, ANONYMOUS_MODEL_NAME)
+        const baseline = internal.effectScope.effects.length
+
+        const { container } = render(<App />)
+        const toggle = () =>
+          act(async () => {
+            container
+              .querySelector('#toggle')
+              ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          })
+
+        await toggle() // mount
+        expect(internal.effectScope.effects.length).toBeGreaterThan(baseline)
+
+        await toggle() // unmount
+        expect(internal.effectScope.effects.length).toBe(baseline)
+      })
+
+      test('should not accumulate effects across mount/unmount cycles', async () => {
+        const localStore = doura()
+
+        const Child = () => {
+          const data = makeAnonymousHook(localStore)(
+            countModel,
+            (s, actions) => ({ value: s.value, add: actions.add }),
+            []
+          )
+          return <div>{data.value}</div>
+        }
+
+        const App = () => {
+          const [show, setShow] = useState(false)
+          return (
+            <>
+              <button id="toggle" onClick={() => setShow((s) => !s)}>
+                toggle
+              </button>
+              {show && <Child />}
+            </>
+          )
+        }
+
+        localStore.getModel(ANONYMOUS_MODEL_NAME, countModel)
+        const internal = getInternal(localStore, ANONYMOUS_MODEL_NAME)
+        const baseline = internal.effectScope.effects.length
+
+        const { container } = render(<App />)
+        const toggle = () =>
+          act(async () => {
+            container
+              .querySelector('#toggle')
+              ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+          })
+
+        for (let i = 0; i < 10; i++) {
+          await toggle() // mount
+          await toggle() // unmount
+        }
+
+        expect(internal.effectScope.effects.length).toBe(baseline)
+      })
     })
   })
 })
@@ -507,6 +628,110 @@ describe('useModel (with name)', () => {
       await nextTick()
     })
     expect(container.querySelector('#state')?.innerHTML).toEqual('2')
+  })
+
+  describe('selector ModelView cleanup on unmount', () => {
+    test('should destroy ModelView when component unmounts', async () => {
+      const douraStore = doura()
+      const { Provider, useSharedModel } = createContainer()
+
+      // Instantiate the model before mounting the selector component
+      // to capture the baseline effect count (model's own view effects).
+      douraStore.getModel('count', countModel)
+      const internal = getInternal(douraStore, 'count')
+      const baseline = internal.effectScope.effects.length
+
+      const Child = () => {
+        const data = useSharedModel(
+          'count',
+          countModel,
+          (s, actions) => ({ value: s.value, add: actions.add }),
+          []
+        )
+        return <div>{data.value}</div>
+      }
+
+      const App = () => {
+        const [show, setShow] = useState(false)
+        return (
+          <>
+            <button id="toggle" onClick={() => setShow((s) => !s)}>
+              toggle
+            </button>
+            {show && <Child />}
+          </>
+        )
+      }
+
+      const { container } = render(
+        <Provider store={douraStore}>
+          <App />
+        </Provider>
+      )
+      const toggle = () =>
+        act(async () => {
+          container
+            .querySelector('#toggle')
+            ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+
+      await toggle() // mount Child — adds selector view effect
+      expect(internal.effectScope.effects.length).toBeGreaterThan(baseline)
+
+      await toggle() // unmount Child — selector view effect should be cleaned up
+      expect(internal.effectScope.effects.length).toBe(baseline)
+    })
+
+    test('should not accumulate effects across mount/unmount cycles', async () => {
+      const douraStore = doura()
+      const { Provider, useSharedModel } = createContainer()
+
+      douraStore.getModel('count', countModel)
+      const internal = getInternal(douraStore, 'count')
+      const baseline = internal.effectScope.effects.length
+
+      const Child = () => {
+        const data = useSharedModel(
+          'count',
+          countModel,
+          (s, actions) => ({ value: s.value, add: actions.add }),
+          []
+        )
+        return <div>{data.value}</div>
+      }
+
+      const App = () => {
+        const [show, setShow] = useState(false)
+        return (
+          <>
+            <button id="toggle" onClick={() => setShow((s) => !s)}>
+              toggle
+            </button>
+            {show && <Child />}
+          </>
+        )
+      }
+
+      const { container } = render(
+        <Provider store={douraStore}>
+          <App />
+        </Provider>
+      )
+      const toggle = () =>
+        act(async () => {
+          container
+            .querySelector('#toggle')
+            ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+
+      for (let i = 0; i < 10; i++) {
+        await toggle() // mount
+        await toggle() // unmount
+      }
+
+      // No orphaned selector effects should remain
+      expect(internal.effectScope.effects.length).toBe(baseline)
+    })
   })
 })
 

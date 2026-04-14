@@ -1,4 +1,10 @@
-import { useDebugValue, useMemo, useRef, useSyncExternalStore } from 'react'
+import {
+  useDebugValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react'
 import {
   Doura,
   AnyModel,
@@ -67,6 +73,12 @@ function useModelWithSelector<
 
     return mv
   }, [model, ...(depends ? depends : [selector])])
+
+  useEffect(() => {
+    return () => {
+      selectorRef.current?.destroy()
+    }
+  }, [])
 
   const state = useSyncExternalStore<ReturnType<S>>(subscribe, view, view)
 
