@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { doura, AnyModel, Selector, Doura } from 'doura'
 import { createUseModel } from './createUseModel'
 import { UseAnonymousModel, UseModel, UseStaticModel } from './types'
@@ -25,6 +25,13 @@ const useAnonymousModel: UseAnonymousModel = <
       douraStore: doura(),
     }
   }
+
+  useEffect(() => {
+    return () => {
+      context.current?.douraStore.destroy()
+      context.current = null
+    }
+  }, [])
 
   return useMemo(
     function () {

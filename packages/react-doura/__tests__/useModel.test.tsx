@@ -735,6 +735,69 @@ describe('useModel (with name)', () => {
   })
 })
 
+describe('useAnonymousModel store cleanup on unmount', () => {
+  test('should destroy internally-created doura store when component unmounts', async () => {
+    // Spy on the doura factory to capture the store instance it creates.
+    const douraModule = require('doura')
+    const originalDoura = douraModule.doura
+    let capturedStore: any = null
+    const douraFactory = jest
+      .spyOn(douraModule, 'doura')
+      .mockImplementation((...args: any[]) => {
+        capturedStore = originalDoura(...args)
+        return capturedStore
+      })
+
+    const model = defineModel({
+      state: { value: 1 },
+      actions: {
+        add() {
+          this.value += 1
+        },
+      },
+    })
+
+    const Child = () => {
+      const data = useModel(model)
+      return <div>{data.value}</div>
+    }
+
+    const App = () => {
+      const [show, setShow] = useState(true)
+      return (
+        <>
+          <button id="toggle" onClick={() => setShow((s) => !s)}>
+            toggle
+          </button>
+          {show && <Child />}
+        </>
+      )
+    }
+
+    const { container } = render(
+      <DouraRoot>
+        <App />
+      </DouraRoot>
+    )
+
+    // The anonymous model should have created a store
+    expect(capturedStore).not.toBeNull()
+    const destroySpy = jest.spyOn(capturedStore, 'destroy')
+
+    // Unmount the Child component
+    await act(async () => {
+      container
+        .querySelector('#toggle')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    // The internally-created store should be destroyed on unmount
+    expect(destroySpy).toHaveBeenCalledTimes(1)
+
+    douraFactory.mockRestore()
+  })
+})
+
 describe('useStaticModel', () => {
   test('name should not be empty', async () => {
     const count = defineModel({
