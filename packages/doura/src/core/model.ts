@@ -195,6 +195,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _actionListeners: Set<ActionListener> = new Set()
   private _subscribers: Set<SubscriptionCallback> = new Set()
   private _depListenersHandlers: UnSubscribe[] = []
+  private _onDestroyHandlers: (() => void)[] = []
   private _isDispatching: boolean
   private _draftListenerHandler: () => void
   private _watchStateChange: boolean = true
@@ -329,10 +330,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   subscribe(listener: SubscriptionCallback): UnSubscribe {
-    this._subscribers.add(listener)
+    const subs = this._subscribers
+    subs.add(listener)
 
     return () => {
-      this._subscribers.delete(listener)
+      subs.delete(listener)
     }
   }
 
@@ -350,14 +352,22 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   depend(dep: ModelInternal<any>) {
     // emit change when dependencies change.
-    this._depListenersHandlers.push(
-      dep.subscribe((event) => {
-        this._triggerListener({
-          ...event,
-          model: this.proxy,
-        })
+    const unsub = dep.subscribe((event) => {
+      this._triggerListener({
+        ...event,
+        model: this.proxy,
       })
-    )
+    })
+    this._depListenersHandlers.push(unsub)
+
+    // When child is destroyed before parent, clean up the stale handler
+    // so the parent doesn't hold references to the destroyed child.
+    dep._onDestroyHandlers.push(() => {
+      const idx = this._depListenersHandlers.indexOf(unsub)
+      if (idx >= 0) {
+        this._depListenersHandlers.splice(idx, 1)
+      }
+    })
   }
 
   createView(viewFn: (s: ModelState<IModel>) => any): ViewExt {
@@ -486,6 +496,12 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       unsub()
     }
     this._draftListenerHandler()
+
+    // notify dependents so they can clean up references to this model
+    for (const handler of this._onDestroyHandlers) {
+      handler()
+    }
+    this._onDestroyHandlers.length = 0
   }
 
   private _setState(newState: ModelState<IModel>) {

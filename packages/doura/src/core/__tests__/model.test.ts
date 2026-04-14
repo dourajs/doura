@@ -282,4 +282,62 @@ describe('model', () => {
       expect(viewGetter).toHaveBeenCalledTimes(2)
     })
   })
+
+  describe('depend() cleanup on child destroy', () => {
+    test('should remove stale handler from parent when child is destroyed', () => {
+      const parent = createModel({
+        state: { value: 1 },
+        actions: {
+          inc() {
+            this.value += 1
+          },
+        },
+      })
+      const child = createModel({
+        state: { count: 0 },
+        actions: {
+          bump() {
+            this.count += 1
+          },
+        },
+      })
+
+      parent.depend(child)
+      expect((parent as any)._depListenersHandlers.length).toBe(1)
+
+      child.destroy()
+
+      // After child destroy, parent's stale dep handler should be cleaned up
+      expect((parent as any)._depListenersHandlers.length).toBe(0)
+    })
+
+    test('should only remove handler for destroyed child, keep others', () => {
+      const parent = createModel({ state: { value: 1 } })
+      const childA = createModel({
+        state: { a: 1 },
+        actions: {
+          bump() {
+            this.a += 1
+          },
+        },
+      })
+      const childB = createModel({
+        state: { b: 1 },
+        actions: {
+          bump() {
+            this.b += 1
+          },
+        },
+      })
+
+      parent.depend(childA)
+      parent.depend(childB)
+      expect((parent as any)._depListenersHandlers.length).toBe(2)
+
+      childA.destroy()
+
+      // Only childA's handler removed
+      expect((parent as any)._depListenersHandlers.length).toBe(1)
+    })
+  })
 })
