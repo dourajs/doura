@@ -359,9 +359,9 @@ export function trigger(
   }
 }
 
-export function triggerEffects(dep: Dep | ReactiveEffect[]) {
+export function triggerEffects(dep: Dep) {
   // spread into array for stabilization
-  const effects = isArray(dep) ? dep : [...dep]
+  const effects = [...dep]
   for (const effect of effects) {
     if (effect.view) {
       triggerEffect(effect)
