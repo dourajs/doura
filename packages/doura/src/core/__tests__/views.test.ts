@@ -878,6 +878,48 @@ describe('createView', () => {
     expect(isDraft(view())).toBeFalsy()
   })
 
+  describe('viewInstances cleanup on destroy', () => {
+    function getModelInternal(name: string): any {
+      return (modelMgr as any)._models.get(name)
+    }
+
+    it('should remove view from viewInstances when destroyed', () => {
+      const model = defineModel({
+        state: { value: 1 },
+        views: {
+          double() {
+            return this.value * 2
+          },
+        },
+      })
+      const store = modelMgr.getModel('test', model)
+      const internal = getModelInternal('test')
+      const baseline = internal.viewInstances.length
+
+      const view = store.$createView((s) => s.value)
+      expect(internal.viewInstances.length).toBe(baseline + 1)
+
+      view.destroy()
+      expect(internal.viewInstances.length).toBe(baseline)
+    })
+
+    it('should not accumulate viewInstances across create/destroy cycles', () => {
+      const model = defineModel({
+        state: { value: 1 },
+      })
+      const store = modelMgr.getModel('test', model)
+      const internal = getModelInternal('test')
+      const baseline = internal.viewInstances.length
+
+      for (let i = 0; i < 20; i++) {
+        const view = store.$createView((s) => s.value)
+        view.destroy()
+      }
+
+      expect(internal.viewInstances.length).toBe(baseline)
+    })
+  })
+
   describe('getApi() cache invalidation with cross-model dependencies', () => {
     test('parent $getApi() should reflect child state changes', async () => {
       const childModel = defineModel({
