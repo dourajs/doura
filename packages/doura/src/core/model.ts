@@ -299,6 +299,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // Clear old draft children to prevent accumulation from previous state trees
     resetDraftChildren(this.stateRef as any)
 
+    // Invalidate lazily-cached STATE entries — the state shape may have changed.
+    // ACTION and VIEW entries are set once at construction and remain valid.
+    for (const key in this.accessCache) {
+      if (this.accessCache[key] === AccessTypes.STATE) {
+        delete this.accessCache[key]
+      }
+    }
+
     // invalid all views;
     for (const view of this.viewInstances) {
       view.effect.scheduler!()

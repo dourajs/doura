@@ -341,6 +341,35 @@ describe('model', () => {
     })
   })
 
+  describe('accessCache invalidation', () => {
+    it('should not let stale STATE cache shadow ctx after replace()', () => {
+      const model = createModel({
+        state: { data: 1 } as Record<string, any>,
+        actions: {
+          replaceFull(newState: any) {
+            this.$state = newState
+          },
+        },
+      })
+
+      const pub = model.publicInst
+
+      // Cache 'data' as STATE
+      expect(pub.data).toBe(1)
+
+      // Replace state — 'data' removed
+      ;(model.actions as any).replaceFull({ other: 2 })
+
+      // Directly write 'data' to ctx (simulates a context property)
+      ;(model as any).ctx.data = 'from-ctx'
+
+      // With the bug: accessCache has data=STATE, returns state.data (undefined)
+      //   instead of falling through to ctx where data='from-ctx'
+      // Without the bug: cache is invalidated, falls through to ctx
+      expect(pub.data).toBe('from-ctx')
+    })
+  })
+
   describe('_lastDraftToSnapshot cache', () => {
     it('should use WeakMap so orphaned draft proxies can be GC-ed', () => {
       const model = createModel({
