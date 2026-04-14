@@ -256,6 +256,23 @@ describe('model', () => {
         },
       })
     })
+
+    it('should not deep-merge a plain object patch into a non-plain-object base value', () => {
+      const model = createModel({
+        state: {
+          items: [1, 2, 3] as any,
+        },
+      })
+
+      // patch value is a plain object, but base.items is an array.
+      // patchObj should replace the value, not recurse into the array.
+      model.patch({ items: { 0: 99 } })
+
+      // With the bug: isPlainObject({ 0: 99 }) is true, so patchObj
+      //   recurses: patchObj(array, { 0: 99 }) → array[0] = 99 → [99, 2, 3]
+      // Without the bug: array is replaced with { 0: 99 }
+      expect(model.stateRef.value.items).toEqual({ 0: 99 })
+    })
   })
 
   describe('createView()', () => {

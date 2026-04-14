@@ -149,7 +149,11 @@ function patchObj(base: Record<string, any>, patch: Record<string, any>) {
   }
 
   keys.forEach((key) => {
-    if (hasOwn(base, key) && isPlainObject(patch[key])) {
+    if (
+      hasOwn(base, key) &&
+      isPlainObject(patch[key]) &&
+      isPlainObject(base[key])
+    ) {
       patchObj(base[key], patch[key])
     } else {
       base[key] = patch[key]
