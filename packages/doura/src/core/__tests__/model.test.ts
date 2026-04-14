@@ -387,6 +387,64 @@ describe('model', () => {
     })
   })
 
+  describe('getApi() allocation', () => {
+    it('should not allocate a new object when state has not changed', () => {
+      const model = createModel({
+        state: { value: 1 },
+        actions: {
+          inc() {
+            this.value += 1
+          },
+        },
+        views: {
+          double() {
+            return this.value * 2
+          },
+        },
+      })
+
+      const api1 = model.getApi()
+      const api2 = model.getApi()
+      // Same state, same api object — cached
+      expect(api1).toBe(api2)
+
+      // Mutate state
+      ;(model.actions as any).inc()
+      const api3 = model.getApi()
+      // State changed, api must differ (new snapshot)
+      expect(api3).not.toBe(api1)
+
+      // But calling getApi() again without further changes should reuse
+      const api4 = model.getApi()
+      expect(api4).toBe(api3)
+    })
+
+    it('should reuse action references across getApi() rebuilds', () => {
+      const model = createModel({
+        state: { value: 1 },
+        actions: {
+          inc() {
+            this.value += 1
+          },
+          dec() {
+            this.value -= 1
+          },
+        },
+      })
+
+      const api1 = model.getApi() as any
+      const incRef = api1.inc
+      const decRef = api1.dec
+
+      ;(model.actions as any).inc()
+      const api2 = model.getApi() as any
+
+      // Actions are immutable — same function references after rebuild
+      expect(api2.inc).toBe(incRef)
+      expect(api2.dec).toBe(decRef)
+    })
+  })
+
   describe('accessCache invalidation', () => {
     it('should not let stale STATE cache shadow ctx after replace()', () => {
       const model = createModel({
