@@ -959,4 +959,297 @@ describe('createView', () => {
       expect(api2.childCount).toBe(1)
     })
   })
+
+  /**
+   * Validates the "no-arg view returning a closure" pattern as an alternative
+   * to the soon-to-be-deprecated parameterized view.
+   *
+   * Shape: `getById: (s) => (id) => s.users[id]`
+   *
+   * Key invariants:
+   *  - Reactivity is a property of the active effect at call-site, not of
+   *    the function being called. Whoever invokes the closure inside an
+   *    effect (another view, an external subscriber, a React selector)
+   *    registers the deps.
+   *  - Tracking granularity equals property-access depth. Whatever gets
+   *    read is what gets tracked.
+   */
+  describe('closure-returning view', () => {
+    // ---- same-model usage ----
+
+    it('re-runs a sibling view when the tracked entry is replaced (same model)', () => {
+      const model = defineModel({
+        state: {
+          users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
+          activeId: 'a',
+        },
+        actions: {
+          replace(id: string, user: { name: string }) {
+            this.users[id] = user
+          },
+          setActive(id: string) {
+            this.activeId = id
+          },
+        },
+        views: {
+          getById: (s) => (id: string) => s.users[id],
+          activeUser() {
+            calls++
+            return this.getById(this.activeId) // consumes the closure
+          },
+        },
+      })
+      let calls = 0
+      const store = modelMgr.getModel('test', model)
+
+      expect(store.activeUser).toEqual({ name: 'Alice' })
+      expect(calls).toBe(1)
+
+      // cache hit
+      expect(store.activeUser).toEqual({ name: 'Alice' })
+      expect(calls).toBe(1)
+
+      // replace entry -> triggers (users, 'a') -> view re-runs
+      store.replace('a', { name: 'Alice2' })
+      expect(store.activeUser).toEqual({ name: 'Alice2' })
+      expect(calls).toBe(2)
+    })
+
+    it('re-runs a sibling view on deep change when leaf is read (same model)', () => {
+      const model = defineModel({
+        state: {
+          users: {
+            a: { name: 'Alice' },
+            b: { name: 'Bob' },
+          } as Record<string, { name: string }>,
+          activeId: 'a',
+        },
+        actions: {
+          rename(id: string, name: string) {
+            this.users[id].name = name
+          },
+          setActive(id: string) {
+            this.activeId = id
+          },
+        },
+        views: {
+          getById: (s) => (id: string) => s.users[id],
+          activeName() {
+            calls++
+            return this.getById(this.activeId).name // reads the leaf
+          },
+        },
+      })
+      let calls = 0
+      const store = modelMgr.getModel('test', model)
+
+      expect(store.activeName).toBe('Alice')
+      expect(calls).toBe(1)
+
+      // mutate active entry -> re-runs
+      store.rename('a', 'Alice2')
+      expect(store.activeName).toBe('Alice2')
+      expect(calls).toBe(2)
+
+      // mutate inactive entry -> not tracked, cache hit
+      store.rename('b', 'Bob2')
+      expect(store.activeName).toBe('Alice2')
+      expect(calls).toBe(2)
+
+      // switch activeId -> re-runs
+      store.setActive('b')
+      expect(store.activeName).toBe('Bob2')
+      expect(calls).toBe(3)
+    })
+
+    it('external caller (no active effect) just reads current value, no subscription', () => {
+      const model = defineModel({
+        state: {
+          users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
+        },
+        actions: {
+          rename(id: string, name: string) {
+            this.users[id].name = name
+          },
+        },
+        views: {
+          getById: (s) => (id: string) => s.users[id],
+        },
+      })
+      const store = modelMgr.getModel('test', model)
+
+      // Direct external call returns a live snapshot view of the current state
+      expect(store.getById('a')).toEqual({ name: 'Alice' })
+
+      store.rename('a', 'Alice2')
+      // Next call sees the updated value — no caller-side effect was involved,
+      // so there's nothing to "invalidate"; the closure just reads fresh.
+      expect(store.getById('a')).toEqual({ name: 'Alice2' })
+    })
+
+    // ---- cross-model usage ----
+
+    it('rebuilds when the tracked entry is replaced (cross-model)', () => {
+      const modelA = defineModel({
+        state: {
+          users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
+        },
+        actions: {
+          replace(id: string, user: { name: string }) {
+            this.users[id] = user
+          },
+        },
+        views: {
+          getById: (s) => (id: string) => s.users[id],
+        },
+      })
+
+      let calls = 0
+      const modelB = defineModel(() => {
+        const a = use('a', modelA)
+        return {
+          state: { activeId: 'a' },
+          views: {
+            activeUser() {
+              calls++
+              return a.getById(this.activeId) // only reads users[id]
+            },
+          },
+        }
+      })
+
+      const a = modelMgr.getModel('a', modelA)
+      const b = modelMgr.getModel('b', modelB)
+
+      expect(b.activeUser).toEqual({ name: 'Alice' })
+      expect(calls).toBe(1)
+
+      // cache hit
+      expect(b.activeUser).toEqual({ name: 'Alice' })
+      expect(calls).toBe(1)
+
+      // replacing the whole entry triggers (users, 'a') -> view re-runs
+      a.replace('a', { name: 'Alice2' })
+      expect(b.activeUser).toEqual({ name: 'Alice2' })
+      expect(calls).toBe(2)
+    })
+
+    it('rebuilds when a deep field is read inside the view (cross-model)', () => {
+      const modelA = defineModel({
+        state: {
+          users: {
+            a: { name: 'Alice' },
+            b: { name: 'Bob' },
+          } as Record<string, { name: string }>,
+        },
+        actions: {
+          rename(id: string, name: string) {
+            this.users[id].name = name
+          },
+        },
+        views: {
+          getById: (s) => (id: string) => s.users[id],
+        },
+      })
+
+      let calls = 0
+      const modelB = defineModel(() => {
+        const a = use('a', modelA)
+        return {
+          state: { activeId: 'a' },
+          actions: {
+            setActive(id: string) {
+              this.activeId = id
+            },
+          },
+          views: {
+            activeName() {
+              calls++
+              return a.getById(this.activeId).name // reads the leaf
+            },
+          },
+        }
+      })
+
+      const a = modelMgr.getModel('a', modelA)
+      const b = modelMgr.getModel('b', modelB)
+
+      expect(b.activeName).toBe('Alice')
+      expect(calls).toBe(1)
+
+      // cache hit
+      expect(b.activeName).toBe('Alice')
+      expect(calls).toBe(1)
+
+      // rename the active entry -> view re-runs
+      a.rename('a', 'Alice2')
+      expect(b.activeName).toBe('Alice2')
+      expect(calls).toBe(2)
+
+      // rename an inactive entry -> not tracked, cache hit
+      a.rename('b', 'Bob2')
+      expect(b.activeName).toBe('Alice2')
+      expect(calls).toBe(2)
+
+      // switching activeId -> view re-runs (depends on b.activeId)
+      b.setActive('b')
+      expect(b.activeName).toBe('Bob2')
+      expect(calls).toBe(3)
+
+      // after switching, mutating the previously-active entry is no longer
+      // tracked — re-collection rebuilt deps to users.b.name
+      a.rename('a', 'AliceX')
+      expect(b.activeName).toBe('Bob2')
+      expect(calls).toBe(3)
+    })
+
+    it('same granularity limit applies to parameterized views (not a closure issue)', () => {
+      const modelA = defineModel({
+        state: {
+          users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
+        },
+        actions: {
+          rename(id: string, name: string) {
+            this.users[id].name = name
+          },
+        },
+        views: {
+          // Parameterized view form (emits deprecation warning in dev)
+          getByIdParam(s, id: string) {
+            return s.users[id]
+          },
+        },
+      })
+
+      let calls = 0
+      const modelB = defineModel(() => {
+        const a = use('a', modelA)
+        return {
+          state: { activeId: 'a' },
+          views: {
+            activeUser() {
+              calls++
+              return a.getByIdParam(this.activeId) // only reads users[id]
+            },
+          },
+        }
+      })
+
+      const a = modelMgr.getModel('a', modelA)
+      const b = modelMgr.getModel('b', modelB)
+
+      expect(b.activeUser).toEqual({ name: 'Alice' })
+      expect(calls).toBe(1)
+
+      // Mutating users.a.name only triggers (users.a, 'name').
+      // The view read users[id] one level above, so it does NOT re-run.
+      // This proves the limitation is access depth, not closure vs param.
+      a.rename('a', 'Alice2')
+      expect(calls).toBe(1)
+
+      expect(
+        'The getByIdParam in the views is using additional parameters.'
+      ).toHaveBeenWarned()
+    })
+  })
 })
