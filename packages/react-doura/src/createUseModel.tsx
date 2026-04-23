@@ -75,47 +75,51 @@ function useModelWithSelector<
 ) {
   const selectorRef = useRef<undefined | ModelView>(undefined)
 
-  // Track depends/selector changes via a version counter so that
-  // useMemo always receives a fixed-length deps array ([model, version]).
-  // This avoids spreading user-provided `depends` into useMemo deps,
-  // which would violate React's requirement for constant deps length.
   const prevRef = useRef<{
     depends: any[] | undefined
     selector: S
-    version: number
-  }>({ depends, selector, version: 0 })
+    model: ModelPublicInstance<IModel>
+  }>({ depends, selector, model })
 
   const prev = prevRef.current
-  let { version } = prev
-  if (depends !== undefined) {
-    if (!shallowArrayEqual(prev.depends, depends)) {
-      version = prev.version + 1
-    }
-  } else {
-    if (prev.selector !== selector) {
-      version = prev.version + 1
+  let needsRecreate = !selectorRef.current || prev.model !== model
+  if (!needsRecreate) {
+    if (depends !== undefined) {
+      needsRecreate = !shallowArrayEqual(prev.depends, depends)
+    } else {
+      needsRecreate = prev.selector !== selector
     }
   }
-  prevRef.current = { depends, selector, version }
 
-  const view = useMemo(() => {
-    const preMv: ModelView | undefined = selectorRef.current
-    if (preMv) {
-      preMv.destroy()
-    }
+  if (needsRecreate) {
+    selectorRef.current?.destroy()
+    selectorRef.current = model.$createView(selector)
+  }
 
-    const mv = (selectorRef.current = model.$createView(selector))
+  prevRef.current = { depends, selector, model }
 
-    return mv
-  }, [model, version])
+  // Stable wrapper so useSyncExternalStore always calls the live view,
+  // even if the underlying ModelView is recreated after StrictMode cleanup.
+  const getSnapshot = useMemo(() => () => selectorRef.current!(), [model])
 
   useEffect(() => {
+    // Re-create the view if it was destroyed by a previous cleanup
+    // (happens during StrictMode's unmount-remount cycle where cleanup
+    // runs but render does not re-execute between the two effect setups).
+    if (!selectorRef.current) {
+      selectorRef.current = model.$createView(selector)
+    }
     return () => {
       selectorRef.current?.destroy()
+      selectorRef.current = undefined
     }
   }, [])
 
-  const state = useSyncExternalStore<ReturnType<S>>(subscribe, view, view)
+  const state = useSyncExternalStore<ReturnType<S>>(
+    subscribe,
+    getSnapshot,
+    getSnapshot
+  )
 
   useDebugValue(state)
 

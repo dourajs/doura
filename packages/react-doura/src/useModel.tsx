@@ -26,10 +26,31 @@ const useAnonymousModel: UseAnonymousModel = <
     }
   }
 
+  // The store is created in render (via useRef lazy init). Its lifetime is
+  // tied to the component — destroy on real unmount only. StrictMode's
+  // simulated unmount must NOT destroy it, because hooks rendered against
+  // this store (useModelInstance, useModelWithSelector) capture the store
+  // during render and there is no re-render between StrictMode's effect
+  // cleanup and the second effect setup.
+  //
+  // We use a mounted flag: cleanup clears it, setup sets it. A microtask
+  // scheduled in cleanup checks whether setup re-ran (StrictMode) or not
+  // (real unmount) and only destroys in the latter case.
+  const mountedRef = useRef(false)
+
   useEffect(() => {
+    mountedRef.current = true
     return () => {
-      context.current?.douraStore.destroy()
-      context.current = null
+      mountedRef.current = false
+      const store = context.current?.douraStore
+      if (store) {
+        Promise.resolve().then(() => {
+          if (!mountedRef.current) {
+            store.destroy()
+            context.current = null
+          }
+        })
+      }
     }
   }, [])
 

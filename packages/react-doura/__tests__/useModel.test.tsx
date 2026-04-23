@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { StrictMode, useState } from 'react'
 import { render, act } from '@testing-library/react'
 import { doura, defineModel, nextTick, AnyModel, Selector } from 'doura'
 import { DouraRoot, useModel, useStaticModel } from '../src/useModel'
@@ -911,5 +911,101 @@ describe('useStaticModel', () => {
     })
 
     expect(stateRef === stateRef1).toBeTruthy()
+  })
+})
+
+describe('StrictMode: useModelWithSelector view lifecycle', () => {
+  // React 18 StrictMode double-invokes render, effects, and cleanup in dev.
+  // The sequence for a mount is:
+  //   1. render (useMemo runs → creates view1)
+  //   2. effect setup
+  //   3. effect cleanup (StrictMode simulated unmount)
+  //   4. render (useMemo skipped — deps unchanged → reuses view1)
+  //   5. effect setup
+  //
+  // The bug: step 3 calls selectorRef.current.destroy() which stops view1's
+  // ReactiveEffect. But step 4 reuses the same destroyed view1 from useMemo
+  // cache. The component then holds a dead view that never updates.
+
+  test('selector view should remain reactive after StrictMode double-mount', async () => {
+    const douraStore = doura()
+    const { Provider, useSharedModel } = createContainer()
+
+    const Child = () => {
+      const data = useSharedModel(
+        'count',
+        countModel,
+        (s, actions) => ({ value: s.value, add: actions.add }),
+        []
+      )
+      return (
+        <>
+          <div id="value">{data.value}</div>
+          <button id="add" onClick={() => data.add(1)}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    const { container } = render(
+      <StrictMode>
+        <Provider store={douraStore}>
+          <Child />
+        </Provider>
+      </StrictMode>
+    )
+
+    // Initial render should show the correct value
+    expect(container.querySelector('#value')?.textContent).toBe('1')
+
+    // Mutate state — if the view is alive, the component should re-render
+    await act(async () => {
+      container
+        .querySelector('#add')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+
+    // This fails if the view was destroyed by StrictMode cleanup and never
+    // recreated: the component stays frozen at the stale value.
+    expect(container.querySelector('#value')?.textContent).toBe('2')
+  })
+
+  test('anonymous useModel with selector should remain reactive under StrictMode', async () => {
+    const Child = () => {
+      const data = useModel(
+        countModel,
+        (s: any, actions: any) => ({ value: s.value, add: actions.add }),
+        []
+      )
+      return (
+        <>
+          <div id="value">{data.value}</div>
+          <button id="add" onClick={() => data.add(1)}>
+            add
+          </button>
+        </>
+      )
+    }
+
+    const { container } = render(
+      <StrictMode>
+        <DouraRoot>
+          <Child />
+        </DouraRoot>
+      </StrictMode>
+    )
+
+    expect(container.querySelector('#value')?.textContent).toBe('1')
+
+    await act(async () => {
+      container
+        .querySelector('#add')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+
+    expect(container.querySelector('#value')?.textContent).toBe('2')
   })
 })
