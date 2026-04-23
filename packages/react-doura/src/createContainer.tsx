@@ -10,6 +10,7 @@ import React, {
 import { Doura, AnyModel, DouraOptions, Selector, doura } from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
 import { UseNamedModel, UseStaticModel } from './types'
+import { DouraContext } from './context'
 
 function checkName(name: any) {
   if (!name) {
@@ -60,7 +61,11 @@ const createContainer = function (options?: DouraOptions) {
       [memoContext]
     )
 
-    return <Context.Provider value={contextValue}>{children}</Context.Provider>
+    return (
+      <DouraContext.Provider value={contextValue}>
+        <Context.Provider value={contextValue}>{children}</Context.Provider>
+      </DouraContext.Provider>
+    )
   }
 
   const useDouraContext = () => {
