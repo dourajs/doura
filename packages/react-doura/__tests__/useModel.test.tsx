@@ -321,8 +321,6 @@ describe('useModel (without name)', () => {
         expect(internal.effectScope.effects.length).toBeGreaterThan(baseline)
 
         await toggle() // unmount
-        // View destruction is deferred via microtask
-        await Promise.resolve()
         expect(internal.effectScope.effects.length).toBe(baseline)
       })
 
@@ -365,8 +363,6 @@ describe('useModel (without name)', () => {
         for (let i = 0; i < 10; i++) {
           await toggle() // mount
           await toggle() // unmount
-          // View destruction is deferred via microtask
-          await Promise.resolve()
         }
 
         expect(internal.effectScope.effects.length).toBe(baseline)
@@ -683,8 +679,6 @@ describe('useModel (with name)', () => {
       expect(internal.effectScope.effects.length).toBeGreaterThan(baseline)
 
       await toggle() // unmount Child — selector view effect should be cleaned up
-      // View destruction is deferred via microtask
-      await Promise.resolve()
       expect(internal.effectScope.effects.length).toBe(baseline)
     })
 
@@ -733,8 +727,6 @@ describe('useModel (with name)', () => {
       for (let i = 0; i < 10; i++) {
         await toggle() // mount
         await toggle() // unmount
-        // View destruction is deferred via microtask
-        await Promise.resolve()
       }
 
       // No orphaned selector effects should remain
@@ -743,72 +735,12 @@ describe('useModel (with name)', () => {
   })
 })
 
-describe('useAnonymousModel store cleanup on unmount', () => {
-  test('should destroy internally-created doura store when component unmounts', async () => {
-    // Spy on the doura factory to capture the store instance it creates.
-    const douraModule = require('doura')
-    const originalDoura = douraModule.doura
-    let capturedStore: any = null
-    const douraFactory = jest
-      .spyOn(douraModule, 'doura')
-      .mockImplementation((...args: any[]) => {
-        capturedStore = originalDoura(...args)
-        return capturedStore
-      })
-
-    const model = defineModel({
-      state: { value: 1 },
-      actions: {
-        add() {
-          this.value += 1
-        },
-      },
-    })
-
-    const Child = () => {
-      const data = useModel(model)
-      return <div>{data.value}</div>
-    }
-
-    const App = () => {
-      const [show, setShow] = useState(true)
-      return (
-        <>
-          <button id="toggle" onClick={() => setShow((s) => !s)}>
-            toggle
-          </button>
-          {show && <Child />}
-        </>
-      )
-    }
-
-    const { container } = render(
-      <DouraRoot>
-        <App />
-      </DouraRoot>
-    )
-
-    // The anonymous model should have created a store
-    expect(capturedStore).not.toBeNull()
-    const destroySpy = jest.spyOn(capturedStore, 'destroy')
-
-    // Unmount the Child component
-    await act(async () => {
-      container
-        .querySelector('#toggle')
-        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-
-    // Store destruction is deferred via microtask to survive StrictMode's
-    // simulated unmount-remount cycle. Flush the microtask.
-    await Promise.resolve()
-
-    // The internally-created store should be destroyed on unmount
-    expect(destroySpy).toHaveBeenCalledTimes(1)
-
-    douraFactory.mockRestore()
-  })
-})
+// useAnonymousModel does not call store.destroy() on unmount.
+// The anonymous store is created via doura() with no plugins, so there are no
+// external resources (DevTools connections, plugin subscriptions) to clean up.
+// All internal resources (draft watchers, effect scope, model state) are only
+// reachable through the component's useRef and will be GC'd after unmount.
+// View cleanup is handled by useModelWithSelector's own useEffect.
 
 describe('useStaticModel', () => {
   test('name should not be empty', async () => {

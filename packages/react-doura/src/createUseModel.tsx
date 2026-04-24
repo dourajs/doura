@@ -103,27 +103,16 @@ function useModelWithSelector<
   const getSnapshot = useMemo(() => () => selectorRef.current!(), [model])
 
   // StrictMode runs effects as setup→cleanup→setup with no render in between.
-  // Cleanup marks the view for disposal; setup checks and re-creates if needed.
-  // On real unmount only cleanup runs — the scheduled microtask sees mountedRef
-  // is still false and performs the actual destroy.
-  const mountedRef = useRef(false)
-
+  // Cleanup synchronously destroys the view and nulls the ref. The subsequent
+  // setup detects the null ref and re-creates the view from the still-alive
+  // model. On real unmount only cleanup runs, which is the desired behavior.
   useEffect(() => {
-    mountedRef.current = true
     if (!selectorRef.current) {
       selectorRef.current = model.$createView(selector)
     }
     return () => {
-      mountedRef.current = false
-      const view = selectorRef.current
-      if (view) {
-        selectorRef.current = undefined
-        Promise.resolve().then(() => {
-          if (!mountedRef.current) {
-            view.destroy()
-          }
-        })
-      }
+      selectorRef.current?.destroy()
+      selectorRef.current = undefined
     }
   }, [])
 
