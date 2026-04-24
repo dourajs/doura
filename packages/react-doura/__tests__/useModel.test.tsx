@@ -321,6 +321,8 @@ describe('useModel (without name)', () => {
         expect(internal.effectScope.effects.length).toBeGreaterThan(baseline)
 
         await toggle() // unmount
+        // View destruction is deferred via microtask
+        await Promise.resolve()
         expect(internal.effectScope.effects.length).toBe(baseline)
       })
 
@@ -363,6 +365,8 @@ describe('useModel (without name)', () => {
         for (let i = 0; i < 10; i++) {
           await toggle() // mount
           await toggle() // unmount
+          // View destruction is deferred via microtask
+          await Promise.resolve()
         }
 
         expect(internal.effectScope.effects.length).toBe(baseline)
@@ -679,6 +683,8 @@ describe('useModel (with name)', () => {
       expect(internal.effectScope.effects.length).toBeGreaterThan(baseline)
 
       await toggle() // unmount Child — selector view effect should be cleaned up
+      // View destruction is deferred via microtask
+      await Promise.resolve()
       expect(internal.effectScope.effects.length).toBe(baseline)
     })
 
@@ -727,6 +733,8 @@ describe('useModel (with name)', () => {
       for (let i = 0; i < 10; i++) {
         await toggle() // mount
         await toggle() // unmount
+        // View destruction is deferred via microtask
+        await Promise.resolve()
       }
 
       // No orphaned selector effects should remain
@@ -790,6 +798,10 @@ describe('useAnonymousModel store cleanup on unmount', () => {
         .querySelector('#toggle')
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
+
+    // Store destruction is deferred via microtask to survive StrictMode's
+    // simulated unmount-remount cycle. Flush the microtask.
+    await Promise.resolve()
 
     // The internally-created store should be destroyed on unmount
     expect(destroySpy).toHaveBeenCalledTimes(1)
