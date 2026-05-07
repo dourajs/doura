@@ -12,19 +12,16 @@ describe('FetchManager', () => {
 
   it('should execute a fetch and return result', async () => {
     const result = await fm.fetch(hash('a'), () => Promise.resolve('data'))
-      .promise
     expect(result).toBe('data')
   })
 
-  it('should deduplicate concurrent fetches for same hash', async () => {
+  it('should reject duplicate inflight fetches for the same hash', async () => {
     const fn = jest.fn(() => Promise.resolve('data'))
-    const l1 = fm.fetch(hash('a'), fn)
-    const l2 = fm.fetch(hash('a'), fn)
-    expect(l1.isNew).toBe(true)
-    expect(l2.isNew).toBe(false)
-    const [r1, r2] = await Promise.all([l1.promise, l2.promise])
-    expect(r1).toBe('data')
-    expect(r2).toBe('data')
+    const p1 = fm.fetch(hash('a'), fn)
+    expect(() => fm.fetch(hash('a'), fn)).toThrow(
+      'Fetch already in flight for hash'
+    )
+    await expect(p1).resolves.toBe('data')
     expect(fn).toHaveBeenCalledTimes(1)
   })
 
@@ -32,14 +29,14 @@ describe('FetchManager', () => {
     const fn = jest.fn(() => Promise.resolve('data'))
     const l1 = fm.fetch(hash('a'), fn)
     const l2 = fm.fetch(hash('b'), fn)
-    await Promise.all([l1.promise, l2.promise])
+    await Promise.all([l1, l2])
     expect(fn).toHaveBeenCalledTimes(2)
   })
 
   it('should allow re-fetch after previous resolve', async () => {
     const fn = jest.fn(() => Promise.resolve('data'))
-    await fm.fetch(hash('a'), fn).promise
-    await fm.fetch(hash('a'), fn).promise
+    await fm.fetch(hash('a'), fn)
+    await fm.fetch(hash('a'), fn)
     expect(fn).toHaveBeenCalledTimes(2)
   })
 
@@ -48,19 +45,19 @@ describe('FetchManager', () => {
     await fm.fetch(hash('a'), (signal) => {
       receivedSignal = signal
       return Promise.resolve('data')
-    }).promise
+    })
     expect(receivedSignal).toBeInstanceOf(AbortSignal)
   })
 
   it('should cancel inflight request', async () => {
     let receivedSignal: AbortSignal | null = null
-    const lease = fm.fetch(hash('a'), (signal) => {
+    const promise = fm.fetch(hash('a'), (signal) => {
       receivedSignal = signal
       return new Promise((resolve) => setTimeout(() => resolve('data'), 1000))
     })
     fm.cancel(hash('a'))
     expect(receivedSignal!.aborted).toBe(true)
-    await expect(lease.promise).rejects.toThrow()
+    await expect(promise).rejects.toThrow()
   })
 
   it('should cancel by prefix', async () => {

@@ -51,7 +51,7 @@ export class QueryCoordinator {
           ? (fn as Function)(ctx, args)
           : (fn as Function)(ctx)
       })
-      .promise.then((result) => {
+      .then((result) => {
         if (!model.destroyed) {
           model.setQueryData(queryName, args, result)
         }

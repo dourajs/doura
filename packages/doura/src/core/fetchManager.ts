@@ -7,11 +7,6 @@ interface InflightEntry {
   reject: (reason: unknown) => void
 }
 
-export interface FetchLease {
-  isNew: boolean
-  promise: Promise<unknown>
-}
-
 export class FetchManager {
   private _inflight = new Map<QueryHash, InflightEntry>()
 
@@ -26,13 +21,9 @@ export class FetchManager {
   fetch(
     hash: QueryHash,
     fetcher: (signal: AbortSignal) => Promise<unknown>
-  ): FetchLease {
-    const existing = this._inflight.get(hash)
-    if (existing) {
-      return {
-        isNew: false,
-        promise: existing.promise,
-      }
+  ): Promise<unknown> {
+    if (this._inflight.has(hash)) {
+      throw new Error(`Fetch already in flight for hash ${String(hash)}`)
     }
 
     const controller = new AbortController()
@@ -52,14 +43,7 @@ export class FetchManager {
       })
 
     this._inflight.set(hash, { controller, promise, reject: rejectFn! })
-    return {
-      isNew: true,
-      promise,
-    }
-  }
-
-  has(hash: QueryHash): boolean {
-    return this._inflight.has(hash)
+    return promise
   }
 
   cancel(hash: QueryHash): void {
