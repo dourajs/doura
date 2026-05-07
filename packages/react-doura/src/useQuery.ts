@@ -6,7 +6,6 @@ import {
   useSyncExternalStore,
 } from 'react'
 import type { QueryHandle, QueryCacheEntry } from 'doura'
-import { computeQueryHash, computeArgsKey } from 'doura'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
 
 // Overload: query with no args (TArgs = void)
@@ -38,23 +37,9 @@ export function useQuery(
     options = argsOrOptions
   }
 
-  const modelPublic = queryHandle._model
-  const queryName = queryHandle._queryName
-  // ModelPublicInstance proxies '_' to the ModelInternal instance
-  const internal: any = (modelPublic as any)._
-  const coordinator: any = internal.coordinator
-
   // Stable hash — memoized so subscribe/effect don't re-fire on
   // args object identity changes that produce the same cache key.
-  const hash = useMemo(
-    () =>
-      computeQueryHash(
-        internal.name,
-        queryName,
-        computeArgsKey(args, queryHandle._spec.key)
-      ),
-    [internal.name, queryName, args]
-  )
+  const hash = useMemo(() => queryHandle.computeHash(args), [queryHandle, args])
 
   // Latest args via ref so refetch() always uses the current value without
   // forcing the callback identity to change on every render.
@@ -62,16 +47,13 @@ export function useQuery(
   argsRef.current = args
 
   const subscribe = useCallback(
-    (cb: () => void) => internal.subscribeQuery(queryName, argsRef.current, cb),
-    [internal, queryName, hash]
+    (cb: () => void) => queryHandle.subscribe(argsRef.current, cb),
+    [queryHandle, hash]
   )
 
   const getSnapshot = useCallback(
-    () =>
-      internal.getQueryState(queryName, argsRef.current) as
-        | QueryCacheEntry
-        | undefined,
-    [internal, queryName, hash]
+    () => queryHandle.getState(argsRef.current) as QueryCacheEntry | undefined,
+    [queryHandle, hash]
   )
 
   const cacheEntry = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
@@ -88,20 +70,22 @@ export function useQuery(
         : options.enabled
       : true
 
+  // Resolved staleTime (hook override > spec > 0)
+  const resolvedStaleTime =
+    options?.staleTime ?? queryHandle._spec.staleTime ?? 0
+
   // Fetch + GC lifecycle
   useEffect(() => {
-    if (!coordinator) return
-    coordinator.observeQuery(hash)
+    queryHandle.observe(argsRef.current)
 
     if (enabled) {
-      const stale = coordinator.isStale(
-        internal,
-        queryName,
-        argsRef.current,
-        options?.staleTime
-      )
+      const entry = queryHandle.getState(argsRef.current)
+      const stale =
+        !entry ||
+        entry.data === undefined ||
+        Date.now() - entry.dataUpdatedAt >= resolvedStaleTime
       if (stale) {
-        coordinator.fetch(internal, queryName, argsRef.current).catch(() => {
+        queryHandle.fetch(argsRef.current).catch(() => {
           // Error surfaces via cacheEntry.error; swallow the rejection
           // to avoid unhandled promise warnings.
         })
@@ -109,11 +93,11 @@ export function useQuery(
     }
 
     return () => {
-      coordinator.unobserveQuery(hash, () => {
+      queryHandle.unobserve(argsRef.current, () => {
         queryHandle.reset(argsRef.current)
       })
     }
-  }, [hash, enabled, coordinator, internal, queryName, options?.staleTime])
+  }, [hash, enabled, queryHandle, resolvedStaleTime])
 
   // Apply select transform to real data (not placeholder)
   const selectedData = useMemo(() => {
@@ -142,15 +126,9 @@ export function useQuery(
   const isPending = !hasData
 
   const refetch = useCallback((): Promise<any> => {
-    if (!coordinator) return Promise.resolve(undefined)
-    return coordinator.fetch(internal, queryName, argsRef.current)
-  }, [coordinator, internal, queryName, hash])
+    return queryHandle.fetch(argsRef.current)
+  }, [queryHandle, hash])
 
-  // Derive isStale from the already-subscribed cacheEntry rather than
-  // re-reading the cache (which recomputes the hash) every render.
-  const resolvedStaleTime = coordinator
-    ? coordinator.resolveStaleTime(internal, queryName, options?.staleTime)
-    : 0
   const isStale =
     !cacheEntry ||
     cacheEntry.data === undefined ||

@@ -758,6 +758,25 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       ? (args: any, data: any) => self.setQueryData(queryName, args, data)
       : (data: any) => self.setQueryData(queryName, undefined, data)
 
+    // Hook integration
+    handle.computeHash = (args?: any): QueryHash =>
+      self._queryHash(queryName, args)
+    handle.subscribe = (args: any, listener: () => void) =>
+      self.subscribeQuery(queryName, args, listener)
+    handle.observe = (args?: any) => {
+      if (self.coordinator) {
+        self.coordinator.observeQuery(self._queryHash(queryName, args))
+      }
+    }
+    handle.unobserve = (args: any, cleanup: () => void) => {
+      if (self.coordinator) {
+        self.coordinator.unobserveQuery(
+          self._queryHash(queryName, args),
+          cleanup
+        )
+      }
+    }
+
     return handle as QueryHandle
   }
 

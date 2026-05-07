@@ -242,4 +242,17 @@ export interface QueryHandle<TArgs extends object | void = any, TData = any> {
   setData: TArgs extends void
     ? (data: TData) => void
     : (args: TArgs, data: TData) => void
+
+  // --- hook integration (used by useQuery / useInfiniteQuery) ---
+  /** Compute the stable cache hash for a given args value. */
+  computeHash(...args: QueryArgsParam<TArgs>): QueryHash
+  /** Subscribe to cache changes for a specific args slot. Returns unsubscribe. */
+  subscribe(
+    args: TArgs extends void ? void : TArgs,
+    listener: () => void
+  ): () => void
+  /** Register a GC observer for the given args slot. */
+  observe(...args: QueryArgsParam<TArgs>): void
+  /** Unregister a GC observer. cleanup is called when gcTime elapses. */
+  unobserve(args: TArgs extends void ? void : TArgs, cleanup: () => void): void
 }
