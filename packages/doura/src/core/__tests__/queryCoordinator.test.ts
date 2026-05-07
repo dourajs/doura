@@ -397,6 +397,45 @@ describe('QueryCoordinator', () => {
 
       mgr.destroy()
     })
+
+    it('should cancel matching inflight hashes without relying on string prefixes', async () => {
+      const coordinator = new QueryCoordinator()
+      const usersSignals: AbortSignal[] = []
+      const postsSignals: AbortSignal[] = []
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          'fetch"Users': (ctx: any, args: any) => {
+            usersSignals.push(ctx.signal)
+            return new Promise((resolve) => setTimeout(resolve, 5000))
+          },
+          fetchPosts: (ctx: any) => {
+            postsSignals.push(ctx.signal)
+            return new Promise((resolve) => setTimeout(resolve, 5000))
+          },
+        },
+      })
+
+      const mgr = modelManager({ query: {} })
+      mgr.getModel('te"st', model)
+      const internal = getInternal(mgr, 'te"st', model)
+
+      coordinator
+        .fetch(internal, 'fetch"Users', { id: 1 } as any)
+        .catch(() => {})
+      coordinator
+        .fetch(internal, 'fetch"Users', { id: 2 } as any)
+        .catch(() => {})
+      coordinator.fetch(internal, 'fetchPosts', undefined).catch(() => {})
+
+      coordinator.cancel(internal, 'fetch"Users')
+
+      expect(usersSignals[0].aborted).toBe(true)
+      expect(usersSignals[1].aborted).toBe(true)
+      expect(postsSignals[0].aborted).toBe(false)
+
+      mgr.destroy()
+    })
   })
 
   describe('isStale', () => {

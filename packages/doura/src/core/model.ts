@@ -49,6 +49,7 @@ import {
   QueryHandle,
 } from './queryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
+import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -245,7 +246,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   coordinator: IQueryCoordinator | undefined = undefined
   queryCache: Map<QueryHash, QueryCacheEntry> = new Map()
   queryNotifiers: Map<QueryHash, (() => void)[]> = new Map()
-  private _queryIndex: Map<string, Set<QueryHash>> = new Map()
+  private _queryIndex = new QueryHashIndex<null>()
 
   constructor(model: IModel, { name, initState }: ModelInternalOptions) {
     this.patch = this.patch.bind(this)
@@ -582,10 +583,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return this._destroyed
   }
 
-  queryHashPrefix(queryName?: string): string {
-    return queryName
-      ? `["${this._queryHashScope}","${queryName}"`
-      : `["${this._queryHashScope}"`
+  get queryHashScope(): string {
+    return this._queryHashScope
   }
 
   private _setState(newState: ModelState<IModel>) {
@@ -837,13 +836,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   ): void {
     const hash = this._queryHash(queryName, args)
     this.queryCache.set(hash, entry)
-
-    let hashes = this._queryIndex.get(queryName)
-    if (!hashes) {
-      hashes = new Set()
-      this._queryIndex.set(queryName, hashes)
-    }
-    hashes.add(hash)
+    this._queryIndex.set(hash, {
+      scope: this._queryHashScope,
+      queryName,
+      data: null,
+    })
 
     this._notifyQueryListeners(hash)
   }
@@ -858,34 +855,18 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
-  /** Resolve which cache hashes are targeted by a (queryName?, args?) pair
-   *  and invoke `cb` for each. Encapsulates the three-branch dispatch
-   *  (all / by-name / by-name+args) shared by invalidate and reset. */
-  private _forMatchingHashes(
-    queryName: string | undefined,
-    args: object | void | undefined,
-    cb: (hash: QueryHash) => void
-  ): void {
-    if (!queryName) {
-      for (const hash of this.queryCache.keys()) {
-        cb(hash)
-      }
-      return
-    }
-    if (args !== undefined) {
-      cb(this._queryHash(queryName, args))
-      return
-    }
-    const hashes = this._queryIndex.get(queryName)
-    if (hashes) {
-      for (const hash of hashes) {
-        cb(hash)
-      }
-    }
-  }
-
   invalidateQueries(queryName?: string, args?: object | void): void {
-    this._forMatchingHashes(queryName, args, (hash) => {
+    if (queryName && args !== undefined) {
+      const hash = this._queryHash(queryName, args)
+      const entry = this.queryCache.get(hash)
+      if (entry) {
+        this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
+        this._notifyQueryListeners(hash)
+      }
+      return
+    }
+
+    this._queryIndex.forEach(this._prefixKey(queryName), (hash) => {
       const entry = this.queryCache.get(hash)
       if (entry) {
         this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
@@ -954,18 +935,25 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   resetQueries(queryName?: string, args?: object | void): void {
-    this._forMatchingHashes(queryName, args, (hash) => {
+    if (queryName && args !== undefined) {
+      const hash = this._queryHash(queryName, args)
       this.queryCache.delete(hash)
       this._notifyQueryListeners(hash)
-    })
-    // Clean up the secondary index for the targeted scope.
-    if (!queryName) {
-      this._queryIndex.clear()
-    } else if (args !== undefined) {
-      this._queryIndex.get(queryName)?.delete(this._queryHash(queryName, args))
-    } else {
-      this._queryIndex.delete(queryName)
+      this._queryIndex.deleteHash(hash)
+      return
     }
+
+    const hashes = this._queryIndex.delete(this._prefixKey(queryName))
+    for (const hash of hashes) {
+      this.queryCache.delete(hash)
+      this._notifyQueryListeners(hash)
+    }
+  }
+
+  private _prefixKey(queryName?: string): QueryHashPrefixKey {
+    return queryName === undefined
+      ? [this._queryHashScope]
+      : [this._queryHashScope, queryName]
   }
 }
 

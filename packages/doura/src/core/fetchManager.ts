@@ -53,9 +53,10 @@ export class FetchManager {
     }
   }
 
-  cancelByPrefix(prefix: string): void {
-    for (const [hash, entry] of this._inflight) {
-      if ((hash as string).startsWith(prefix)) {
+  cancelMany(hashes: Iterable<QueryHash>): void {
+    for (const hash of hashes) {
+      const entry = this._inflight.get(hash)
+      if (entry) {
         this._abortEntry(hash, entry)
       }
     }

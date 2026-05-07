@@ -60,17 +60,17 @@ describe('FetchManager', () => {
     await expect(promise).rejects.toThrow()
   })
 
-  it('should cancel by prefix', async () => {
+  it('should cancel multiple inflight requests by exact hash list', async () => {
     const signals: AbortSignal[] = []
     const makePromise = (signal: AbortSignal) => {
       signals.push(signal)
       return new Promise((resolve) => setTimeout(() => resolve('data'), 1000))
     }
-    fm.fetch(hash('["users","fetch","1"]'), makePromise)
-    fm.fetch(hash('["users","fetch","2"]'), makePromise)
-    fm.fetch(hash('["posts","fetch","1"]'), makePromise)
+    fm.fetch(hash('a'), makePromise)
+    fm.fetch(hash('b'), makePromise)
+    fm.fetch(hash('c'), makePromise)
 
-    fm.cancelByPrefix('["users"')
+    fm.cancelMany([hash('a'), hash('b')])
     expect(signals[0].aborted).toBe(true)
     expect(signals[1].aborted).toBe(true)
     expect(signals[2].aborted).toBe(false)

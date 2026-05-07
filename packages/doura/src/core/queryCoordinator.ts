@@ -1,13 +1,14 @@
 import { FetchManager } from './fetchManager'
 import { GCManager } from './gcManager'
 import { QueryConfig, DEFAULT_QUERY_CONFIG, QueryHash } from './queryTypes'
+import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
 import type { ModelInternal } from './model'
 
 export class QueryCoordinator {
   private _fetchManager: FetchManager
   private _gcManager: GCManager
   private _config: QueryConfig
-  private _appliedInflight = new Map<QueryHash, Promise<unknown>>()
+  private _appliedInflight = new QueryHashIndex<Promise<unknown>>()
 
   constructor(config?: Partial<QueryConfig>) {
     this._config = { ...DEFAULT_QUERY_CONFIG, ...config }
@@ -33,7 +34,7 @@ export class QueryCoordinator {
     const hash = handle.computeHash(args as any)
     const shared = this._appliedInflight.get(hash)
     if (shared) {
-      return shared
+      return shared.data
     }
 
     const existing = model.getQueryState(queryName, args)
@@ -71,16 +72,22 @@ export class QueryCoordinator {
         throw error
       })
       .finally(() => {
-        this._appliedInflight.delete(hash)
+        this._appliedInflight.deleteHash(hash)
       })
 
-    this._appliedInflight.set(hash, appliedPromise)
+    this._appliedInflight.set(hash, {
+      scope: model.queryHashScope,
+      queryName,
+      data: appliedPromise,
+    })
     return appliedPromise
   }
 
   cancel(model: ModelInternal, queryName?: string, args?: object | void): void {
     if (!queryName) {
-      this._fetchManager.cancelByPrefix(model.queryHashPrefix())
+      this._fetchManager.cancelMany(
+        this._appliedInflight.find(this._prefixKey(model.queryHashScope))
+      )
       return
     }
 
@@ -90,11 +97,15 @@ export class QueryCoordinator {
     }
 
     if (args !== undefined) {
-      const hash = handle.computeHash(args as any)
-      this._fetchManager.cancel(hash)
+      this._fetchManager.cancel(handle.computeHash(args as any))
       return
     }
-    this._fetchManager.cancelByPrefix(model.queryHashPrefix(queryName))
+
+    this._fetchManager.cancelMany(
+      this._appliedInflight.find(
+        this._prefixKey(model.queryHashScope, queryName)
+      )
+    )
   }
 
   resolveStaleTime(
@@ -128,6 +139,10 @@ export class QueryCoordinator {
 
   unobserveQuery(hash: QueryHash, cleanup: () => void): void {
     this._gcManager.unobserve(hash as string, this._config.gcTime, cleanup)
+  }
+
+  private _prefixKey(scope: string, queryName?: string): QueryHashPrefixKey {
+    return queryName === undefined ? [scope] : [scope, queryName]
   }
 
   destroy(): void {
