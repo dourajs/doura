@@ -150,6 +150,29 @@ export function query<
   return spec
 }
 
+/** Coordinator interface — breaks the circular import between model.ts
+ *  and queryCoordinator.ts. ModelInternal depends only on this interface;
+ *  the concrete QueryCoordinator implements it. */
+export interface IQueryCoordinator {
+  readonly config: QueryConfig
+  fetch(model: any, queryName: string, args: object | void): Promise<unknown>
+  cancel(model: any, queryName?: string, args?: object | void): void
+  resolveStaleTime(
+    model: any,
+    queryName: string,
+    overrideStaleTime?: number
+  ): number
+  isStale(
+    model: any,
+    queryName: string,
+    args: object | void,
+    overrideStaleTime?: number
+  ): boolean
+  observeQuery(hash: QueryHash): void
+  unobserveQuery(hash: QueryHash, cleanup: () => void): void
+  destroy(): void
+}
+
 export type FetchStatus = 'idle' | 'fetching'
 
 export interface QueryCacheEntry {
@@ -189,6 +212,8 @@ export interface QueryHandle<TArgs extends object | void = any, TData = any> {
   readonly _model: any // ModelPublicInstance — typed as any to avoid circular import
   readonly _queryName: string
   readonly _spec: NormalizedQuerySpec<any, any, any>
+  /** Runtime discriminator: true when the query's fn takes args (TArgs != void). */
+  readonly _hasArgs: boolean
   // Phantom types for inference
   readonly _args?: TArgs
   readonly _data?: TData

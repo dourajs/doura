@@ -41,6 +41,7 @@ import {
 import { queueJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
 import {
+  IQueryCoordinator,
   NormalizedQuerySpec,
   QueryCacheEntry,
   QueryHash,
@@ -236,7 +237,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _destroyed: boolean = false
   private _lastDraftToSnapshot: WeakMap<object, any> = new WeakMap()
 
-  // Query cache infrastructure
+  // Query infrastructure
+  coordinator: IQueryCoordinator | undefined = undefined
   queryCache: Map<QueryHash, QueryCacheEntry> = new Map()
   queryNotifiers: Map<QueryHash, (() => void)[]> = new Map()
   private _queryIndex: Map<string, Set<QueryHash>> = new Map()
@@ -729,10 +731,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     spec: NormalizedQuerySpec
   ): QueryHandle {
     const self = this
+    // fn.length > 1 means fn(ctx, args) — i.e. the query requires args.
+    const hasArgs = spec.fn.length > 1
     const handle: any = {
       _model: this.publicInst,
       _queryName: queryName,
       _spec: spec,
+      _hasArgs: hasArgs,
     }
 
     handle.getData = (args?: any) => self.getQueryData(queryName, args)
@@ -740,41 +745,36 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     handle.isFetching = (args?: any) =>
       self.getQueryState(queryName, args)?.fetchStatus === 'fetching'
     handle.isStale = (args?: any): boolean => {
-      const coord: any = (self as any)._coordinator
-      if (!coord) return true
-      return coord.isStale(self, queryName, args)
+      if (!self.coordinator) return true
+      return self.coordinator.isStale(self, queryName, args)
     }
     handle.fetch = (args?: any): Promise<any> => {
-      const coord: any = (self as any)._coordinator
-      if (!coord) return Promise.resolve(undefined)
-      return coord.fetch(self, queryName, args) as Promise<any>
+      if (!self.coordinator) return Promise.resolve(undefined)
+      return self.coordinator.fetch(self, queryName, args) as Promise<any>
     }
     handle.invalidate = (args?: any) => self.invalidateQueries(queryName, args)
     handle.reset = (args?: any) => self.resetQueries(queryName, args)
-    // setData: void queries call with (data); args queries call with (args, data).
-    // Detect by arity so both calling conventions work at runtime.
-    handle.setData = (...rest: any[]) => {
-      if (rest.length <= 1) {
-        self.setQueryData(queryName, undefined, rest[0])
-      } else {
-        self.setQueryData(queryName, rest[0], rest[1])
-      }
-    }
+    handle.setData = hasArgs
+      ? (args: any, data: any) => self.setQueryData(queryName, args, data)
+      : (data: any) => self.setQueryData(queryName, undefined, data)
 
     return handle as QueryHandle
   }
 
-  // --- Query cache methods ---
+  private _queryHash(queryName: string, args: object | void): QueryHash {
+    return computeQueryHash(
+      this.name,
+      queryName,
+      computeArgsKey(args, this.queries[queryName]?._spec.key)
+    )
+  }
+
   subscribeQuery(
     queryName: string,
     args: object | void,
     listener: () => void
   ): () => void {
-    const hash = computeQueryHash(
-      this.name,
-      queryName,
-      computeArgsKey(args, this.queries[queryName]?._spec.key)
-    )
+    const hash = this._queryHash(queryName, args)
     let listeners = this.queryNotifiers.get(hash)
     if (!listeners) {
       listeners = []
@@ -793,12 +793,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     queryName: string,
     args: object | void
   ): QueryCacheEntry | undefined {
-    const hash = computeQueryHash(
-      this.name,
-      queryName,
-      computeArgsKey(args, this.queries[queryName]?._spec.key)
-    )
-    return this.queryCache.get(hash)
+    return this.queryCache.get(this._queryHash(queryName, args))
   }
 
   setQueryState(
@@ -806,8 +801,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     args: object | void,
     entry: QueryCacheEntry
   ): void {
-    const key = computeArgsKey(args, this.queries[queryName]?._spec.key)
-    const hash = computeQueryHash(this.name, queryName, key)
+    const hash = this._queryHash(queryName, args)
     this.queryCache.set(hash, entry)
 
     let hashes = this._queryIndex.get(queryName)
@@ -830,54 +824,40 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
-  private _removeQuery(queryName: string, args: object | void): void {
-    const hash = computeQueryHash(
-      this.name,
-      queryName,
-      computeArgsKey(args, this.queries[queryName]?._spec.key)
-    )
-    this.queryCache.delete(hash)
-    this._queryIndex.get(queryName)?.delete(hash)
-    this._notifyQueryListeners(hash)
-  }
-
-  // --- Public query API methods ---
-  invalidateQueries(queryName?: string, args?: object | void): void {
+  /** Resolve which cache hashes are targeted by a (queryName?, args?) pair
+   *  and invoke `cb` for each. Encapsulates the three-branch dispatch
+   *  (all / by-name / by-name+args) shared by invalidate and reset. */
+  private _forMatchingHashes(
+    queryName: string | undefined,
+    args: object | void | undefined,
+    cb: (hash: QueryHash) => void
+  ): void {
     if (!queryName) {
-      // Invalidate all — create new entry objects for reference change
-      for (const [hash, entry] of this.queryCache) {
-        this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
-        this._notifyQueryListeners(hash)
+      for (const hash of this.queryCache.keys()) {
+        cb(hash)
       }
       return
     }
-
     if (args !== undefined) {
-      // Invalidate specific
-      const hash = computeQueryHash(
-        this.name,
-        queryName,
-        computeArgsKey(args, this.queries[queryName]?._spec.key)
-      )
+      cb(this._queryHash(queryName, args))
+      return
+    }
+    const hashes = this._queryIndex.get(queryName)
+    if (hashes) {
+      for (const hash of hashes) {
+        cb(hash)
+      }
+    }
+  }
+
+  invalidateQueries(queryName?: string, args?: object | void): void {
+    this._forMatchingHashes(queryName, args, (hash) => {
       const entry = this.queryCache.get(hash)
       if (entry) {
         this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
         this._notifyQueryListeners(hash)
       }
-      return
-    }
-
-    // Invalidate all entries for this queryName
-    const hashes = this._queryIndex.get(queryName)
-    if (hashes) {
-      for (const hash of hashes) {
-        const entry = this.queryCache.get(hash)
-        if (entry) {
-          this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
-          this._notifyQueryListeners(hash)
-        }
-      }
-    }
+    })
   }
 
   setQueryData(queryName: string, args: object | void, data: unknown): void {
@@ -907,11 +887,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
 
     // Always update the query cache entry
-    const hash = computeQueryHash(
-      this.name,
-      queryName,
-      computeArgsKey(args, this.queries[queryName]?._spec.key)
-    )
+    const hash = this._queryHash(queryName, args)
     const existing = this.queryCache.get(hash)
     const entry: QueryCacheEntry = {
       data,
@@ -923,71 +899,33 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   getQueryData(queryName: string, args: object | void): unknown {
-    // Reads always come from the query cache.
-    const hash = computeQueryHash(
-      this.name,
-      queryName,
-      computeArgsKey(args, this.queries[queryName]?._spec.key)
-    )
-    const entry = this.queryCache.get(hash)
-    return entry?.data
+    return this.queryCache.get(this._queryHash(queryName, args))?.data
   }
 
   prefetchQuery(queryName: string, args?: object | void): void {
-    const coordinator = (this as any)._coordinator as
-      | {
-          fetch: (
-            model: ModelInternal,
-            name: string,
-            args: object | void
-          ) => Promise<unknown>
-        }
-      | undefined
-    if (coordinator) {
+    if (this.coordinator) {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
-      coordinator.fetch(this, queryName, args).catch(() => {})
+      this.coordinator.fetch(this, queryName, args).catch(() => {})
     }
   }
 
   cancelQueries(queryName?: string, args?: object | void): void {
-    const coordinator = (this as any)._coordinator as
-      | {
-          cancel: (
-            model: ModelInternal,
-            name?: string,
-            args?: object | void
-          ) => void
-        }
-      | undefined
-    if (coordinator) {
-      coordinator.cancel(this, queryName, args)
+    if (this.coordinator) {
+      this.coordinator.cancel(this, queryName, args)
     }
   }
 
   resetQueries(queryName?: string, args?: object | void): void {
+    this._forMatchingHashes(queryName, args, (hash) => {
+      this.queryCache.delete(hash)
+      this._notifyQueryListeners(hash)
+    })
+    // Clean up the secondary index for the targeted scope.
     if (!queryName) {
-      // Reset all — collect hashes before clearing for notification
-      const hashes = Array.from(this.queryCache.keys())
-      this.queryCache.clear()
       this._queryIndex.clear()
-      for (const hash of hashes) {
-        this._notifyQueryListeners(hash)
-      }
-      return
-    }
-
-    if (args !== undefined) {
-      this._removeQuery(queryName, args)
-      return
-    }
-
-    // Reset all entries for this queryName
-    const hashes = this._queryIndex.get(queryName)
-    if (hashes) {
-      for (const hash of hashes) {
-        this.queryCache.delete(hash)
-        this._notifyQueryListeners(hash)
-      }
+    } else if (args !== undefined) {
+      this._queryIndex.get(queryName)?.delete(this._queryHash(queryName, args))
+    } else {
       this._queryIndex.delete(queryName)
     }
   }

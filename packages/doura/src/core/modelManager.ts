@@ -177,7 +177,7 @@ class ModelManagerInternal implements ModelManager {
   }): ModelInternal {
     if (!name) {
       const instance = createModelInstance(model)
-      ;(instance as any)._coordinator = this._queryCoordinator
+      instance.coordinator = this._queryCoordinator
       return instance
     }
 
@@ -187,7 +187,7 @@ class ModelManagerInternal implements ModelManager {
       name,
       initState: this._getInitialState(name),
     })
-    ;(modelInstance as any)._coordinator = this._queryCoordinator
+    modelInstance.coordinator = this._queryCoordinator
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)

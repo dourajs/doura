@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { QueryHandle } from 'doura'
 
 export interface InfiniteQueryConfig<TArgs extends object, TData> {
@@ -29,6 +29,57 @@ export interface UseInfiniteQueryResult<TArgs extends object, TData> {
 
 type FetchKind = 'none' | 'initial' | 'next' | 'prev' | 'refetch'
 
+interface InfiniteState<TArgs, TData> {
+  pages: TData[]
+  pageArgs: TArgs[]
+  error: unknown
+  fetchingKind: FetchKind
+}
+
+type InfiniteEvent<TArgs, TData> =
+  | { type: 'fetching'; kind: Exclude<FetchKind, 'none'> }
+  | {
+      type: 'success'
+      data: TData
+      args: TArgs
+      position: 'append' | 'prepend' | 'replace'
+    }
+  | { type: 'error'; error: unknown }
+
+function infiniteReducer<TArgs, TData>(
+  state: InfiniteState<TArgs, TData>,
+  event: InfiniteEvent<TArgs, TData>
+): InfiniteState<TArgs, TData> {
+  switch (event.type) {
+    case 'fetching':
+      return { ...state, fetchingKind: event.kind }
+    case 'success': {
+      const pages =
+        event.position === 'append'
+          ? [...state.pages, event.data]
+          : event.position === 'prepend'
+            ? [event.data, ...state.pages]
+            : [event.data]
+      const pageArgs =
+        event.position === 'append'
+          ? [...state.pageArgs, event.args]
+          : event.position === 'prepend'
+            ? [event.args, ...state.pageArgs]
+            : [event.args]
+      return { pages, pageArgs, error: undefined, fetchingKind: 'none' }
+    }
+    case 'error':
+      return { ...state, error: event.error, fetchingKind: 'none' }
+  }
+}
+
+const INITIAL_STATE: InfiniteState<any, any> = {
+  pages: [],
+  pageArgs: [],
+  error: undefined,
+  fetchingKind: 'initial',
+}
+
 /**
  * Paginated query hook that accumulates pages fetched from the same
  * `QueryHandle` across different args.
@@ -52,12 +103,14 @@ export function useInfiniteQuery<TArgs extends object, TData>(
   queryHandle: QueryHandle<TArgs, TData>,
   config: InfiniteQueryConfig<TArgs, TData>
 ): UseInfiniteQueryResult<TArgs, TData> {
-  const [pages, setPages] = useState<TData[]>([])
-  const [pageArgs, setPageArgs] = useState<TArgs[]>([])
-  const [error, setError] = useState<unknown>(undefined)
-  // Start as 'initial' so isLoading is true during the first render before
-  // the mount effect fires the fetch.
-  const [fetchingKind, setFetchingKind] = useState<FetchKind>('initial')
+  const [state, dispatch] = useReducer(
+    infiniteReducer as (
+      s: InfiniteState<TArgs, TData>,
+      e: InfiniteEvent<TArgs, TData>
+    ) => InfiniteState<TArgs, TData>,
+    INITIAL_STATE as InfiniteState<TArgs, TData>
+  )
+  const { pages, pageArgs, error, fetchingKind } = state
 
   // Latest config/handle via refs so stable callback identities still see
   // current values across renders.
@@ -88,7 +141,7 @@ export function useInfiniteQuery<TArgs extends object, TData>(
     ): Promise<void> => {
       const runId = ++runIdRef.current
       if (isMountedRef.current) {
-        setFetchingKind(kind)
+        dispatch({ type: 'fetching', kind })
       }
       try {
         // Bypass TArgs-conditional arity — we always pass args for object args.
@@ -99,27 +152,11 @@ export function useInfiniteQuery<TArgs extends object, TData>(
         )(args)
         if (runIdRef.current !== runId) return
         if (!isMountedRef.current) return
-        setPages((prev) =>
-          position === 'append'
-            ? [...prev, data]
-            : position === 'prepend'
-              ? [data, ...prev]
-              : [data]
-        )
-        setPageArgs((prev) =>
-          position === 'append'
-            ? [...prev, args]
-            : position === 'prepend'
-              ? [args, ...prev]
-              : [args]
-        )
-        setError(undefined)
-        setFetchingKind('none')
+        dispatch({ type: 'success', data, args, position })
       } catch (err) {
         if (runIdRef.current !== runId) return
         if (!isMountedRef.current) return
-        setError(err)
-        setFetchingKind('none')
+        dispatch({ type: 'error', error: err })
       }
     },
     []

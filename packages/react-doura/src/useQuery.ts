@@ -27,47 +27,33 @@ export function useQuery(
   argsOrOptions?: any,
   maybeOptions?: any
 ): UseQueryResult<any, any> {
-  // --- Resolve overloaded args ---
-  // Heuristic: if second arg looks like QueryOverrides (known option keys) and
-  // third arg is absent, treat second arg as options for a void-args query.
+  // Resolve overloaded args using the runtime tag rather than key-scanning.
   let args: any
   let options: QueryOverrides<any, any> | undefined
-  if (
-    maybeOptions === undefined &&
-    argsOrOptions !== undefined &&
-    argsOrOptions !== null &&
-    typeof argsOrOptions === 'object' &&
-    ('enabled' in argsOrOptions ||
-      'staleTime' in argsOrOptions ||
-      'select' in argsOrOptions ||
-      'placeholderData' in argsOrOptions) &&
-    // The query args variant would typically have a domain key like `id`;
-    // we only treat as options when NO args-shaped keys are present besides
-    // options keys. For safety, if the object has ONLY option keys, treat
-    // as options. Mixed shapes fall through to args.
-    Object.keys(argsOrOptions).every((k) =>
-      ['enabled', 'staleTime', 'select', 'placeholderData'].includes(k)
-    )
-  ) {
-    args = undefined
-    options = argsOrOptions
-  } else {
+  if (queryHandle._hasArgs) {
     args = argsOrOptions
     options = maybeOptions
+  } else {
+    args = undefined
+    options = argsOrOptions
   }
 
   const modelPublic = queryHandle._model
   const queryName = queryHandle._queryName
   // ModelPublicInstance proxies '_' to the ModelInternal instance
   const internal: any = (modelPublic as any)._
-  const coordinator: any = internal._coordinator
+  const coordinator: any = internal.coordinator
 
-  // Stable hash — used as dep key so subscribe/effect don't re-fire on
+  // Stable hash — memoized so subscribe/effect don't re-fire on
   // args object identity changes that produce the same cache key.
-  const hash = computeQueryHash(
-    internal.name,
-    queryName,
-    computeArgsKey(args, queryHandle._spec.key)
+  const hash = useMemo(
+    () =>
+      computeQueryHash(
+        internal.name,
+        queryName,
+        computeArgsKey(args, queryHandle._spec.key)
+      ),
+    [internal.name, queryName, args]
   )
 
   // Latest args via ref so refetch() always uses the current value without
@@ -124,7 +110,7 @@ export function useQuery(
 
     return () => {
       coordinator.unobserveQuery(hash, () => {
-        internal._removeQuery(queryName, argsRef.current)
+        queryHandle.reset(argsRef.current)
       })
     }
   }, [hash, enabled, coordinator, internal, queryName, options?.staleTime])
@@ -160,14 +146,15 @@ export function useQuery(
     return coordinator.fetch(internal, queryName, argsRef.current)
   }, [coordinator, internal, queryName, hash])
 
-  const isStale = coordinator
-    ? coordinator.isStale(
-        internal,
-        queryName,
-        argsRef.current,
-        options?.staleTime
-      )
-    : true
+  // Derive isStale from the already-subscribed cacheEntry rather than
+  // re-reading the cache (which recomputes the hash) every render.
+  const resolvedStaleTime = coordinator
+    ? coordinator.resolveStaleTime(internal, queryName, options?.staleTime)
+    : 0
+  const isStale =
+    !cacheEntry ||
+    cacheEntry.data === undefined ||
+    Date.now() - cacheEntry.dataUpdatedAt >= resolvedStaleTime
 
   return {
     data: displayData,

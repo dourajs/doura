@@ -87,19 +87,19 @@ const publicPropertiesMap: PublicPropertiesMap =
       $state: (i) => i.stateValue,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
-      $queries: (i) => (i as any).queries,
+      $queries: (i) => i.queries,
       $patch: (i) => i.patch,
       $onAction: (i) => i.onAction,
       $subscribe: (i) => i.subscribe,
       $isolate: (i) => i.isolate,
       $getApi: (i) => i.getApi,
       $createView: (i) => createView.bind(null, i),
-      $invalidateQueries: (i) => (i as any).invalidateQueries.bind(i),
-      $setQueryData: (i) => (i as any).setQueryData.bind(i),
-      $getQueryData: (i) => (i as any).getQueryData.bind(i),
-      $prefetchQuery: (i) => (i as any).prefetchQuery.bind(i),
-      $cancelQueries: (i) => (i as any).cancelQueries.bind(i),
-      $resetQueries: (i) => (i as any).resetQueries.bind(i),
+      $invalidateQueries: (i) => i.invalidateQueries.bind(i),
+      $setQueryData: (i) => i.setQueryData.bind(i),
+      $getQueryData: (i) => i.getQueryData.bind(i),
+      $prefetchQuery: (i) => i.prefetchQuery.bind(i),
+      $cancelQueries: (i) => i.cancelQueries.bind(i),
+      $resetQueries: (i) => i.resetQueries.bind(i),
     } as PublicPropertiesMap
   )
 
@@ -128,15 +128,15 @@ const createGetter =
           case AccessTypes.CONTEXT:
             return ctx[key]
           case AccessTypes.QUERY:
-            return (instance as any).queries[key]
+            return instance.queries[key]
           // default: just fallthrough
         }
       } else if (hasOwn(state, key)) {
         accessCache[key] = AccessTypes.STATE
         return state[key]
-      } else if (hasOwn((instance as any).queries, key)) {
+      } else if (hasOwn(instance.queries, key)) {
         accessCache[key] = AccessTypes.QUERY
-        return (instance as any).queries[key]
+        return instance.queries[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -199,7 +199,7 @@ const set = (
       warn(`Attempting to mutate view "${key}". Views are readonly.`, instance)
     }
     return false
-  } else if (hasOwn((instance as any).queries, key)) {
+  } else if (hasOwn(instance.queries, key)) {
     if (__DEV__) {
       warn(
         `Attempting to mutate query "${key}". Queries are readonly.`,

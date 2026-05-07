@@ -1,3 +1,4 @@
+import { NOOP } from '../utils'
 import { QueryHash } from './queryTypes'
 
 interface InflightEntry {
@@ -5,10 +6,6 @@ interface InflightEntry {
   promise: Promise<unknown>
   reject: (reason: unknown) => void
 }
-
-// noop to prevent unhandled rejection warnings
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-const noop = () => {}
 
 export class FetchManager {
   private _inflight = new Map<QueryHash, InflightEntry>()
@@ -48,7 +45,7 @@ export class FetchManager {
       entry.controller.abort()
       entry.reject(new DOMException('The operation was aborted.', 'AbortError'))
       // Suppress unhandled rejection on the internal promise
-      entry.promise.catch(noop)
+      entry.promise.catch(NOOP)
       this._inflight.delete(hash)
     }
   }
@@ -61,7 +58,7 @@ export class FetchManager {
           new DOMException('The operation was aborted.', 'AbortError')
         )
         // Suppress unhandled rejection on the internal promise
-        entry.promise.catch(noop)
+        entry.promise.catch(NOOP)
         this._inflight.delete(hash)
       }
     }

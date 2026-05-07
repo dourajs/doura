@@ -35,10 +35,11 @@ export class QueryCoordinator {
       queryName,
       computeArgsKey(args, model.queries[queryName]?._spec.key)
     )
+    const existing = model.getQueryState(queryName, args)
     model.setQueryState(queryName, args, {
-      data: model.getQueryState(queryName, args)?.data,
+      data: existing?.data,
       error: undefined,
-      dataUpdatedAt: model.getQueryState(queryName, args)?.dataUpdatedAt || 0,
+      dataUpdatedAt: existing?.dataUpdatedAt || 0,
       fetchStatus: 'fetching',
     })
 
@@ -54,11 +55,11 @@ export class QueryCoordinator {
       return result
     } catch (error) {
       if ((error as any)?.name !== 'AbortError') {
+        const prev = model.getQueryState(queryName, args)
         model.setQueryState(queryName, args, {
-          data: model.getQueryState(queryName, args)?.data,
+          data: prev?.data,
           error,
-          dataUpdatedAt:
-            model.getQueryState(queryName, args)?.dataUpdatedAt || 0,
+          dataUpdatedAt: prev?.dataUpdatedAt || 0,
           fetchStatus: 'idle',
         })
       }
