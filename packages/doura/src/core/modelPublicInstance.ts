@@ -16,10 +16,20 @@ import {
   ModelState,
   ModelActions,
   ModelViews,
+  ModelQueries,
+  StripIndexSignature,
 } from './modelOptions'
 import { createView, Selector, ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
+
+/** Names of declared queries on a model (string keys only). Falls back
+ *  to `string` when ModelQueries resolves to an empty object so external
+ *  call sites that don't know the model's queries still type-check. */
+type ModelQueryName<IModel extends AnyModel> =
+  keyof ModelQueries<IModel> extends never
+    ? string
+    : Extract<keyof ModelQueries<IModel>, string>
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $name: string
@@ -27,6 +37,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $state: ModelState<IModel>
   $actions: ModelActions<IModel>
   $views: ModelViews<IModel>
+  $queries: ModelQueries<IModel>
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
@@ -35,9 +46,35 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $createView: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
-} & ModelState<IModel> &
-  ModelViews<IModel> &
-  ModelActions<IModel>
+  $invalidateQueries<N extends ModelQueryName<IModel>>(
+    queryName?: N,
+    args?: object
+  ): void
+  $cancelQueries<N extends ModelQueryName<IModel>>(
+    queryName?: N,
+    args?: object
+  ): void
+  $resetQueries<N extends ModelQueryName<IModel>>(
+    queryName?: N,
+    args?: object
+  ): void
+  $setQueryData<N extends ModelQueryName<IModel>>(
+    queryName: N,
+    args: object | void,
+    data: unknown
+  ): void
+  $getQueryData<N extends ModelQueryName<IModel>>(
+    queryName: N,
+    args?: object | void
+  ): unknown | undefined
+  $prefetchQuery<N extends ModelQueryName<IModel>>(
+    queryName: N,
+    args?: object | void
+  ): Promise<void>
+} & StripIndexSignature<ModelState<IModel>> &
+  StripIndexSignature<ModelViews<IModel>> &
+  StripIndexSignature<ModelActions<IModel>> &
+  StripIndexSignature<ModelQueries<IModel>>
 
 const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
@@ -50,12 +87,19 @@ const publicPropertiesMap: PublicPropertiesMap =
       $state: (i) => i.stateValue,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
+      $queries: (i) => (i as any).queries,
       $patch: (i) => i.patch,
       $onAction: (i) => i.onAction,
       $subscribe: (i) => i.subscribe,
       $isolate: (i) => i.isolate,
       $getApi: (i) => i.getApi,
       $createView: (i) => createView.bind(null, i),
+      $invalidateQueries: (i) => (i as any).invalidateQueries.bind(i),
+      $setQueryData: (i) => (i as any).setQueryData.bind(i),
+      $getQueryData: (i) => (i as any).getQueryData.bind(i),
+      $prefetchQuery: (i) => (i as any).prefetchQuery.bind(i),
+      $cancelQueries: (i) => (i as any).cancelQueries.bind(i),
+      $resetQueries: (i) => (i as any).resetQueries.bind(i),
     } as PublicPropertiesMap
   )
 
@@ -83,11 +127,16 @@ const createGetter =
             return actions[key]
           case AccessTypes.CONTEXT:
             return ctx[key]
+          case AccessTypes.QUERY:
+            return (instance as any).queries[key]
           // default: just fallthrough
         }
       } else if (hasOwn(state, key)) {
         accessCache[key] = AccessTypes.STATE
         return state[key]
+      } else if (hasOwn((instance as any).queries, key)) {
+        accessCache[key] = AccessTypes.QUERY
+        return (instance as any).queries[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -148,6 +197,14 @@ const set = (
   } else if (hasOwn(views, key)) {
     if (__DEV__) {
       warn(`Attempting to mutate view "${key}". Views are readonly.`, instance)
+    }
+    return false
+  } else if (hasOwn((instance as any).queries, key)) {
+    if (__DEV__) {
+      warn(
+        `Attempting to mutate query "${key}". Queries are readonly.`,
+        instance
+      )
     }
     return false
   }

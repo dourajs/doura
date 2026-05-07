@@ -17,7 +17,10 @@ const model = defineModel({
   },
 })
 
-expectType<ModelPublicInstance<typeof model>>(store.getModel('test', model))
+const tModel = store.getModel('test', model)
+
+// store apis
+expectType<ModelPublicInstance<typeof model>>(tModel)
 expectType<void>(store.destroy())
 expectType<{ [modelName: string]: State }>(store.getState())
 expectType<() => void>(store.subscribe(() => {}))

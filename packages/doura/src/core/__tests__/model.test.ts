@@ -459,7 +459,7 @@ describe('model', () => {
       const pub = model.publicInst
 
       // Cache 'data' as STATE
-      expect(pub.data).toBe(1)
+      expect((pub as any).data).toBe(1)
 
       // Replace state — 'data' removed
       ;(model.actions as any).replaceFull({ other: 2 })
@@ -470,7 +470,7 @@ describe('model', () => {
       // With the bug: accessCache has data=STATE, returns state.data (undefined)
       //   instead of falling through to ctx where data='from-ctx'
       // Without the bug: cache is invalidated, falls through to ctx
-      expect(pub.data).toBe('from-ctx')
+      expect((pub as any).data).toBe('from-ctx')
     })
   })
 

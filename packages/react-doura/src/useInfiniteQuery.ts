@@ -1,0 +1,185 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { QueryHandle } from 'doura'
+
+export interface InfiniteQueryConfig<TArgs extends object, TData> {
+  /** Args for the first page. */
+  initialArgs: TArgs
+  /** Given the last loaded page (and all pages so far), return the args for
+   *  the page AFTER it, or undefined when no more pages exist. */
+  getNextArgs: (lastPage: TData, allPages: TData[]) => TArgs | undefined
+  /** Optional — same idea as getNextArgs but for pages BEFORE the first. */
+  getPreviousArgs?: (firstPage: TData, allPages: TData[]) => TArgs | undefined
+}
+
+export interface UseInfiniteQueryResult<TArgs extends object, TData> {
+  data: { pages: TData[]; args: TArgs[] } | undefined
+  error: unknown
+  isLoading: boolean
+  isFetching: boolean
+  isSuccess: boolean
+  isError: boolean
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+  isFetchingNextPage: boolean
+  isFetchingPreviousPage: boolean
+  fetchNextPage: () => Promise<void>
+  fetchPreviousPage: () => Promise<void>
+  refetch: () => Promise<void>
+}
+
+type FetchKind = 'none' | 'initial' | 'next' | 'prev' | 'refetch'
+
+/**
+ * Paginated query hook that accumulates pages fetched from the same
+ * `QueryHandle` across different args.
+ *
+ * - Initial fetch runs once on mount (StrictMode-safe via a ref guard).
+ * - `fetchNextPage` / `fetchPreviousPage` compute the next/previous args
+ *   from the user-supplied `getNextArgs` / `getPreviousArgs` and call
+ *   `queryHandle.fetch(args)`, which dedupes through the store's
+ *   FetchManager so concurrent requesters of the same page share work.
+ * - Race guard via runIdRef: only the latest page fetch writes state.
+ *   Out-of-order resolves from superseded runs (e.g. refetch during a
+ *   pending fetchNextPage) silently drop.
+ * - `refetch` resets pages to just the initial args. For multi-page
+ *   refresh semantics, call refetch then re-invoke fetchNextPage.
+ *
+ * Accumulated pages live in local component state. Per-page cache entries
+ * are still populated in the model (so another useQuery on the same args
+ * will read them back), but this hook does not subscribe to those caches.
+ */
+export function useInfiniteQuery<TArgs extends object, TData>(
+  queryHandle: QueryHandle<TArgs, TData>,
+  config: InfiniteQueryConfig<TArgs, TData>
+): UseInfiniteQueryResult<TArgs, TData> {
+  const [pages, setPages] = useState<TData[]>([])
+  const [pageArgs, setPageArgs] = useState<TArgs[]>([])
+  const [error, setError] = useState<unknown>(undefined)
+  // Start as 'initial' so isLoading is true during the first render before
+  // the mount effect fires the fetch.
+  const [fetchingKind, setFetchingKind] = useState<FetchKind>('initial')
+
+  // Latest config/handle via refs so stable callback identities still see
+  // current values across renders.
+  const configRef = useRef(config)
+  configRef.current = config
+  const handleRef = useRef(queryHandle)
+  handleRef.current = queryHandle
+
+  // Race guard — every fetchPage call is given a unique runId; only the
+  // latest run's result is allowed to land. Cleanup does NOT increment it,
+  // so StrictMode's double-mount still lets the first fetch land (the
+  // isMountedRef gate handles post-unmount writes).
+  const runIdRef = useRef(0)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const fetchPage = useCallback(
+    async (
+      args: TArgs,
+      position: 'append' | 'prepend' | 'replace',
+      kind: Exclude<FetchKind, 'none'>
+    ): Promise<void> => {
+      const runId = ++runIdRef.current
+      if (isMountedRef.current) {
+        setFetchingKind(kind)
+      }
+      try {
+        // Bypass TArgs-conditional arity — we always pass args for object args.
+        // TS can't resolve QueryArgsParam<TArgs extends object> at the call
+        // site, so cast the method signature to a uniform one-arg form.
+        const data = await (
+          handleRef.current.fetch as (a: TArgs) => Promise<TData>
+        )(args)
+        if (runIdRef.current !== runId) return
+        if (!isMountedRef.current) return
+        setPages((prev) =>
+          position === 'append'
+            ? [...prev, data]
+            : position === 'prepend'
+              ? [data, ...prev]
+              : [data]
+        )
+        setPageArgs((prev) =>
+          position === 'append'
+            ? [...prev, args]
+            : position === 'prepend'
+              ? [args, ...prev]
+              : [args]
+        )
+        setError(undefined)
+        setFetchingKind('none')
+      } catch (err) {
+        if (runIdRef.current !== runId) return
+        if (!isMountedRef.current) return
+        setError(err)
+        setFetchingKind('none')
+      }
+    },
+    []
+  )
+
+  // Kick off the initial fetch exactly once (StrictMode-safe).
+  const initialFetchedRef = useRef(false)
+  useEffect(() => {
+    if (initialFetchedRef.current) return
+    initialFetchedRef.current = true
+    void fetchPage(configRef.current.initialArgs, 'replace', 'initial')
+  }, [fetchPage])
+
+  const fetchNextPage = useCallback(async (): Promise<void> => {
+    if (pages.length === 0) return
+    const next = configRef.current.getNextArgs(pages[pages.length - 1], pages)
+    if (next === undefined) return
+    await fetchPage(next, 'append', 'next')
+  }, [pages, fetchPage])
+
+  const fetchPreviousPage = useCallback(async (): Promise<void> => {
+    const getPrev = configRef.current.getPreviousArgs
+    if (!getPrev || pages.length === 0) return
+    const prev = getPrev(pages[0], pages)
+    if (prev === undefined) return
+    await fetchPage(prev, 'prepend', 'prev')
+  }, [pages, fetchPage])
+
+  const refetch = useCallback(async (): Promise<void> => {
+    await fetchPage(configRef.current.initialArgs, 'replace', 'refetch')
+  }, [fetchPage])
+
+  const hasData = pages.length > 0
+  const hasError = error !== undefined && error !== null
+
+  // Compute has*Page each render using the latest config. Cheap in practice
+  // since user getNextArgs usually reads a cursor off the last page.
+  const hasNextPage =
+    hasData &&
+    configRef.current.getNextArgs(pages[pages.length - 1], pages) !== undefined
+  const getPrev = configRef.current.getPreviousArgs
+  const hasPreviousPage =
+    hasData && !!getPrev && getPrev(pages[0], pages) !== undefined
+
+  const isFetching = fetchingKind !== 'none'
+  const isLoading = !hasData && !hasError && isFetching
+
+  return {
+    data: hasData ? { pages, args: pageArgs } : undefined,
+    error,
+    isLoading,
+    isFetching,
+    isSuccess: hasData && !hasError,
+    isError: hasError,
+    hasNextPage,
+    hasPreviousPage,
+    isFetchingNextPage: fetchingKind === 'next',
+    isFetchingPreviousPage: fetchingKind === 'prev',
+    fetchNextPage,
+    fetchPreviousPage,
+    refetch,
+  }
+}

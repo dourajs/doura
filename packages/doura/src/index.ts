@@ -19,13 +19,32 @@ export type {
   ModelViews,
   ModelData,
   ModelAPI,
+  ModelQueries,
   ModelPublicInstance,
   ModelManager,
   ModelManagerOptions,
   Plugin,
+  QueryCtx,
+  OnDataCtx,
+  QuerySpec,
+  QueryShorthand,
+  NormalizedQuerySpec,
+  QueriesOption,
+  QueryCacheEntry,
+  QueryConfig,
+  QueryHandle,
+  QueryHash,
+  FetchStatus,
 } from './core'
 
-export { defineModel, nextTick, use } from './core'
+export {
+  defineModel,
+  query,
+  nextTick,
+  use,
+  computeQueryHash,
+  computeArgsKey,
+} from './core'
 
 export { Doura, DouraOptions, doura } from './doura'
 

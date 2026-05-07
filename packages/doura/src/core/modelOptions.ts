@@ -1,6 +1,7 @@
 import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn } from '../utils'
+import { QueriesOption, QueryCtx, QueryHandle } from './queryTypes'
 
 export type State = {
   [x: string]: any
@@ -24,21 +25,61 @@ export type Views<ViewOptions> = {
     ? Args extends [] | [s: any]
       ? ReturnType<ViewOptions[K]>
       : Args extends [s: any, ...extArgs: infer ExtArgs]
-      ? (...args: ExtArgs) => ReturnType<ViewOptions[K]>
-      : never
+        ? (...args: ExtArgs) => ReturnType<ViewOptions[K]>
+        : never
     : never
 }
+
+/** Names of declared queries (string keys only). Falls back to `string`
+ *  when Q is `any` so legacy / loose call sites still accept any name. */
+type QueryNames<Q> = 0 extends 1 & Q
+  ? string
+  : keyof Q extends never
+    ? string
+    : Extract<keyof Q, string>
+
+export interface ModelQueryMethods<Q = {}> {
+  $invalidateQueries<N extends QueryNames<Q>>(
+    queryName?: N,
+    args?: object
+  ): void
+  $cancelQueries<N extends QueryNames<Q>>(queryName?: N, args?: object): void
+  $resetQueries<N extends QueryNames<Q>>(queryName?: N, args?: object): void
+  $setQueryData<N extends QueryNames<Q>>(
+    queryName: N,
+    args: object | void,
+    data: unknown
+  ): void
+  $getQueryData<N extends QueryNames<Q>>(
+    queryName: N,
+    args?: object | void
+  ): unknown | undefined
+  $prefetchQuery<N extends QueryNames<Q>>(
+    queryName: N,
+    args?: object | void
+  ): Promise<void>
+}
+
+/** Map a raw queries options object (what the user writes under `queries`)
+ *  to the handles that actually appear on `this` inside actions. */
+type QueriesOnThis<Q> =
+  Q extends Record<string, any>
+    ? { readonly [K in keyof Q]: HandleFromEntry<Q[K]> }
+    : {}
 
 export type ModelThis<
   S extends State = {},
   A extends ActionOptions = {},
-  V extends ViewOptions = {}
+  V extends ViewOptions = {},
+  Q = {},
 > = {
   $state: S
   $patch: (s: AnyObject) => void
 } & S &
   Views<V> &
-  Actions<A>
+  Actions<A> &
+  QueriesOnThis<Q> &
+  ModelQueryMethods<Q>
 
 export type ViewThis<S extends State = {}, V extends ViewOptions = {}> = S & {
   $state: S
@@ -48,17 +89,18 @@ export type ViewThis<S extends State = {}, V extends ViewOptions = {}> = S & {
 export type ObjectModel<
   S extends State,
   A extends ActionOptions,
-  V extends ViewOptions
+  V extends ViewOptions,
 > = {
   state: S
   actions?: A
   views?: V & ThisType<ViewThis<S, V>>
+  queries?: QueriesOption<S>
 } & ThisType<ModelThis<S, A, V>>
 
 export interface FunctionModel<
   S extends State,
   A extends ActionOptions,
-  V extends ViewOptions
+  V extends ViewOptions,
 > {
   (): ObjectModel<S, A, V>
 }
@@ -66,7 +108,7 @@ export interface FunctionModel<
 export type ModelOptions<
   S extends State,
   A extends ActionOptions,
-  V extends ViewOptions
+  V extends ViewOptions,
 > = ObjectModel<S, A, V> | FunctionModel<S, A, V>
 
 export type AnyObjectModel = ObjectModel<any, any, any>
@@ -75,35 +117,104 @@ export type AnyFunctionModel = FunctionModel<any, any, any>
 
 export type AnyModel = AnyObjectModel | AnyFunctionModel
 
-export type ModelState<Model> = Model extends ModelOptions<infer S, any, any>
-  ? { [K in keyof S]: S[K] }
-  : never
+/** Strip index signatures, keeping only known literal keys */
+export type StripIndexSignature<T> = {
+  [K in keyof T as string extends K
+    ? never
+    : number extends K
+      ? never
+      : symbol extends K
+        ? never
+        : K]: T[K]
+}
 
-export type ModelActions<Model> = Model extends ModelOptions<any, infer A, any>
-  ? Actions<A>
-  : never
+export type ModelState<Model> =
+  Model extends ModelOptions<infer S, any, any>
+    ? { [K in keyof S]: S[K] }
+    : never
 
-export type ModelViews<Model> = Model extends ModelOptions<any, any, infer V>
-  ? Views<V>
-  : never
+export type ModelActions<Model> =
+  Model extends ModelOptions<any, infer A, any> ? Actions<A> : never
 
-function validateObject(model: AnyObjectModel, prop: keyof AnyObjectModel) {
-  const target = model[prop] as any
+export type ModelViews<Model> =
+  Model extends ModelOptions<any, any, infer V> ? Views<V> : never
+
+/** Infer (TArgs, TData) from a user-provided query entry (shorthand fn or
+ *  full spec object), then surface them as a QueryHandle. */
+type HandleFromEntry<T> = T extends (
+  ctx: QueryCtx,
+  args: infer A
+) => Promise<infer D>
+  ? QueryHandle<A extends object ? A : void, D>
+  : T extends (ctx: QueryCtx) => Promise<infer D>
+    ? QueryHandle<void, D>
+    : T extends {
+          fn: (ctx: QueryCtx, args: infer A) => Promise<infer D>
+        }
+      ? QueryHandle<A extends object ? A : void, D>
+      : T extends { fn: (ctx: QueryCtx) => Promise<infer D> }
+        ? QueryHandle<void, D>
+        : QueryHandle<any, any>
+
+/** Extract the queries type from a model definition as QueryHandle refs. */
+export type ModelQueries<Model> = Model extends { queries: infer Q }
+  ? Q extends Record<string, any>
+    ? { readonly [K in keyof Q]: HandleFromEntry<Q[K]> }
+    : {}
+  : Model extends () => infer R
+    ? R extends { queries: infer Q2 }
+      ? Q2 extends Record<string, any>
+        ? { readonly [K in keyof Q2]: HandleFromEntry<Q2[K]> }
+        : {}
+      : {}
+    : {}
+
+function validateObject(model: AnyObjectModel, prop: string) {
+  const target = (model as any)[prop] as any
   if (target) {
     invariant(isPlainObject(target), `model.${prop} should be object!`)
   }
 }
 
+function validateQueries(model: AnyObjectModel) {
+  const queries = (model as any).queries
+  if (!queries) return
+  invariant(isPlainObject(queries), `model.queries should be object!`)
+  for (const key of Object.keys(queries)) {
+    const spec = queries[key]
+    if (
+      typeof spec !== 'function' &&
+      !(isPlainObject(spec) && typeof spec.fn === 'function')
+    ) {
+      warn(
+        `query "${key}" must be a function or an object with an "fn" property`
+      )
+      continue
+    }
+
+    if (isPlainObject(spec)) {
+      if ('setData' in spec) {
+        warn(`query "${key}" uses removed option "setData"; use "onData"`)
+      }
+      if ('getData' in spec) {
+        warn(
+          `query "${key}" uses removed option "getData"; query reads now come from cache`
+        )
+      }
+    }
+  }
+}
+
 function checkConflictedKey(
-  type: keyof AnyObjectModel,
+  type: string,
   obj: AnyObjectModel,
   cache: Map<string, string>
 ) {
-  if (!obj[type]) {
+  if (!(obj as any)[type]) {
     return
   }
 
-  for (const key of Object.keys(obj[type])) {
+  for (const key of Object.keys((obj as any)[type])) {
     if (cache.has(key)) {
       const conflictedType = cache.get(key)
       warn(
@@ -124,11 +235,11 @@ export const validateModelOptions = (model: AnyObjectModel): void => {
 
   validateObject(model, 'actions')
   validateObject(model, 'views')
+  validateQueries(model)
 
   const keys = new Map<string, string>()
   checkConflictedKey('state', model, keys)
   checkConflictedKey('views', model, keys)
-
-  keys.clear()
   checkConflictedKey('actions', model, keys)
+  checkConflictedKey('queries', model, keys)
 }

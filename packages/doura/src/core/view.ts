@@ -20,7 +20,7 @@ export function createView<IModel extends AnyObjectModel, TReturn>(
   const view = instance.createView(function (
     this: ModelPublicInstance<IModel>
   ) {
-    return selector(this, this.$actions)
+    return selector(this as unknown as ModelAPI<IModel>, this.$actions)
   })
 
   const res = view.getSnapshot as ModelView<Selector<IModel, TReturn>>

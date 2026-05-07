@@ -325,7 +325,7 @@ function getOwnPropertyDescriptor(state: ObjectDraftState, key: any) {
     writable: true,
     configurable: !isArray(target) || key !== 'length',
     enumerable: desc.enumerable,
-    value: target[key],
+    value: (target as any)[key],
   }
 }
 

@@ -9,10 +9,13 @@ import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
 import { emptyObject, removeUnordered } from '../utils'
+import { QueryConfig } from './queryTypes'
+import { QueryCoordinator } from './queryCoordinator'
 
 export type ModelManagerOptions = {
   initialState?: Record<string, any>
   plugins?: [Plugin, any?][]
+  query?: Partial<QueryConfig>
 }
 
 export type Model = AnyModel | AnyFunctionModel
@@ -56,9 +59,15 @@ class ModelManagerInternal implements ModelManager {
   private _models = new Map<string, ModelInternal>()
   private _subscribers: DouraSubscriptionCallback[] = []
   private _onModelChange: DouraSubscriptionCallback
+  _queryCoordinator: QueryCoordinator
 
-  constructor(initialState = emptyObject, plugins: [Plugin, any?][] = []) {
+  constructor(
+    initialState = emptyObject,
+    plugins: [Plugin, any?][] = [],
+    query?: Partial<QueryConfig>
+  ) {
     this._initialState = initialState
+    this._queryCoordinator = new QueryCoordinator(query)
     const emitChange: SchedulerJob = () => {
       const listeners = this._subscribers.slice()
       for (let i = 0; i < listeners.length; i++) {
@@ -139,6 +148,7 @@ class ModelManagerInternal implements ModelManager {
     this._models.clear()
     this._subscribers.length = 0
     this._initialState = emptyObject
+    this._queryCoordinator.destroy()
   }
 
   private _createModelProxy(): ModelProxy {
@@ -166,7 +176,9 @@ class ModelManagerInternal implements ModelManager {
     model: AnyObjectModel
   }): ModelInternal {
     if (!name) {
-      return createModelInstance(model)
+      const instance = createModelInstance(model)
+      ;(instance as any)._coordinator = this._queryCoordinator
+      return instance
     }
 
     this._hooks.map((hook) => hook.onModel?.(name, model, { doura: this }))
@@ -175,6 +187,7 @@ class ModelManagerInternal implements ModelManager {
       name,
       initState: this._getInitialState(name),
     })
+    ;(modelInstance as any)._coordinator = this._queryCoordinator
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)
@@ -197,6 +210,7 @@ class ModelManagerInternal implements ModelManager {
 export function modelManager({
   initialState,
   plugins,
+  query,
 }: ModelManagerOptions = {}): ModelManager {
-  return new ModelManagerInternal(initialState, plugins)
+  return new ModelManagerInternal(initialState, plugins, query)
 }

@@ -32,6 +32,9 @@ export function Test() {
   })
   const model = useStaticModel('temp', tempModel)
 
-  expectType<{ n: number; s: string }>(model.current.value)
+  // useStaticModel returns the ModelAPI directly; state is accessed by key.
+  // (The previous `.current` indirection type-checked only because a leaked
+  // index signature in ModelAPI made any property access widen to any.)
+  expectType<{ n: number; s: string }>(model.value)
   expectType<void>(model.add(1))
 }
