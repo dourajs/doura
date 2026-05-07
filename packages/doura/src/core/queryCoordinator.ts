@@ -1,13 +1,13 @@
 import { FetchManager } from './fetchManager'
 import { GCManager } from './gcManager'
 import { QueryConfig, DEFAULT_QUERY_CONFIG, QueryHash } from './queryTypes'
-import { computeQueryHash, computeArgsKey } from './queryUtils'
 import type { ModelInternal } from './model'
 
 export class QueryCoordinator {
   private _fetchManager: FetchManager
   private _gcManager: GCManager
   private _config: QueryConfig
+  private _appliedInflight = new Map<QueryHash, Promise<unknown>>()
 
   constructor(config?: Partial<QueryConfig>) {
     this._config = { ...DEFAULT_QUERY_CONFIG, ...config }
@@ -30,11 +30,12 @@ export class QueryCoordinator {
     }
     const fn = handle._spec.fn
 
-    const hash = computeQueryHash(
-      model.name,
-      queryName,
-      computeArgsKey(args, model.queries[queryName]?._spec.key)
-    )
+    const hash = handle.computeHash(args as any)
+    const shared = this._appliedInflight.get(hash)
+    if (shared) {
+      return shared
+    }
+
     const existing = model.getQueryState(queryName, args)
     model.setQueryState(queryName, args, {
       data: existing?.data,
@@ -43,45 +44,57 @@ export class QueryCoordinator {
       fetchStatus: 'fetching',
     })
 
-    try {
-      const result = await this._fetchManager.fetch(hash, (signal) => {
+    const appliedPromise = this._fetchManager
+      .fetch(hash, (signal) => {
         const ctx = { signal }
         return args !== undefined
           ? (fn as Function)(ctx, args)
           : (fn as Function)(ctx)
       })
+      .promise.then((result) => {
+        if (!model.destroyed) {
+          model.setQueryData(queryName, args, result)
+        }
+        return result
+      })
+      .catch((error) => {
+        if (!model.destroyed) {
+          const prev = model.getQueryState(queryName, args)
+          const aborted = (error as any)?.name === 'AbortError'
+          model.setQueryState(queryName, args, {
+            data: prev?.data,
+            error: aborted ? undefined : error,
+            dataUpdatedAt: prev?.dataUpdatedAt || 0,
+            fetchStatus: 'idle',
+          })
+        }
+        throw error
+      })
+      .finally(() => {
+        this._appliedInflight.delete(hash)
+      })
 
-      model.setQueryData(queryName, args, result)
-      return result
-    } catch (error) {
-      if ((error as any)?.name !== 'AbortError') {
-        const prev = model.getQueryState(queryName, args)
-        model.setQueryState(queryName, args, {
-          data: prev?.data,
-          error,
-          dataUpdatedAt: prev?.dataUpdatedAt || 0,
-          fetchStatus: 'idle',
-        })
-      }
-      throw error
-    }
+    this._appliedInflight.set(hash, appliedPromise)
+    return appliedPromise
   }
 
   cancel(model: ModelInternal, queryName?: string, args?: object | void): void {
     if (!queryName) {
-      this._fetchManager.cancelByPrefix(`["${model.name}"`)
+      this._fetchManager.cancelByPrefix(model.queryHashPrefix())
       return
     }
+
+    const handle = model.queries[queryName]
+    if (!handle) {
+      return
+    }
+
     if (args !== undefined) {
-      const hash = computeQueryHash(
-        model.name,
-        queryName,
-        computeArgsKey(args, model.queries[queryName]?._spec.key)
-      )
+      const hash = handle.computeHash(args as any)
       this._fetchManager.cancel(hash)
       return
     }
-    this._fetchManager.cancelByPrefix(`["${model.name}","${queryName}"`)
+    this._fetchManager.cancelByPrefix(model.queryHashPrefix(queryName))
   }
 
   resolveStaleTime(
@@ -118,6 +131,8 @@ export class QueryCoordinator {
   }
 
   destroy(): void {
+    this._appliedInflight.clear()
+    this._fetchManager.destroy()
     this._gcManager.destroy()
   }
 }

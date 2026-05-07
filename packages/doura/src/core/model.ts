@@ -3,6 +3,7 @@ import {
   hasOwn,
   isObject,
   def,
+  NOOP,
   emptyArray,
   removeUnordered,
 } from '../utils'
@@ -189,6 +190,8 @@ function markViewShouldRun(view: View) {
   view.dirty = true
 }
 
+let detachedModelQueryScopeId = 0
+
 export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   name: string
   options: IModel
@@ -236,6 +239,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _watchStateChange: boolean = true
   private _destroyed: boolean = false
   private _lastDraftToSnapshot: WeakMap<object, any> = new WeakMap()
+  private _queryHashScope: string
 
   // Query infrastructure
   coordinator: IQueryCoordinator | undefined = undefined
@@ -253,6 +257,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
     this.options = model
     this.name = name || ''
+    this._queryHashScope = name || `@@detached:${++detachedModelQueryScopeId}`
     this._isDispatching = false
     this._initState = initState || model.state
     this.stateRef = draft({
@@ -573,6 +578,16 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this._onDestroyHandlers.length = 0
   }
 
+  get destroyed(): boolean {
+    return this._destroyed
+  }
+
+  queryHashPrefix(queryName?: string): string {
+    return queryName
+      ? `["${this._queryHashScope}","${queryName}"`
+      : `["${this._queryHashScope}"`
+  }
+
   private _setState(newState: ModelState<IModel>) {
     this._api = null
     this._currentState = newState
@@ -782,7 +797,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   private _queryHash(queryName: string, args: object | void): QueryHash {
     return computeQueryHash(
-      this.name,
+      this._queryHashScope,
       queryName,
       computeArgsKey(args, this.queries[queryName]?._spec.key)
     )
@@ -921,11 +936,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return this.queryCache.get(this._queryHash(queryName, args))?.data
   }
 
-  prefetchQuery(queryName: string, args?: object | void): void {
+  prefetchQuery(queryName: string, args?: object | void): Promise<void> {
     if (this.coordinator) {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      this.coordinator.fetch(this, queryName, args).catch(() => {})
+      const prefetchPromise = this.coordinator
+        .fetch(this, queryName, args)
+        .then(() => undefined)
+      prefetchPromise.catch(NOOP)
+      return prefetchPromise
     }
+    return Promise.resolve()
   }
 
   cancelQueries(queryName?: string, args?: object | void): void {

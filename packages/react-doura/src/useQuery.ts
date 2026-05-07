@@ -76,16 +76,17 @@ export function useQuery(
 
   // Fetch + GC lifecycle
   useEffect(() => {
-    queryHandle.observe(argsRef.current)
+    const effectArgs = args
+    queryHandle.observe(effectArgs)
 
     if (enabled) {
-      const entry = queryHandle.getState(argsRef.current)
+      const entry = queryHandle.getState(effectArgs)
       const stale =
         !entry ||
         entry.data === undefined ||
         Date.now() - entry.dataUpdatedAt >= resolvedStaleTime
       if (stale) {
-        queryHandle.fetch(argsRef.current).catch(() => {
+        queryHandle.fetch(effectArgs).catch(() => {
           // Error surfaces via cacheEntry.error; swallow the rejection
           // to avoid unhandled promise warnings.
         })
@@ -93,8 +94,8 @@ export function useQuery(
     }
 
     return () => {
-      queryHandle.unobserve(argsRef.current, () => {
-        queryHandle.reset(argsRef.current)
+      queryHandle.unobserve(effectArgs, () => {
+        queryHandle.reset(effectArgs)
       })
     }
   }, [hash, enabled, queryHandle, resolvedStaleTime])

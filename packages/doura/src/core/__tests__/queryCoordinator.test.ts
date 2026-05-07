@@ -106,6 +106,105 @@ describe('QueryCoordinator', () => {
       mgr.destroy()
     })
 
+    it('should apply onData only once for a deduplicated response', async () => {
+      const coordinator = new QueryCoordinator()
+      const onData = jest.fn(({ state }, data: number) => {
+        state.value += data
+      })
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          fetchData: {
+            fn: async () => 1,
+            onData,
+          },
+        },
+      })
+
+      const mgr = modelManager({ query: {} })
+      const inst = mgr.getModel('test', model)
+      const internal = getInternal(mgr, 'test', model)
+
+      const [r1, r2] = await Promise.all([
+        coordinator.fetch(internal, 'fetchData', undefined),
+        coordinator.fetch(internal, 'fetchData', undefined),
+      ])
+
+      expect(r1).toBe(1)
+      expect(r2).toBe(1)
+      expect(onData).toHaveBeenCalledTimes(1)
+      expect(inst.$state.value).toBe(1)
+
+      mgr.destroy()
+    })
+
+    it('should reject every waiter if shared onData commit throws', async () => {
+      const coordinator = new QueryCoordinator()
+      const onData = jest.fn(() => {
+        throw new Error('onData exploded')
+      })
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          fetchData: {
+            fn: async () => 1,
+            onData,
+          },
+        },
+      })
+
+      const mgr = modelManager({ query: {} })
+      const inst = mgr.getModel('test', model)
+      const internal = getInternal(mgr, 'test', model)
+
+      const p1 = coordinator.fetch(internal, 'fetchData', undefined)
+      const p2 = coordinator.fetch(internal, 'fetchData', undefined)
+
+      await expect(p1).rejects.toThrow('onData exploded')
+      await expect(p2).rejects.toThrow('onData exploded')
+      expect(onData).toHaveBeenCalledTimes(1)
+      expect(inst.$queries.fetchData.getState()?.fetchStatus).toBe('idle')
+      expect(inst.$queries.fetchData.getState()?.error).toBeInstanceOf(Error)
+
+      mgr.destroy()
+    })
+
+    it('should keep detached model hashes isolated when names are empty', async () => {
+      const mgr = modelManager({ query: {} })
+      const fnA = jest.fn(async () => 'A')
+      const fnB = jest.fn(async () => 'B')
+
+      const modelA = defineModel({
+        state: {},
+        queries: {
+          fetchData: fnA,
+        },
+      })
+      const modelB = defineModel({
+        state: {},
+        queries: {
+          fetchData: fnB,
+        },
+      })
+
+      const instA = mgr.getDetachedModel(modelA)
+      const instB = mgr.getDetachedModel(modelB)
+
+      const [a, b] = await Promise.all([
+        instA.$queries.fetchData.fetch(),
+        instB.$queries.fetchData.fetch(),
+      ])
+
+      expect(a).toBe('A')
+      expect(b).toBe('B')
+      expect(fnA).toHaveBeenCalledTimes(1)
+      expect(fnB).toHaveBeenCalledTimes(1)
+      expect(instA.$queries.fetchData.getData()).toBe('A')
+      expect(instB.$queries.fetchData.getData()).toBe('B')
+
+      mgr.destroy()
+    })
+
     it('should set fetchStatus to fetching during fetch', async () => {
       const coordinator = new QueryCoordinator()
       let resolveFetch!: (v: unknown) => void
@@ -205,6 +304,36 @@ describe('QueryCoordinator', () => {
 
       expect(signal.aborted).toBe(true)
       await expect(promise).rejects.toThrow()
+
+      mgr.destroy()
+    })
+
+    it('should clear fetchStatus after aborting a fetch', async () => {
+      const coordinator = new QueryCoordinator()
+      let signal!: AbortSignal
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          fetchData: (ctx: any) => {
+            signal = ctx.signal
+            return new Promise((resolve) =>
+              setTimeout(() => resolve('data'), 5000)
+            )
+          },
+        },
+      })
+
+      const mgr = modelManager({ query: {} })
+      const inst = mgr.getModel('test', model)
+      const internal = getInternal(mgr, 'test', model)
+
+      const promise = coordinator.fetch(internal, 'fetchData', undefined)
+      coordinator.cancel(internal, 'fetchData', undefined)
+
+      expect(signal.aborted).toBe(true)
+      await expect(promise).rejects.toThrow()
+      expect(inst.$queries.fetchData.isFetching()).toBe(false)
+      expect(inst.$queries.fetchData.getState()?.fetchStatus).toBe('idle')
 
       mgr.destroy()
     })
@@ -393,6 +522,38 @@ describe('QueryCoordinator', () => {
   })
 
   describe('$prefetchQuery through model instance', () => {
+    it('should return a promise that resolves after the cache is warmed', async () => {
+      let resolveFetch!: (value: string) => void
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          fetchData: () =>
+            new Promise<string>((resolve) => {
+              resolveFetch = resolve
+            }),
+        },
+      })
+
+      const mgr = modelManager({ query: {} })
+      const inst = mgr.getModel('test', model)
+
+      const promise = inst.$prefetchQuery('fetchData')
+      let settled = false
+      promise.then(() => {
+        settled = true
+      })
+
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      resolveFetch('prefetched')
+      await promise
+
+      expect(inst.$getQueryData('fetchData')).toBe('prefetched')
+
+      mgr.destroy()
+    })
+
     it('should work when coordinator is wired by modelManager', async () => {
       const fn = jest.fn(async () => 'prefetched')
       const model = defineModel({
@@ -486,6 +647,37 @@ describe('QueryCoordinator', () => {
       expect(inst.$getQueryData('fetchData')).toBe('from-doura')
 
       store.destroy()
+    })
+
+    it('should abort inflight fetches and keep destroyed caches empty', async () => {
+      let signal!: AbortSignal
+      const onData = jest.fn()
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          fetchData: {
+            fn: (ctx: any) => {
+              signal = ctx.signal
+              return new Promise((resolve) =>
+                setTimeout(() => resolve(1), 5000)
+              )
+            },
+            onData,
+          },
+        },
+      })
+
+      const store = doura({ query: {} })
+      const inst = store.getModel('test', model)
+      const internal = (inst as any)._
+
+      const promise = inst.$queries.fetchData.fetch()
+      store.destroy()
+
+      expect(signal.aborted).toBe(true)
+      await expect(promise).rejects.toThrow()
+      expect(onData).not.toHaveBeenCalled()
+      expect(internal.queryCache.size).toBe(0)
     })
   })
 })

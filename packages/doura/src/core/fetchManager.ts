@@ -7,16 +7,32 @@ interface InflightEntry {
   reject: (reason: unknown) => void
 }
 
+export interface FetchLease {
+  isNew: boolean
+  promise: Promise<unknown>
+}
+
 export class FetchManager {
   private _inflight = new Map<QueryHash, InflightEntry>()
+
+  private _abortEntry(hash: QueryHash, entry: InflightEntry): void {
+    entry.controller.abort()
+    entry.reject(new DOMException('The operation was aborted.', 'AbortError'))
+    // Suppress unhandled rejection on the internal promise
+    entry.promise.catch(NOOP)
+    this._inflight.delete(hash)
+  }
 
   fetch(
     hash: QueryHash,
     fetcher: (signal: AbortSignal) => Promise<unknown>
-  ): Promise<unknown> {
+  ): FetchLease {
     const existing = this._inflight.get(hash)
     if (existing) {
-      return existing.promise
+      return {
+        isNew: false,
+        promise: existing.promise,
+      }
     }
 
     const controller = new AbortController()
@@ -36,31 +52,34 @@ export class FetchManager {
       })
 
     this._inflight.set(hash, { controller, promise, reject: rejectFn! })
-    return promise
+    return {
+      isNew: true,
+      promise,
+    }
+  }
+
+  has(hash: QueryHash): boolean {
+    return this._inflight.has(hash)
   }
 
   cancel(hash: QueryHash): void {
     const entry = this._inflight.get(hash)
     if (entry) {
-      entry.controller.abort()
-      entry.reject(new DOMException('The operation was aborted.', 'AbortError'))
-      // Suppress unhandled rejection on the internal promise
-      entry.promise.catch(NOOP)
-      this._inflight.delete(hash)
+      this._abortEntry(hash, entry)
     }
   }
 
   cancelByPrefix(prefix: string): void {
     for (const [hash, entry] of this._inflight) {
       if ((hash as string).startsWith(prefix)) {
-        entry.controller.abort()
-        entry.reject(
-          new DOMException('The operation was aborted.', 'AbortError')
-        )
-        // Suppress unhandled rejection on the internal promise
-        entry.promise.catch(NOOP)
-        this._inflight.delete(hash)
+        this._abortEntry(hash, entry)
       }
+    }
+  }
+
+  destroy(): void {
+    for (const [hash, entry] of this._inflight) {
+      this._abortEntry(hash, entry)
     }
   }
 }

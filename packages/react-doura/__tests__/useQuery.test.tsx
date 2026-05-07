@@ -1,6 +1,7 @@
 import React, { StrictMode } from 'react'
 import { render, act, waitFor } from '@testing-library/react'
-import { defineModel } from 'doura'
+import { defineModel, doura } from 'doura'
+import { createContainer } from '../src/createContainer'
 import { DouraRoot, useModel } from '../src/useModel'
 import { useQuery } from '../src/useQuery'
 
@@ -306,5 +307,60 @@ describe('useQuery', () => {
     })
     expect(container.querySelector('#b')?.textContent).toBe('yes')
     expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  test('should unobserve the previous args slot when args change', async () => {
+    const store = doura({ query: { gcTime: 0 } })
+    const { Provider, useSharedModel } = createContainer()
+    const model = defineModel({
+      state: {},
+      queries: {
+        fetchUser: {
+          key: (args: { id: string }) => [args.id],
+          fn: (_ctx: any, args: { id: string }) =>
+            Promise.resolve({ id: args.id, name: 'User ' + args.id }),
+        },
+      },
+    })
+
+    const App = ({ id }: { id: string }) => {
+      const api = useSharedModel('t10', model)
+      const { data } = useQuery(api.fetchUser, { id })
+      return <div id="data">{data ? data.id : 'none'}</div>
+    }
+
+    const { container, rerender } = render(
+      <Provider store={store}>
+        <App id="1" />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#data')?.textContent).toBe('1')
+    })
+
+    const inst = store.getModel('t10', model)
+
+    rerender(
+      <Provider store={store}>
+        <App id="2" />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#data')?.textContent).toBe('2')
+    })
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(inst.$queries.fetchUser.getData({ id: '1' })).toBeUndefined()
+    expect(inst.$queries.fetchUser.getData({ id: '2' })).toEqual({
+      id: '2',
+      name: 'User 2',
+    })
+
+    store.destroy()
   })
 })

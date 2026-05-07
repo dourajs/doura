@@ -7,7 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Doura, AnyModel, DouraOptions, Selector, doura } from 'doura'
+import { Doura, AnyModel, DouraOptions, Selector, doura, nextTick } from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
 import { UseNamedModel, UseStaticModel } from './types'
 import { DouraContext } from './context'
@@ -25,6 +25,7 @@ const createContainer = function (options?: DouraOptions) {
   function Provider(props: PropsWithChildren<{ store?: Doura }>) {
     const { children, store: propsStore } = props
     const internalStoreRef = useRef<Doura | null>(null)
+    const pendingDestroyStoreRef = useRef<Doura | null>(null)
 
     const memoContext = useMemo(
       function () {
@@ -32,8 +33,10 @@ const createContainer = function (options?: DouraOptions) {
         if (propsStore) {
           store = propsStore
         } else {
-          store = doura(options)
-          internalStoreRef.current = store
+          if (!internalStoreRef.current) {
+            internalStoreRef.current = doura(options)
+          }
+          store = internalStoreRef.current
         }
         return {
           store,
@@ -53,9 +56,24 @@ const createContainer = function (options?: DouraOptions) {
 
     useEffect(
       function () {
+        if (pendingDestroyStoreRef.current === memoContext.store) {
+          pendingDestroyStoreRef.current = null
+        }
+
         return function () {
-          internalStoreRef.current?.destroy()
-          internalStoreRef.current = null
+          if (!propsStore && internalStoreRef.current === memoContext.store) {
+            pendingDestroyStoreRef.current = memoContext.store
+            nextTick(() => {
+              if (
+                pendingDestroyStoreRef.current === memoContext.store &&
+                internalStoreRef.current === memoContext.store
+              ) {
+                memoContext.store.destroy()
+                internalStoreRef.current = null
+                pendingDestroyStoreRef.current = null
+              }
+            })
+          }
         }
       },
       [memoContext]
@@ -81,7 +99,7 @@ const createContainer = function (options?: DouraOptions) {
 
   const useSharedModel: UseNamedModel = <
     IModel extends AnyModel,
-    S extends Selector<IModel>
+    S extends Selector<IModel>,
   >(
     name: string,
     model: IModel,
