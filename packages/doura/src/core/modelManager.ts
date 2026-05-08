@@ -9,6 +9,7 @@ import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
 import { emptyObject, removeUnordered } from '../utils'
+import { warn } from '../warning'
 import { QueryConfig } from './queryTypes'
 import { QueryCoordinator } from './queryCoordinator'
 
@@ -22,6 +23,9 @@ export type Model = AnyModel | AnyFunctionModel
 
 export interface ModelManager {
   getState(): Record<string, State>
+  getModel<IModel extends AnyObjectModel & { name: string }>(
+    model: IModel
+  ): ModelPublicInstance<IModel>
   getModel<IModel extends AnyModel>(
     name: string,
     model: IModel
@@ -57,6 +61,7 @@ class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models = new Map<string, ModelInternal>()
+  private _modelOptions = new Map<string, AnyModel>()
   private _subscribers: DouraSubscriptionCallback[] = []
   private _onModelChange: DouraSubscriptionCallback
   _queryCoordinator: QueryCoordinator
@@ -81,12 +86,30 @@ class ModelManagerInternal implements ModelManager {
     this._hooks.map((hook) => hook.onInit?.({ initialState }, { doura: this }))
   }
 
+  getModel<IModel extends AnyObjectModel & { name: string }>(
+    model: IModel
+  ): ModelPublicInstance<IModel>
   getModel<IModel extends AnyModel>(
     name: string,
     model: IModel
-  ): ModelPublicInstance<IModel> {
+  ): ModelPublicInstance<IModel>
+  getModel(nameOrModel: any, maybeModel?: any): ModelPublicInstance<any> {
+    const hasExplicitName = typeof nameOrModel === 'string'
+    const name = hasExplicitName
+      ? nameOrModel
+      : typeof nameOrModel === 'object'
+        ? nameOrModel?.name
+        : undefined
+    const model = hasExplicitName ? maybeModel : nameOrModel
+
+    if (!name) {
+      throw new Error(
+        `model name is required; pass getModel(name, model) or define the model with a "name" option`
+      )
+    }
+
     const instance = this.getModelInstance({ name, model })
-    return instance.publicInst as ModelPublicInstance<IModel>
+    return instance.publicInst
   }
 
   getDetachedModel<IModel extends AnyModel>(
@@ -99,6 +122,11 @@ class ModelManagerInternal implements ModelManager {
   getModelInstance({ name, model }: { name?: string; model: AnyModel }) {
     const cachedInstace = name && this._models.get(name)
     if (cachedInstace) {
+      if (this._modelOptions.get(name) !== model) {
+        warn(
+          `model "${name}" has already been initialized with a different model options reference`
+        )
+      }
       return cachedInstace
     }
 
@@ -111,13 +139,13 @@ class ModelManagerInternal implements ModelManager {
           manager: this,
           model: modelProxy,
         })
-        instance = this._initModel({ name, model: model() })
+        instance = this._initModel({ name, model: model(), sourceModel: model })
       } finally {
         setCurrentModelContext(preCtx)
       }
       modelProxy.setModel(instance)
     } else if (typeof model === 'object') {
-      instance = this._initModel({ name, model })
+      instance = this._initModel({ name, model, sourceModel: model })
     } else {
       throw new Error('invalid model')
     }
@@ -146,6 +174,7 @@ class ModelManagerInternal implements ModelManager {
     this._hooks.map((hook) => hook.onDestroy?.())
     this._models.forEach((m) => m.destroy())
     this._models.clear()
+    this._modelOptions.clear()
     this._subscribers.length = 0
     this._initialState = emptyObject
     this._queryCoordinator.destroy()
@@ -171,9 +200,11 @@ class ModelManagerInternal implements ModelManager {
   private _initModel({
     name,
     model,
+    sourceModel,
   }: {
     name?: string
     model: AnyObjectModel
+    sourceModel?: AnyModel
   }): ModelInternal {
     if (!name) {
       const instance = createModelInstance(model)
@@ -191,6 +222,7 @@ class ModelManagerInternal implements ModelManager {
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)
+    this._modelOptions.set(name, sourceModel || model)
     this._hooks.map((hook) => {
       hook.onModelInstance?.(modelInstance.publicInst, { doura: this })
     })

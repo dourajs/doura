@@ -67,6 +67,7 @@ export type ObjectModel<
   A extends ActionOptions,
   V extends ViewOptions,
 > = {
+  name?: string
   state: S
   actions?: A
   views?: V & ThisType<ViewThis<S, V>>

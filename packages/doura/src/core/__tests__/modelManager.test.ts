@@ -111,6 +111,85 @@ describe('modelManager', () => {
     expect(newStore.$state.value).toBe(0)
   })
 
+  it('should get a model by its defineModel name option', () => {
+    const modelMgr = modelManager()
+    const model = defineModel({
+      name: 'named',
+      state: { value: 0 },
+      actions: {
+        increment() {
+          this.value += 1
+        },
+      },
+    })
+
+    const store = modelMgr.getModel(model)
+    store.increment()
+    expect(store.$name).toBe('named')
+    expect(modelMgr.getState()).toEqual({
+      named: { value: 1 },
+    })
+  })
+
+  it('should let an explicit name override the defineModel name option', () => {
+    const modelMgr = modelManager()
+    const model = defineModel({
+      name: 'declared',
+      state: { value: 0 },
+    })
+
+    const store = modelMgr.getModel('override', model)
+    expect(store.$name).toBe('override')
+    expect(modelMgr.getState()).toEqual({
+      override: { value: 0 },
+    })
+  })
+
+  it('should not infer model names from function model function names', () => {
+    const modelMgr = modelManager()
+    const model = defineModel(() => ({
+      state: { value: 0 },
+    }))
+
+    expect(() => modelMgr.getModel(model as any)).toThrow(
+      'model name is required'
+    )
+  })
+
+  it('should warn when the same name is requested with a different model options reference', () => {
+    const modelMgr = modelManager()
+    const first = defineModel({
+      name: 'shared',
+      state: { value: 1 },
+    })
+    const second = defineModel({
+      name: 'shared',
+      state: { value: 2 },
+    })
+
+    const firstStore = modelMgr.getModel(first)
+    const secondStore = modelMgr.getModel(second)
+
+    expect(secondStore).toBe(firstStore)
+    expect(
+      `model "shared" has already been initialized with a different model options reference`
+    ).toHaveBeenWarned()
+  })
+
+  it('should not warn when detached models have a name option', () => {
+    const modelMgr = modelManager()
+    const model = defineModel({
+      name: 'detached',
+      state: { value: 0 },
+    })
+
+    const first = modelMgr.getDetachedModel(model)
+    const second = modelMgr.getDetachedModel(model)
+
+    expect(first).not.toBe(second)
+    expect(modelMgr.getState()).toEqual({})
+  })
+
   it('should trigger change when dependencies have changed', async () => {
     let storeCount = 0
     let modelCount = 0

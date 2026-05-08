@@ -1,7 +1,12 @@
 import React, { StrictMode, useState } from 'react'
 import { render, act } from '@testing-library/react'
 import { doura, defineModel, nextTick, AnyModel, Selector } from 'doura'
-import { DouraRoot, useModel, useStaticModel } from '../src/useModel'
+import {
+  DouraRoot,
+  useAnonymousModel,
+  useModel,
+  useStaticModel,
+} from '../src/useModel'
 import { createContainer } from '../src/createContainer'
 import { createUseModel } from '../src/createUseModel'
 import { countModel } from './models'
@@ -19,7 +24,7 @@ beforeEach(() => {
   jest.useFakeTimers()
 })
 
-describe('useModel (without name)', () => {
+describe('useAnonymousModel', () => {
   test('should work', async () => {
     const count = defineModel({
       state: {
@@ -32,7 +37,7 @@ describe('useModel (without name)', () => {
       },
     })
     const App = () => {
-      const counter = useModel(count)
+      const counter = useAnonymousModel(count)
 
       return (
         <>
@@ -59,11 +64,65 @@ describe('useModel (without name)', () => {
     expect(container.querySelector('#value')?.innerHTML).toEqual('2')
   })
 
+  test('should ignore model name and stay isolated from named useModel', async () => {
+    const named = defineModel({
+      name: 'localCount',
+      state: { value: 1 },
+      actions: {
+        add(payload: number = 1) {
+          this.value += payload
+        },
+      },
+    })
+
+    const App = () => {
+      const shared = useModel(named)
+      const local = useAnonymousModel(named)
+
+      return (
+        <>
+          <div id="shared">{shared.value}</div>
+          <button id="sharedButton" onClick={() => shared.add(2)}>
+            add shared
+          </button>
+          <div id="local">{local.value}</div>
+          <button id="localButton" onClick={() => local.add(3)}>
+            add local
+          </button>
+        </>
+      )
+    }
+
+    const { container } = render(
+      <DouraRoot>
+        <App />
+      </DouraRoot>
+    )
+
+    await act(async () => {
+      container
+        .querySelector('#sharedButton')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#shared')?.innerHTML).toEqual('3')
+    expect(container.querySelector('#local')?.innerHTML).toEqual('1')
+
+    await act(async () => {
+      container
+        .querySelector('#localButton')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#shared')?.innerHTML).toEqual('3')
+    expect(container.querySelector('#local')?.innerHTML).toEqual('4')
+  })
+
   describe('should always be isolation', () => {
     test('should isolation with named model', async () => {
       const App = () => {
         const counter = useModel('count', countModel)
-        const loacalCounter = useModel(countModel)
+        const loacalCounter = useAnonymousModel(countModel)
 
         return (
           <>
@@ -103,8 +162,8 @@ describe('useModel (without name)', () => {
 
     test('should isolation with another useModel', async () => {
       const App = () => {
-        const counterA = useModel(countModel)
-        const counterB = useModel(countModel)
+        const counterA = useAnonymousModel(countModel)
+        const counterB = useAnonymousModel(countModel)
 
         return (
           <>
@@ -142,7 +201,7 @@ describe('useModel (without name)', () => {
   describe('selector', () => {
     it('should work', async () => {
       const App = () => {
-        const counter = useModel(
+        const counter = useAnonymousModel(
           countModel,
           (state, actions) => {
             return {
@@ -197,7 +256,7 @@ describe('useModel (without name)', () => {
         },
       })
       const App = () => {
-        const m = useModel(
+        const m = useAnonymousModel(
           model,
           (state, actions) => {
             return {
@@ -236,7 +295,7 @@ describe('useModel (without name)', () => {
 
     it('should not work when return api directly', async () => {
       const App = () => {
-        const counter = useModel(countModel, (s) => s, [])
+        const counter = useAnonymousModel(countModel, (s) => s, [])
 
         return (
           <>
@@ -373,6 +432,46 @@ describe('useModel (without name)', () => {
 
 describe('useModel (with name)', () => {
   describe('DouraRoot', () => {
+    test('useModel(model) should use defineModel name option', async () => {
+      const named = defineModel({
+        name: 'implicitCount',
+        state: {
+          value: 1,
+        },
+        actions: {
+          add(payload: number = 1) {
+            this.value += payload
+          },
+        },
+      })
+      const App = () => {
+        const counter = useModel(named)
+        return (
+          <>
+            <div id="value">{counter.value}</div>
+            <button id="button" type="button" onClick={() => counter.add()}>
+              add
+            </button>
+          </>
+        )
+      }
+
+      const { container } = render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
+      )
+
+      expect(container.querySelector('#value')?.innerHTML).toEqual('1')
+      await act(async () => {
+        container
+          .querySelector('#button')
+          ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await nextTick()
+      })
+      expect(container.querySelector('#value')?.innerHTML).toEqual('2')
+    })
+
     test('DouraRoot should worked without props douraStore', async () => {
       const App = () => {
         const counter = useModel('count', countModel)
@@ -444,6 +543,27 @@ describe('useModel (with name)', () => {
 
     const App = () => {
       const counter = useModel('', countModel)
+      return <div id="value">{counter.value}</div>
+    }
+
+    expect(() => {
+      render(
+        <DouraRoot>
+          <App />
+        </DouraRoot>
+      )
+    }).toThrow()
+  })
+
+  test('useModel(model) should throw when model has no name option', async () => {
+    const unnamed = defineModel({
+      state: {
+        value: 1,
+      },
+    })
+
+    const App = () => {
+      const counter: any = useModel(unnamed as any)
       return <div id="value">{counter.value}</div>
     }
 
@@ -918,7 +1038,7 @@ describe('StrictMode: useModelWithSelector view lifecycle', () => {
 
   test('anonymous useModel with selector should remain reactive under StrictMode', async () => {
     const Child = () => {
-      const data = useModel(
+      const data = useAnonymousModel(
         countModel,
         (s: any, actions: any) => ({ value: s.value, add: actions.add }),
         []

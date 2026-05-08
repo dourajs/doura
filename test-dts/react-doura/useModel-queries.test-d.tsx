@@ -1,5 +1,5 @@
 import { defineModel, QueryHandle, QueryCtx } from 'doura'
-import { useModel } from 'react-doura'
+import { useAnonymousModel, useModel } from 'react-doura'
 import { expectType } from '../helper'
 
 interface User {
@@ -122,7 +122,10 @@ export function TestUseModelQueryTypes() {
 
 // Anonymous model variant — same typing guarantees.
 export function TestUseModelAnonymousQueryTypes() {
-  const api = useModel(userModel)
+  // @ts-expect-error — useModel(model) requires defineModel({ name, ... })
+  useModel(userModel)
+
+  const api = useAnonymousModel(userModel)
 
   expectType<QueryHandle<[], User[]>>(api.fetchList)
   expectType<QueryHandle<[string], User>>(api.fetchUser)

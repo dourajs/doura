@@ -1,5 +1,5 @@
 import { defineModel } from 'doura'
-import { useModel, Selector } from 'react-doura'
+import { useAnonymousModel, useModel, Selector } from 'react-doura'
 import { expectType } from '../helper'
 
 type customType = 'custom' | 'custom0'
@@ -35,6 +35,44 @@ const count = defineModel({
   },
 })
 
+const namedCount = defineModel({
+  name: 'count',
+  state: {
+    value: 1,
+    s: '',
+  },
+  actions: {
+    addValue(payload: number = 1) {
+      this.value += payload
+    },
+    setString(payload: customType) {
+      this.s = payload
+    },
+    async asyncAdd(arg0: number) {
+      this.addValue(arg0)
+    },
+    async asyncStr(arg0: number, arg1?: customType) {
+      if (arg1) {
+        this.addValue(arg0)
+      }
+    },
+  },
+  views: {
+    viewNumber() {
+      return this.value
+    },
+    viewString() {
+      return this.s + ''
+    },
+  },
+})
+
+const functionCount = defineModel(() => ({
+  state: {
+    value: 1,
+  },
+}))
+
 const countSelector: Selector<typeof count> = function (
   stateAndViews,
   actions
@@ -49,7 +87,14 @@ const countSelector: Selector<typeof count> = function (
 }
 
 export function Test() {
-  const model = useModel(count, countSelector)
+  // @ts-expect-error — useModel(model) requires defineModel({ name, ... })
+  useModel(count, countSelector)
+  // @ts-expect-error — implicit name lookup is object-model only
+  useModel(functionCount)
+
+  const model = useAnonymousModel(count, countSelector)
+  const anonymousFunctionModel = useAnonymousModel(functionCount)
+  expectType<number>(anonymousFunctionModel.value)
   expectType<number>(model.n)
   expectType<number>(model.v)
   expectType<string>(model.s)
@@ -57,6 +102,10 @@ export function Test() {
   expectType<void>(model.addValue())
   expectType<void>(model.setString('custom'))
   expectType<Promise<void>>(model.asyncAdd(0))
+
+  const implicitNamedModel = useModel(namedCount, countSelector)
+  expectType<number>(implicitNamedModel.n)
+  expectType<void>(implicitNamedModel.addValue())
 
   const namedModel = useModel('count', count, countSelector)
   expectType<number>(namedModel.n)

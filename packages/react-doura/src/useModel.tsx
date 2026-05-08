@@ -8,7 +8,7 @@ const ANONYMOUS_MODEL_NAME = 'anonymous model'
 
 const useAnonymousModel: UseAnonymousModel = <
   IModel extends AnyModel,
-  S extends Selector<IModel>
+  S extends Selector<IModel>,
 >(
   model: IModel,
   selector?: S,
@@ -45,11 +45,17 @@ const useModel = ((name: any, model: any, selector?: any, depends?: any) => {
     return useRootModel(name, model, selector, depends)
   }
 
-  return useAnonymousModel(name, model, selector)
+  if (typeof name !== 'object' || !name.name) {
+    throw new Error(
+      `[react-doura]: model name is required. Use defineModel({ name, ... }) or call useAnonymousModel(model).`
+    )
+  }
+
+  return useRootModel(name.name, name, model, selector)
 }) as UseModel
 
 const useStaticModel: UseStaticModel = (name, model) => {
   return useRootStaticModel(name, model)
 }
 
-export { DouraRoot, useModel, useStaticModel }
+export { DouraRoot, useModel, useAnonymousModel, useStaticModel }
