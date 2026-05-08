@@ -62,4 +62,15 @@ describe('GCManager', () => {
     jest.advanceTimersByTime(0)
     expect(cleanup).toHaveBeenCalledTimes(1)
   })
+
+  it('should not retain refcount entry when gcTime is Infinity and refcount drops to 0', () => {
+    gc.observe('a')
+    gc.observe('b')
+    gc.unobserve('a', Infinity, jest.fn())
+    gc.unobserve('b', Infinity, jest.fn())
+
+    // After all observers are gone with Infinity gcTime, internal state
+    // should not retain stale entries — they would accumulate unbounded.
+    expect((gc as any)._refcounts.size).toBe(0)
+  })
 })

@@ -1,10 +1,9 @@
+import { emptyArray } from '../utils'
 import { FetchManager } from './fetchManager'
 import { GCManager } from './gcManager'
 import { QueryConfig, DEFAULT_QUERY_CONFIG, QueryHash } from './queryTypes'
 import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
 import type { ModelInternal } from './model'
-
-const emptyArgs: readonly unknown[] = []
 
 export class QueryCoordinator {
   private _fetchManager: FetchManager
@@ -25,7 +24,7 @@ export class QueryCoordinator {
   async fetch(
     model: ModelInternal,
     queryName: string,
-    args: readonly unknown[] = emptyArgs
+    args: readonly unknown[] = emptyArray
   ): Promise<unknown> {
     const handle = model.queries[queryName]
     if (!handle) {
@@ -33,7 +32,7 @@ export class QueryCoordinator {
     }
     const fn = handle._spec.fn
 
-    const argsTuple = args || emptyArgs
+    const argsTuple = args
     const hash = handle.computeHash(...(argsTuple as any[]))
     const shared = this._appliedInflight.get(hash)
     if (shared) {
@@ -128,7 +127,7 @@ export class QueryCoordinator {
   isStale(
     model: ModelInternal,
     queryName: string,
-    args: readonly unknown[] = emptyArgs,
+    args: readonly unknown[] = emptyArray,
     overrideStaleTime?: number
   ): boolean {
     const entry = model.getQueryState(queryName, args)

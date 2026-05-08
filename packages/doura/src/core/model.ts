@@ -196,10 +196,6 @@ function markViewShouldRun(view: View) {
   view.dirty = true
 }
 
-function normalizeQueryArgs(args?: readonly unknown[]): readonly unknown[] {
-  return args ? args : emptyArray
-}
-
 let detachedModelQueryScopeId = 0
 
 export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
@@ -240,8 +236,6 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _actionKeys: string[] = []
   private _queryKeys: string[] = []
   private _modelKeys: string[] = []
-  private _queryHandles: Record<string, InternalQueryHandle> =
-    Object.create(null)
   private _initState: ModelState<IModel>
   private _currentState: any
   private _actionListeners: ActionListener[] = []
@@ -409,7 +403,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       }
       for (let i = 0; i < this._queryKeys.length; i++) {
         const key = this._queryKeys[i]
-        def(data, key, this._queryHandles[key])
+        def(data, key, (this.queries as any)[key])
       }
       for (let i = 0; i < this._modelKeys.length; i++) {
         const key = this._modelKeys[i]
@@ -763,11 +757,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
               }
         const handle = this._buildQueryHandle(queryName, normalized)
         ;(this.queries as any)[queryName] = handle
-        this._queryHandles[queryName] = handle
       }
     }
     Object.freeze(this.queries)
-    Object.freeze(this._queryHandles)
   }
 
   private _cacheAccess(key: string, type: AccessTypes) {
@@ -842,7 +834,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return computeQueryHash(
       this._queryHashScope,
       queryName,
-      computeArgsKey(normalizeQueryArgs(args))
+      computeArgsKey(args)
     )
   }
 

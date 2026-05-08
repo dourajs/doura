@@ -1,4 +1,3 @@
-// packages/doura/src/core/queryUtils.ts
 import { QueryHash } from './queryTypes'
 
 export function stableStringify(value: unknown): string {

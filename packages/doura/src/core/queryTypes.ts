@@ -1,5 +1,3 @@
-// packages/doura/src/core/queryTypes.ts
-
 export type QueryHash = string & { __brand: 'QueryHash' }
 
 export interface QueryCtx {

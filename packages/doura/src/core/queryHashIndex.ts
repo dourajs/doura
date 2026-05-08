@@ -46,9 +46,12 @@ export class QueryHashIndex<T> {
   }
 
   delete(prefixKey: QueryHashPrefixKey): QueryHash[] {
-    const hashes = this.find(prefixKey)
-    for (const hash of hashes) {
-      this._entries.delete(hash)
+    const hashes: QueryHash[] = []
+    for (const [hash, entry] of this._entries) {
+      if (matchesPrefixKey(entry, prefixKey)) {
+        hashes.push(hash)
+        this._entries.delete(hash)
+      }
     }
     return hashes
   }

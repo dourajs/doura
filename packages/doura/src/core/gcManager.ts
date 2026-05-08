@@ -19,7 +19,10 @@ export class GCManager {
     this._refcounts.set(key, count)
 
     if (count > 0) return
-    if (gcTime === Infinity) return
+    if (gcTime === Infinity) {
+      this._refcounts.delete(key)
+      return
+    }
 
     const timer = setTimeout(() => {
       this._timers.delete(key)
