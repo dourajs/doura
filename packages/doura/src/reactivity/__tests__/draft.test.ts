@@ -251,6 +251,19 @@ describe(`reactivity/draft`, () => {
         expect(nextState.anArray.length).toBe(baseLength - 1)
       })
 
+      it('does not restore truncated array items that were read before length changed', () => {
+        const baseState = {
+          todos: [{ id: 0, finished: false }],
+        }
+        const nextState = produce(baseState, (s) => {
+          s.todos.filter((todo) => !todo.finished)
+          s.todos.length = 0
+        })
+
+        expect(nextState.todos).toEqual([])
+        expect(baseState.todos).toEqual([{ id: 0, finished: false }])
+      })
+
       it('can extend via the length property', () => {
         const baseLength = baseState.anArray.length
         const nextState = produce(baseState, (s) => {
