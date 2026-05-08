@@ -254,7 +254,7 @@ interface Doura {
 
 - **`getState()`** — Returns a snapshot of all named models' state, keyed by model name.
 - **`getModel(name, model)`** — Retrieves or creates a named model instance. Repeated calls with the same name return the same instance.
-- **`getDetachedModel(model)`** — Creates an anonymous model instance that is not registered in the store and not included in `getState()`.
+- **`getDetachedModel(model)`** — Creates a detached model instance that is not registered in the store and not included in `getState()`.
 - **`subscribe(fn)`** — Registers a listener that fires whenever any named model's state changes (batched via microtask). Returns an unsubscribe function.
 - **`destroy()`** — Destroys the store: calls `onDestroy` on all plugin hooks, destroys all model instances, and clears subscribers.
 

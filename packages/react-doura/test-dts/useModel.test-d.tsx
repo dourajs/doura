@@ -1,5 +1,5 @@
 import { defineModel } from 'doura'
-import { expectType, useAnonymousModel, useModel, Selector } from './index'
+import { expectType, useDetachedModel, useModel, Selector } from './index'
 
 type customType = 'custom' | 'custom0'
 
@@ -98,9 +98,9 @@ const countSelector: Selector<typeof count> = function (
 }
 
 function Test() {
-  const model = useAnonymousModel(count, countSelector)
-  const anonymousStandaloneModel = useAnonymousModel(standaloneCount)
-  expectType<number>(anonymousStandaloneModel.value)
+  const model = useDetachedModel(count, countSelector)
+  const detachedStandaloneModel = useDetachedModel(standaloneCount)
+  expectType<number>(detachedStandaloneModel.value)
   expectType<number>(model.n)
   expectType<number>(model.v)
   expectType<string>(model.s)

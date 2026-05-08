@@ -1,10 +1,10 @@
 import { useMemo, useRef } from 'react'
 import { doura, AnyModel, Selector, Doura } from 'doura'
 import { createUseModel } from './createUseModel'
-import { UseAnonymousModel, UseModel, UseStaticModel } from './types'
+import { UseDetachedModel, UseModel, UseStaticModel } from './types'
 import { DouraRoot, useRootModel, useRootStaticModel } from './global'
 
-const useAnonymousModel: UseAnonymousModel = <
+const useDetachedModel: UseDetachedModel = <
   IModel extends AnyModel,
   S extends Selector<IModel>,
 >(
@@ -24,7 +24,7 @@ const useAnonymousModel: UseAnonymousModel = <
     }
   }
 
-  // The anonymous store is created via doura() with no plugins, so there are
+  // The detached store is created via doura() with no plugins, so there are
   // no onDestroy hooks or external subscriptions to clean up. All resources
   // (draft watchers, effect scope, model state) are only reachable through
   // this useRef and will be GC'd when the component unmounts.
@@ -46,4 +46,4 @@ const useStaticModel: UseStaticModel = (model) => {
   return useRootStaticModel(model)
 }
 
-export { DouraRoot, useModel, useAnonymousModel, useStaticModel }
+export { DouraRoot, useModel, useDetachedModel, useStaticModel }

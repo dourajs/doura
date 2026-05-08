@@ -1,6 +1,6 @@
 import { AnyModel, Selector, ModelAPI } from 'doura'
 
-export interface UseAnonymousModel {
+export interface UseDetachedModel {
   <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     model: IModel,
@@ -20,7 +20,7 @@ export interface UseModel {
 
 export interface UseSharedModel extends UseModel {}
 
-export interface useAnonymousStaticModel {
+export interface UseDetachedStaticModel {
   <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
 }
 

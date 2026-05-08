@@ -1,11 +1,11 @@
-import { useModel } from 'react-doura'
+import { useDetachedModel } from 'react-doura'
 import { todoModel } from '../models/todo'
 import { inputModel } from '../models/form'
 
 export default function TodoList() {
   const { todos, filteredTodos, addTodo, toggleTodo, clear } =
-    useModel(todoModel)
-  const { value: todoContent, update, reset } = useModel(inputModel)
+    useDetachedModel(todoModel)
+  const { value: todoContent, update, reset } = useDetachedModel(inputModel)
 
   return (
     <div>

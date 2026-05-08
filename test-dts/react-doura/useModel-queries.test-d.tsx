@@ -1,5 +1,5 @@
 import { defineModel, QueryHandle, QueryCtx } from 'doura'
-import { useAnonymousModel, useModel } from 'react-doura'
+import { useDetachedModel, useModel } from 'react-doura'
 import { expectType } from '../helper'
 
 interface User {
@@ -121,12 +121,12 @@ export function TestUseModelQueryTypes() {
   expectType<void>(api.bump())
 }
 
-// Anonymous model variant — same typing guarantees.
-export function TestUseModelAnonymousQueryTypes() {
+// Detached model variant — same typing guarantees.
+export function TestUseDetachedModelQueryTypes() {
   // @ts-expect-error — explicit name overloads were removed
   useModel('user', userModel)
 
-  const api = useAnonymousModel(userModel)
+  const api = useDetachedModel(userModel)
 
   expectType<QueryHandle<[], User[]>>(api.fetchList)
   expectType<QueryHandle<[string], User>>(api.fetchUser)

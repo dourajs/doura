@@ -54,13 +54,14 @@ The core abstraction in `packages/doura/src/reactivity/`:
     - **Public proxy** (external API): reads immutable snapshot via `PublicInstanceProxyHandlers`.
   - When an action completes at depth 0, the scheduler job is invalidated and `_update()` fires synchronously — snapshot is immediately available after action call.
 - **`use(name, model)`** (`use.ts`) — inside function models, composes child models. `currentModelContext` is set during function model evaluation; `use()` reads it, instantiates the child, and registers dependency propagation via `depend()`.
-- **`ModelManager`** (`modelManager.ts`) — the store holding named model instances. `getModel(name, model)` retrieves or creates (cached by name). `getDetachedModel(model)` creates anonymous instances.
+- **`ModelManager`** (`modelManager.ts`) — the store holding named model instances. `getModel(name, model)` retrieves or creates (cached by name). `getDetachedModel(model)` creates detached instances.
 - **Scheduler** (`scheduler.ts`) — Vue 3-derived microtask scheduler with `queueJob()`, `invalidateJob()`, `nextTick()`.
 
 ### React Integration (`packages/react-doura/src/`)
 
 - **`createContainer()`** (`createContainer.tsx`): Creates a React Context + Provider wrapping a `Doura` store instance. Returns `{ Provider, useSharedModel, useStaticModel }`.
-- **`useModel(model, selector?)`** (`useModel.tsx`): Without a name, creates component-scoped anonymous model (own `doura()` in a `useRef`). With a name, delegates to global root store.
+- **`useDetachedModel(model, selector?)`** (`useModel.tsx`): Creates a component-scoped detached model (own `doura()` in a `useRef`).
+- **`useModel(model, selector?)`** (`useModel.tsx`): Reads a model from the global root store.
 - **`createUseModel`** (`createUseModel.tsx`): Core hook logic using `useSyncExternalStore`. Without selector: subscribes to `$getApi()`. With selector: creates a `ModelView` via `$createView(selector)` for derived subscriptions.
 - **`batchManager`** (`batchManager.ts`): Coordinates model change → React update batching via `unstable_batchedUpdates`.
 

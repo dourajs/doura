@@ -3,26 +3,12 @@ id: react-doura
 title: React Doura
 ---
 
-## useModel
+## useDetachedModel
 
 ### Types
 
 ```ts
-declare interface UseModel extends UseAnonymousModel, UseNamedModel {}
-```
-
-:::caution
-With the param `name` or not, `useModel` has very different behavior.
-:::
-
-## useModel Without Name
-
-`useModel` can replace `useState`, and enjoy doura features.
-
-### Types
-
-```ts
-declare interface UseAnonymousModel {
+declare interface UseDetachedModel {
   <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
   <IModel extends AnyModel, S extends Selector<IModel>>(
     model: IModel,
@@ -31,6 +17,8 @@ declare interface UseAnonymousModel {
   ): ReturnType<S>
 }
 ```
+
+`useDetachedModel` creates a component-scoped detached model instance. It can replace `useState`, and enjoy doura features.
 
 ### Example
 
@@ -48,7 +36,7 @@ const count = defineModel({
   },
 })
 const App = () => {
-  const counter = useModel(count)
+  const counter = useDetachedModel(count)
 
   return (
     <>
@@ -118,7 +106,7 @@ const countModel = defineModel({
 })
 
 const App = () => {
-  const counter = useModel(
+  const counter = useDetachedModel(
     countModel,
     (state, actions) => {
       return {

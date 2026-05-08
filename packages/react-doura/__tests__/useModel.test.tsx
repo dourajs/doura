@@ -3,7 +3,7 @@ import { render, act } from '@testing-library/react'
 import { doura, defineModel, nextTick, AnyModel, Selector } from 'doura'
 import {
   DouraRoot,
-  useAnonymousModel,
+  useDetachedModel,
   useModel,
   useStaticModel,
 } from '../src/useModel'
@@ -24,7 +24,7 @@ beforeEach(() => {
   jest.useFakeTimers()
 })
 
-describe('useAnonymousModel', () => {
+describe('useDetachedModel', () => {
   test('should work', async () => {
     const count = defineModel({
       name: 'count',
@@ -38,7 +38,7 @@ describe('useAnonymousModel', () => {
       },
     })
     const App = () => {
-      const counter = useAnonymousModel(count)
+      const counter = useDetachedModel(count)
 
       return (
         <>
@@ -78,7 +78,7 @@ describe('useAnonymousModel', () => {
 
     const App = () => {
       const shared = useModel(named)
-      const local = useAnonymousModel(named)
+      const local = useDetachedModel(named)
 
       return (
         <>
@@ -123,7 +123,7 @@ describe('useAnonymousModel', () => {
     test('should isolation with named model', async () => {
       const App = () => {
         const counter = useModel(countModel)
-        const loacalCounter = useAnonymousModel(countModel)
+        const loacalCounter = useDetachedModel(countModel)
 
         return (
           <>
@@ -163,8 +163,8 @@ describe('useAnonymousModel', () => {
 
     test('should isolation with another useModel', async () => {
       const App = () => {
-        const counterA = useAnonymousModel(countModel)
-        const counterB = useAnonymousModel(countModel)
+        const counterA = useDetachedModel(countModel)
+        const counterB = useDetachedModel(countModel)
 
         return (
           <>
@@ -202,7 +202,7 @@ describe('useAnonymousModel', () => {
   describe('selector', () => {
     it('should work', async () => {
       const App = () => {
-        const counter = useAnonymousModel(
+        const counter = useDetachedModel(
           countModel,
           (state, actions) => {
             return {
@@ -258,7 +258,7 @@ describe('useAnonymousModel', () => {
         },
       })
       const App = () => {
-        const m = useAnonymousModel(
+        const m = useDetachedModel(
           model,
           (state, actions) => {
             return {
@@ -297,7 +297,7 @@ describe('useAnonymousModel', () => {
 
     it('should not work when return api directly', async () => {
       const App = () => {
-        const counter = useAnonymousModel(countModel, (s) => s, [])
+        const counter = useDetachedModel(countModel, (s) => s, [])
 
         return (
           <>
@@ -321,10 +321,10 @@ describe('useAnonymousModel', () => {
     })
 
     describe('ModelView cleanup on unmount', () => {
-      // Anonymous useModel creates a per-component doura() store internally.
+      // useDetachedModel creates a per-component doura() store internally.
       // We simulate this by creating our own store + createUseModel, which is
-      // the exact same code path useAnonymousModel takes.
-      function makeAnonymousHook(store: ReturnType<typeof doura>) {
+      // the exact same code path useDetachedModel takes.
+      function makeDetachedHook(store: ReturnType<typeof doura>) {
         return <IModel extends AnyModel, S extends Selector<IModel>>(
           model: IModel,
           selector?: S,
@@ -342,7 +342,7 @@ describe('useAnonymousModel', () => {
         const localStore = doura()
 
         const Child = () => {
-          const data = makeAnonymousHook(localStore)(
+          const data = makeDetachedHook(localStore)(
             countModel,
             (s, actions) => ({ value: s.value, add: actions.add }),
             []
@@ -386,7 +386,7 @@ describe('useAnonymousModel', () => {
         const localStore = doura()
 
         const Child = () => {
-          const data = makeAnonymousHook(localStore)(
+          const data = makeDetachedHook(localStore)(
             countModel,
             (s, actions) => ({ value: s.value, add: actions.add }),
             []
@@ -854,8 +854,8 @@ describe('useModel (with name)', () => {
   })
 })
 
-// useAnonymousModel does not call store.destroy() on unmount.
-// The anonymous store is created via doura() with no plugins, so there are no
+// useDetachedModel does not call store.destroy() on unmount.
+// The detached store is created via doura() with no plugins, so there are no
 // external resources (DevTools connections, plugin subscriptions) to clean up.
 // All internal resources (draft watchers, effect scope, model state) are only
 // reachable through the component's useRef and will be GC'd after unmount.
@@ -1035,9 +1035,9 @@ describe('StrictMode: useModelWithSelector view lifecycle', () => {
     expect(container.querySelector('#value')?.textContent).toBe('2')
   })
 
-  test('anonymous useModel with selector should remain reactive under StrictMode', async () => {
+  test('useDetachedModel with selector should remain reactive under StrictMode', async () => {
     const Child = () => {
-      const data = useAnonymousModel(
+      const data = useDetachedModel(
         countModel,
         (s: any, actions: any) => ({ value: s.value, add: actions.add }),
         []
