@@ -86,6 +86,13 @@ const createGetter =
     }
 
     if (key[0] !== '$') {
+      if (hasOwn(state, key)) {
+        if (accessCache[key] === undefined) {
+          accessCache[key] = AccessTypes.STATE
+        }
+        return state[key]
+      }
+
       const n = accessCache[key]
       if (n !== undefined) {
         switch (n) {
@@ -103,15 +110,18 @@ const createGetter =
             return isPublicInstance ? models[key] : instance.modelProxies[key]
           // default: just fallthrough
         }
-      } else if (hasOwn(state, key)) {
-        accessCache[key] = AccessTypes.STATE
-        return state[key]
-      } else if (hasOwn(instance.queries, key)) {
-        accessCache[key] = AccessTypes.QUERY
-        return instance.queries[key]
       } else if (hasOwn(models, key)) {
         accessCache[key] = AccessTypes.MODEL
         return isPublicInstance ? models[key] : instance.modelProxies[key]
+      } else if (hasOwn(views, key)) {
+        accessCache[key] = AccessTypes.VIEW
+        return views[key]
+      } else if (hasOwn(instance.queries, key)) {
+        accessCache[key] = AccessTypes.QUERY
+        return instance.queries[key]
+      } else if (hasOwn(actions, key)) {
+        accessCache[key] = AccessTypes.ACTION
+        return actions[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -162,10 +172,10 @@ const set = (
 
     state[key] = value
     return true
-  } else if (hasOwn(actions, key)) {
+  } else if (hasOwn(models, key)) {
     if (__DEV__) {
       warn(
-        `Attempting to mutate action "${key}". Actions are readonly.`,
+        `Attempting to mutate model "${key}". Models are readonly.`,
         instance
       )
     }
@@ -183,10 +193,10 @@ const set = (
       )
     }
     return false
-  } else if (hasOwn(models, key)) {
+  } else if (hasOwn(actions, key)) {
     if (__DEV__) {
       warn(
-        `Attempting to mutate model "${key}". Models are readonly.`,
+        `Attempting to mutate action "${key}". Actions are readonly.`,
         instance
       )
     }

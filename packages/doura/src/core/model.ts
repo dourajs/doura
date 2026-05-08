@@ -308,9 +308,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
     this.effectScope = effectScope()
     this._initModels()
-    this._initActions()
     this._initViews()
     this._initQueries()
+    this._initActions()
   }
 
   patch(obj: AnyObject) {
@@ -641,7 +641,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const actions = this.options.actions
     if (actions) {
       for (const actionName of Object.keys(actions)) {
-        this.accessCache[actionName] = AccessTypes.ACTION
+        this._cacheAccess(actionName, AccessTypes.ACTION)
         this._actionKeys.push(actionName)
         const action = actions[actionName]
 
@@ -691,7 +691,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   private _initModels() {
     for (const modelName of Object.keys(this.models)) {
-      this.accessCache[modelName] = AccessTypes.MODEL
+      this._cacheAccess(modelName, AccessTypes.MODEL)
       this._modelKeys.push(modelName)
     }
     Object.freeze(this.models)
@@ -702,7 +702,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const views = this.options.views
     if (views) {
       for (const viewName of Object.keys(views)) {
-        this.accessCache[viewName] = AccessTypes.VIEW
+        this._cacheAccess(viewName, AccessTypes.VIEW)
         const viewFn = views[viewName]
         const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
@@ -751,7 +751,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const queries = (this.options as any).queries
     if (queries) {
       for (const queryName of Object.keys(queries)) {
-        this.accessCache[queryName] = AccessTypes.QUERY
+        this._cacheAccess(queryName, AccessTypes.QUERY)
         this._queryKeys.push(queryName)
         const spec = queries[queryName]
         const normalized: NormalizedQuerySpec =
@@ -768,6 +768,12 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
     Object.freeze(this.queries)
     Object.freeze(this._queryHandles)
+  }
+
+  private _cacheAccess(key: string, type: AccessTypes) {
+    if (this.accessCache[key] === undefined) {
+      this.accessCache[key] = type
+    }
   }
 
   private _buildQueryHandle(

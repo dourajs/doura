@@ -88,6 +88,96 @@ describe('model', () => {
     })
   })
 
+  test('conflicted direct access follows validation precedence', () => {
+    const makeChild = (name: string) =>
+      createModel({
+        name,
+        state: { value: name },
+      })
+
+    const stateKeyChild = makeChild('stateKey')
+    const modelKeyChild = makeChild('modelKey')
+
+    const model = createModel(
+      {
+        state: {
+          stateKey: 'state',
+        },
+        views: {
+          stateKey() {
+            return 'view-state'
+          },
+          modelKey() {
+            return 'view-model'
+          },
+          viewKey() {
+            return 'view'
+          },
+        },
+        actions: {
+          stateKey() {
+            return 'action-state'
+          },
+          viewKey() {
+            return 'action-view'
+          },
+          modelKey() {
+            return 'action-model'
+          },
+          queryKey() {
+            return 'action-query'
+          },
+          actionKey() {
+            return 'action'
+          },
+        },
+        queries: {
+          stateKey: async () => 'query-state',
+          modelKey: async () => 'query-model',
+          viewKey: async () => 'query-view',
+          queryKey: async () => 'query',
+        },
+      },
+      {
+        models: {
+          stateKey: stateKeyChild.publicInst,
+          modelKey: modelKeyChild.publicInst,
+        },
+        modelProxies: {
+          stateKey: stateKeyChild.proxy,
+          modelKey: modelKeyChild.proxy,
+        },
+      }
+    )
+    const api = model.proxy as any
+
+    expect(api.stateKey).toBe('state')
+    expect(api.modelKey).toBe(modelKeyChild.proxy)
+    expect(api.viewKey).toBe('view')
+    expect(api.queryKey).toBe(api.$queries.queryKey)
+    expect(api.actionKey()).toBe('action')
+
+    expect(api.$views.stateKey).toBe('view-state')
+    expect(api.$views.modelKey).toBe('view-model')
+    expect(api.$actions.stateKey()).toBe('action-state')
+    expect(api.$actions.modelKey()).toBe('action-model')
+    expect(api.$queries.stateKey).toBeDefined()
+    expect(api.$models.stateKey).toBe(stateKeyChild.publicInst)
+
+    expect(() => {
+      api.viewKey = 'new'
+    }).toThrow()
+    expect('Attempting to mutate view "viewKey"').toHaveBeenWarned()
+
+    expect(() => {
+      api.modelKey = 'new'
+    }).toThrow()
+    expect('Attempting to mutate model "modelKey"').toHaveBeenWarned()
+
+    model.replace({})
+    expect(api.stateKey).toBe(stateKeyChild.proxy)
+  })
+
   describe('isolate', () => {
     it('should not track reactive values in isolate()', () => {
       const model = createModel({

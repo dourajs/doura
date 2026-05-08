@@ -167,6 +167,7 @@ describe('defineModel', () => {
       })
 
       modelMgr.getModel(
+        // @ts-expect-error - intentional runtime validation fixture
         defineModel({
           name: 'parent',
           state: { child: 1 },

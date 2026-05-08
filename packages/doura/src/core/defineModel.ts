@@ -7,6 +7,8 @@ import {
   ModelThis,
   ViewThis,
   AnyObjectModel,
+  StripIndexSignature,
+  ModelChildren,
 } from './modelOptions'
 import { InferQueryEntry, QueriesOption } from './queryTypes'
 
@@ -16,6 +18,60 @@ export type DefineModel<
   V extends ViewOptions,
   Models extends readonly AnyObjectModel[] = [],
 > = ModelOptions<S, A, V, Models> & {} // BUG: {} is required
+
+type IsAny<T> = 0 extends 1 & T ? true : false
+
+type KnownStringKeys<T> =
+  IsAny<T> extends true ? never : Extract<keyof StripIndexSignature<T>, string>
+
+type ConflictMessage<
+  Type extends string,
+  ConflictedType extends string,
+  K,
+> = K extends string
+  ? `key "${K}" in "${Type}" is conflicted with the key in "${ConflictedType}"`
+  : never
+
+type KeyConflict<
+  Type extends string,
+  T,
+  ConflictedType extends string,
+  Conflicted,
+> = ConflictMessage<
+  Type,
+  ConflictedType,
+  Extract<KnownStringKeys<T>, KnownStringKeys<Conflicted>>
+>
+
+type ModelKeyConflicts<
+  S extends State,
+  A extends ActionOptions,
+  V extends ViewOptions,
+  Q,
+  Models extends readonly AnyObjectModel[],
+> =
+  | KeyConflict<'models', ModelChildren<Models>, 'state', S>
+  | KeyConflict<'views', V, 'state', S>
+  | KeyConflict<'views', V, 'models', ModelChildren<Models>>
+  | KeyConflict<'queries', Q, 'state', S>
+  | KeyConflict<'queries', Q, 'models', ModelChildren<Models>>
+  | KeyConflict<'queries', Q, 'views', V>
+  | KeyConflict<'actions', A, 'state', S>
+  | KeyConflict<'actions', A, 'models', ModelChildren<Models>>
+  | KeyConflict<'actions', A, 'views', V>
+  | KeyConflict<'actions', A, 'queries', Q>
+
+type NoModelKeyConflicts<
+  S extends State,
+  A extends ActionOptions,
+  V extends ViewOptions,
+  Q,
+  Models extends readonly AnyObjectModel[],
+> = [ModelKeyConflicts<S, A, V, Q, Models>] extends [never]
+  ? {}
+  : {
+      readonly __doura_key_conflict__: ModelKeyConflicts<S, A, V, Q, Models>
+    }
 
 // Overload 1: object model.
 //
@@ -63,7 +119,8 @@ export function defineModel<
     actions?: A
     views?: V & ThisType<ViewThis<S, V, Models>>
     queries?: Q & QueriesOption<S, ModelThis<S, A, V, Q, Models>>
-  } & ThisType<ModelThis<S, A, V, Q, Models>>
+  } & NoModelKeyConflicts<S, A, V, Q, Models> &
+    ThisType<ModelThis<S, A, V, Q, Models>>
 ): M & { name: N } & DefineModel<S, A, V, Models>
 
 // Implementation

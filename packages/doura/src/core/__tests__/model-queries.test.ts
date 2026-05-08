@@ -82,6 +82,7 @@ describe('model queries', () => {
 
   describe('query name conflict detection', () => {
     it('should warn when query name conflicts with state key', () => {
+      // @ts-expect-error - intentional runtime validation fixture
       const model = defineModel({
         name: 'model',
         state: { fetchUser: 'existing' },

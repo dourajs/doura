@@ -293,8 +293,8 @@ export const validateModelOptions = (model: AnyObjectModel): void => {
 
   const keys = new Map<string, string>()
   checkConflictedKey('state', model, keys)
-  checkConflictedKey('views', model, keys)
-  checkConflictedKey('actions', model, keys)
-  checkConflictedKey('queries', model, keys)
   checkConflictedModelKey(model, keys)
+  checkConflictedKey('views', model, keys)
+  checkConflictedKey('queries', model, keys)
+  checkConflictedKey('actions', model, keys)
 }
