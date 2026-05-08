@@ -1,0 +1,654 @@
+# Doura + React-Doura Usage Manual
+
+> Agent-facing reference. Each section provides enough context to use the feature, with links to full documentation.
+
+## Quick Start
+
+```bash
+npm install doura react-doura
+```
+
+```ts
+import { defineModel, doura } from 'doura'
+
+const counterModel = defineModel({
+  name: 'counter',
+  state: { count: 0 },
+  actions: {
+    increment() {
+      this.count += 1
+    },
+  },
+  views: {
+    double() {
+      return this.count * 2
+    },
+  },
+})
+
+// Standalone usage
+const store = doura()
+const counter = store.getModel(counterModel)
+counter.increment()
+console.log(counter.count)  // 1
+console.log(counter.double) // 2
+```
+
+```tsx
+// React usage
+import { DouraRoot, useModel } from 'react-doura'
+
+function Counter() {
+  const counter = useModel(counterModel)
+  return <button onClick={() => counter.increment()}>{counter.count}</button>
+}
+
+function App() {
+  return (
+    <DouraRoot>
+      <Counter />
+    </DouraRoot>
+  )
+}
+```
+
+Full details: [Installation](../doc-sites/docs/installation.md) | [Introduction](../doc-sites/docs/introduction.md)
+
+---
+
+## Defining Models
+
+`defineModel` is the central API for declaring state, logic, and derived data.
+
+```ts
+import { defineModel, query } from 'doura'
+
+const model = defineModel({
+  name: 'uniqueName',    // required: unique string identifier
+  state: { /* ... */ },  // required: initial state (plain object)
+  actions: { /* ... */ }, // optional: methods that mutate state
+  views: { /* ... */ },   // optional: computed/derived values
+  models: [ /* ... */ ],  // optional: array of child model definitions
+  queries: { /* ... */ }, // optional: async data fetching with caching
+})
+```
+
+Key constraint: property names across `state`, `actions`, `views`, `queries`, and `models` must not conflict.
+
+### State
+
+State is the initial data shape. Access state properties directly via `this` in actions and views.
+
+```ts
+state: {
+  users: [] as User[],
+  currentId: null as string | null,
+}
+```
+
+Full details: [State](../doc-sites/docs/core-concepts/state.md)
+
+### Actions
+
+Actions mutate state. Three semantics:
+
+```ts
+actions: {
+  // Modify — mutate via this (most common)
+  increment() {
+    this.count += 1
+  },
+  // Replace — assign to this.$state
+  reset() {
+    this.$state = { count: 0 }
+  },
+  // Patch — return partial object (deep merged)
+  patch() {
+    return { count: 2 }
+  },
+  // Async actions
+  async fetchAndSet() {
+    const data = await fetch('/api/data').then(r => r.json())
+    this.data = data
+  },
+}
+```
+
+Inside actions, `this` provides access to all state, views, queries, and child models.
+
+Full details: [Actions](../doc-sites/docs/core-concepts/actions.md) | [API Reference](../doc-sites/docs/api/core/doura.md#action)
+
+### Views
+
+Views are computed/derived values. They re-evaluate only when their dependencies change.
+
+```ts
+views: {
+  // Shorthand: receives state as argument
+  double(state) {
+    return state.count * 2
+  },
+  // this-based: can reference other views
+  quadruple() {
+    return this.double * 2
+  },
+}
+```
+
+Full details: [Views](../doc-sites/docs/core-concepts/views.md) | [Optimize Views](../doc-sites/docs/guides/optimize-views.md)
+
+### Model Composition
+
+Compose child models via the `models` option. Children are accessed by their `name`:
+
+```ts
+const childModel = defineModel({
+  name: 'child',
+  state: { value: 0 },
+  actions: { inc() { this.value++ } },
+})
+
+const parentModel = defineModel({
+  name: 'parent',
+  state: { own: 'data' },
+  models: [childModel],
+  actions: {
+    doSomething() {
+      this.child.inc()  // access child by its name
+    },
+  },
+})
+```
+
+Named models are shared: if multiple parents compose the same child, they point to the same instance within a store.
+
+Full details: [Composing Models](../doc-sites/docs/guides/compose-model.md)
+
+### Queries
+
+Built-in async data fetching with caching. Each query entry maintains a cache keyed by its arguments.
+
+```ts
+import { defineModel, query } from 'doura'
+
+const userModel = defineModel({
+  name: 'user',
+  state: { currentUser: null as User | null },
+  queries: {
+    // Shorthand form
+    fetchAll: async function (ctx) {
+      const res = await fetch('/api/users', { signal: ctx.signal })
+      return res.json()
+    },
+    // Full form with options
+    fetchById: query({
+      fn: async function (ctx, id: string) {
+        const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
+        return res.json()
+      },
+      staleTime: 30_000,
+    }),
+  },
+})
+```
+
+Every query function receives `QueryCtx` as its first argument, which provides an `AbortSignal` for cancellation.
+
+**QueryHandle methods** (available on model instances as `instance.queryName`):
+
+| Method | Description |
+|--------|-------------|
+| `fetch(...args)` | Fetch and return data |
+| `prefetch(...args)` | Warm cache without awaiting |
+| `getData(...args)` | Read cached data without fetching |
+| `getState(...args)` | Read raw cache entry |
+| `isFetching(...args)` | Check if currently fetching |
+| `isStale(...args)` | Check if data is stale |
+| `cancel(...args?)` | Cancel inflight request(s) |
+| `invalidate(...args?)` | Mark entry/entries stale |
+| `reset(...args?)` | Clear entry/entries entirely |
+| `setData(...args, data)` | Write data into cache manually |
+
+Full details: [Queries Guide](../doc-sites/docs/guides/queries.md) | [QueryHandle API](../doc-sites/docs/api/core/doura.md#queryhandle)
+
+---
+
+## Store
+
+The `doura()` factory creates a store that manages model instances.
+
+```ts
+import { doura } from 'doura'
+
+const store = doura({
+  initialState: { counter: { count: 10 } },  // optional: pre-seed state
+  plugins: [[myPlugin, options]],              // optional: plugin tuples
+  query: { gcTime: 300_000, staleTime: 0 },   // optional: query defaults
+})
+```
+
+### Store API
+
+| Method | Description |
+|--------|-------------|
+| `getModel(model)` | Get or create a named model instance (singleton per store) |
+| `getDetachedModel(model)` | Create an independent instance not tracked by the store |
+| `getState()` | Snapshot of all named models' state |
+| `subscribe(fn)` | Listen to any state change; returns unsubscribe fn |
+| `destroy()` | Tear down all models and plugins |
+
+```ts
+const counter = store.getModel(counterModel)
+counter.increment()
+
+const unsub = store.subscribe(() => console.log(store.getState()))
+unsub()
+store.destroy()
+```
+
+Full details: [Store](../doc-sites/docs/core-concepts/store.md) | [API Reference](../doc-sites/docs/api/core/doura.md#doura)
+
+---
+
+## React Integration
+
+### DouraRoot (Global Store)
+
+Wraps your app to provide a global store context:
+
+```tsx
+import { DouraRoot, useModel, useStaticModel } from 'react-doura'
+
+<DouraRoot>
+  <App />
+</DouraRoot>
+```
+
+In dev mode, `DouraRoot` auto-enables the Redux DevTools plugin.
+
+### useModel
+
+Reactive hook that re-renders when accessed state/views change:
+
+```tsx
+// Full API access
+const counter = useModel(counterModel)
+
+// With selector — only re-renders on selected value changes
+const { count, increment } = useModel(
+  counterModel,
+  (s) => ({ count: s.count, increment: s.increment }),
+  []  // deps for selector stability
+)
+```
+
+### useDetachedModel
+
+Component-scoped isolated model (replaces useState with full Doura features):
+
+```tsx
+const counter = useDetachedModel(counterModel)
+// Each component instance gets its own independent model
+```
+
+### useStaticModel
+
+Non-reactive access (no re-renders). Use for stable references like action methods:
+
+```tsx
+const counter = useStaticModel(counterModel)
+// counter.increment is stable; counter.count won't trigger re-render
+```
+
+### createContainer (Multiple Stores)
+
+Creates an isolated store scope:
+
+```tsx
+import { createContainer } from 'react-doura'
+
+const { Provider, useSharedModel, useStaticModel } = createContainer()
+
+<Provider>
+  <ScopedComponent />
+</Provider>
+```
+
+Full details: [Component State](../doc-sites/docs/react/component-state.md) | [Global Store](../doc-sites/docs/react/global-store.md) | [Multiple Stores](../doc-sites/docs/react/multiple-stores.md) | [API Reference](../doc-sites/docs/api/core/react-doura.md)
+
+---
+
+## useQuery
+
+Subscribe to a query's cache and auto-fetch when stale:
+
+```tsx
+import { useModel, useQuery } from 'react-doura'
+
+function UserProfile({ userId }: { userId: string }) {
+  const user = useModel(userModel)
+
+  const { data, isLoading, error, refetch } = useQuery(
+    user.fetchById,
+    [userId],
+    { staleTime: 60_000, enabled: !!userId }
+  )
+
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {String(error)}</div>
+  return <div>{data.name}</div>
+}
+```
+
+**Options** (`QueryOverrides`):
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `enabled` | `boolean \| () => boolean` | Control whether fetch runs |
+| `staleTime` | `number` | Override staleness threshold |
+| `select` | `(data) => TSelected` | Transform data before returning |
+| `placeholderData` | `TData \| (prev?) => TData` | Show before real data arrives |
+
+**Result** (`UseQueryResult`):
+
+| Field | Description |
+|-------|-------------|
+| `data` | The query data (or selected/transformed) |
+| `error` | Error if fetch failed |
+| `isLoading` | No data, no error, enabled |
+| `isPending` | No data yet |
+| `isFetching` | Fetch in progress |
+| `isSuccess` | Has data, no error |
+| `isError` | Has error |
+| `isStale` | Data missing or older than staleTime |
+| `isRefetching` | Has data AND currently fetching |
+| `isPlaceholderData` | Showing placeholder data |
+| `refetch()` | Manually trigger a refetch |
+
+Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#usequery)
+
+---
+
+## useInfiniteQuery
+
+Paginated query that accumulates pages:
+
+```tsx
+import { useModel, useInfiniteQuery } from 'react-doura'
+
+function PostList() {
+  const posts = useModel(postsModel)
+
+  const { data, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useInfiniteQuery(posts.fetchPage, {
+      initialArgs: [1] as [number],
+      getNextArgs: (lastPage, allPages) =>
+        lastPage.hasMore ? [allPages.length + 1] as [number] : undefined,
+    })
+
+  return (
+    <div>
+      {data?.pages.flatMap(page =>
+        page.items.map(item => <div key={item.id}>{item.title}</div>)
+      )}
+      {hasNextPage && (
+        <button onClick={fetchNextPage} disabled={isFetchingNextPage}>
+          Load more
+        </button>
+      )}
+    </div>
+  )
+}
+```
+
+**Config** (`InfiniteQueryConfig`):
+- `initialArgs` — args for the first page
+- `getNextArgs(lastPage, allPages)` — return next args or `undefined` to stop
+- `getPreviousArgs?(firstPage, allPages)` — optional reverse pagination
+
+Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#useinfinitequery)
+
+---
+
+## useAction
+
+Track action lifecycle (loading/success/error) in React:
+
+```tsx
+import { useModel, useAction } from 'react-doura'
+
+function SaveButton() {
+  const form = useModel(formModel)
+  const { run, isPending, isError, error } = useAction(form.submit, {
+    onSuccess: () => alert('Saved!'),
+    pendingDelay: 300,  // ms before showing pending (avoids flash)
+  })
+
+  return (
+    <button onClick={() => run()} disabled={isPending}>
+      {isPending ? 'Saving...' : 'Save'}
+    </button>
+  )
+}
+```
+
+**Options** (`UseActionOptions`):
+- `onSuccess?(data)` — called on success
+- `onError?(error)` — called on failure
+- `onSettled?(data, error)` — called either way
+- `pendingDelay?` — ms before entering pending state (default: 300)
+
+**Result** (`UseActionResult`):
+- `run(...args)` — fire-and-forget (swallows rejections)
+- `runAsync(...args)` — returns Promise, throws on failure
+- `data`, `error`, `isIdle`, `isPending`, `isSuccess`, `isError`, `reset()`
+
+Semantics:
+- Synchronous actions skip pending entirely
+- Async actions use `pendingDelay` to prevent loading flash for fast operations
+- Race-safe: only the most recent call can write state
+
+Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#useaction)
+
+---
+
+## Advanced APIs
+
+### $isolate
+
+Read state without tracking dependencies (prevents unnecessary view re-evaluation):
+
+```ts
+views: {
+  userName() {
+    const user = this.$isolate((state) => state.user)
+    return user.name  // only re-evaluates when user.name changes, not user.age
+  },
+}
+```
+
+Full details: [Optimize Views](../doc-sites/docs/guides/optimize-views.md) | [API Reference](../doc-sites/docs/api/core/doura.md#isolate)
+
+### $patch
+
+Shallow-merge partial state into the model:
+
+```ts
+const instance = store.getModel(model)
+instance.$patch({ count: 5, name: 'updated' })
+```
+
+### $subscribe
+
+Subscribe to state changes on a specific model instance:
+
+```ts
+const unsub = instance.$subscribe(() => {
+  console.log('state changed:', instance.$rawState)
+})
+```
+
+### $onAction
+
+Subscribe to action invocations:
+
+```ts
+const unsub = instance.$onAction((action) => {
+  console.log(`Action: ${action.name}`, action.args)
+})
+```
+
+### $createView
+
+Create a reactive derived view (external to the model definition):
+
+```ts
+const view = instance.$createView((api) => ({
+  total: api.count + api.bonus,
+}))
+
+console.log(view())  // { total: ... }
+view.destroy()       // cleanup when done
+```
+
+### markRaw
+
+Prevent an object from being wrapped in reactive proxies:
+
+```ts
+import { markRaw } from 'doura'
+
+state: {
+  lib: markRaw(new ThirdPartyLib()),  // never made reactive
+}
+```
+
+### markStrict
+
+Preserve all property descriptors (including non-enumerable) during copy-on-write:
+
+```ts
+import { markStrict } from 'doura'
+
+state: {
+  data: markStrict(objectWithNonEnumerableProps),
+}
+```
+
+Full details: [API Reference](../doc-sites/docs/api/core/doura.md#markraw)
+
+---
+
+## Plugins
+
+Plugins extend store behavior via lifecycle hooks.
+
+```ts
+import { Plugin } from 'doura'
+
+const myPlugin: Plugin<{ verbose: boolean }> = (option) => ({
+  onInit({ initialState }, { doura }) { /* store created */ },
+  onModel(name, model, { doura }) { /* model registered */ },
+  onModelInstance(instance, { doura }) { /* instance created */ },
+  onDestroy() { /* store destroyed */ },
+})
+
+const store = doura({
+  plugins: [[myPlugin, { verbose: true }]],
+})
+```
+
+### Built-in Plugins
+
+**doura-plugin-log** — Logs every action and resulting state:
+
+```ts
+import log from 'doura-plugin-log'
+doura({ plugins: [[log]] })
+```
+
+**doura-plugin-persist** — Persists state to storage with migration support:
+
+```ts
+import persist, { createWebStorage } from 'doura-plugin-persist'
+
+doura({
+  plugins: [[persist, {
+    key: 'my-app',
+    storage: createWebStorage('local'),
+    whitelist: ['user', 'settings'],
+    version: 2,
+    migrate(state, version) { /* transform old state */ return state },
+  }]],
+})
+```
+
+**devtool** — Redux DevTools integration (auto-enabled in `DouraRoot` during dev):
+
+```ts
+import { doura, devtool } from 'doura'
+doura({ plugins: [[devtool]] })
+```
+
+Full details: [Plugins](../doc-sites/docs/core-concepts/plugins.md) | [Plugin API](../doc-sites/docs/api/plugins/index.md) | [Persist Guide](../doc-sites/docs/guides/persist-plugin.md)
+
+---
+
+## TypeScript
+
+Doura provides full type inference from `defineModel`. No manual type annotations needed for most cases.
+
+```ts
+// Type inference works automatically
+const model = defineModel({
+  name: 'typed',
+  state: { count: 0, items: [] as Item[] },
+  actions: {
+    add(item: Item) { this.items.push(item) },
+  },
+  views: {
+    total() { return this.items.length },
+  },
+})
+
+// For empty arrays or nullable values, cast in state:
+state: {
+  items: [] as Item[],
+  current: null as Item | null,
+}
+```
+
+Requires `strict: true` or `noImplicitThis: true` in `tsconfig.json`.
+
+Full details: [TypeScript Guide](../doc-sites/docs/guides/typescript.md)
+
+---
+
+## Model Instance API Summary
+
+Every model instance (from `store.getModel()`, `useModel()`, etc.) exposes:
+
+| Access | Description |
+|--------|-------------|
+| `instance.stateKey` | Direct state access |
+| `instance.actionName()` | Call action |
+| `instance.viewName` | Read computed view |
+| `instance.queryName` | QueryHandle object |
+| `instance.childName` | Child model instance |
+| `instance.$state` | Full state (assignable to replace) |
+| `instance.$rawState` | Raw unproxied state |
+| `instance.$actions` | Actions namespace |
+| `instance.$views` | Views namespace |
+| `instance.$queries` | Queries namespace |
+| `instance.$models` | Child models namespace |
+| `instance.$patch(obj)` | Deep merge partial state |
+| `instance.$onAction(fn)` | Subscribe to actions |
+| `instance.$subscribe(fn)` | Subscribe to state changes |
+| `instance.$isolate(fn)` | Read without tracking |
+| `instance.$getApi()` | Full API snapshot |
+| `instance.$createView(selector)` | Create external reactive view |
+| `instance.$invalidateQueries()` | Mark all queries stale |
+| `instance.$cancelQueries()` | Cancel all inflight queries |
+| `instance.$resetQueries()` | Clear all query caches |
+
+Full details: [ModelInstance API](../doc-sites/docs/api/core/doura.md#modelinstance)

@@ -85,6 +85,7 @@ const sidebars = {
         'guides/compose-model',
         'guides/queries',
         'guides/optimize-views',
+        'guides/persist-plugin',
         'guides/typescript',
       ],
       collapsed: true,
