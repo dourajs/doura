@@ -20,7 +20,7 @@ export type {
   ModelData,
   ModelAPI,
   ModelQueries,
-  ModelPublicInstance,
+  ModelInstance,
   ModelManager,
   ModelManagerOptions,
   Plugin,

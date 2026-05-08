@@ -10,7 +10,7 @@ import {
   AnyModel,
   Selector,
   ModelView,
-  ModelPublicInstance,
+  ModelInstance,
   hasOwn,
   ModelAPI,
 } from 'doura'
@@ -29,9 +29,9 @@ function shallowArrayEqual(
   return true
 }
 
-function readonlyModel(model: ModelPublicInstance<AnyModel>) {
+function readonlyModel(model: ModelInstance<AnyModel>) {
   return new Proxy(model, {
-    get(target: ModelPublicInstance<AnyModel>, key: string | symbol): any {
+    get(target: ModelInstance<AnyModel>, key: string | symbol): any {
       if (key === '$state') {
         return target.$state
       } else if (hasOwn(target.$state, key)) {
@@ -60,7 +60,7 @@ function getModelCacheKey(model: AnyModel) {
 }
 
 function useModel<IModel extends AnyModel>(
-  model: ModelPublicInstance<IModel>,
+  model: ModelInstance<IModel>,
   subscribe: SubscribeFn
 ) {
   const view = useMemo(() => () => model.$getApi(), [model])
@@ -76,7 +76,7 @@ function useModelWithSelector<
   IModel extends AnyModel,
   S extends Selector<IModel>,
 >(
-  model: ModelPublicInstance<IModel>,
+  model: ModelInstance<IModel>,
   subscribe: SubscribeFn,
   selector: S,
   depends?: any[]
@@ -86,7 +86,7 @@ function useModelWithSelector<
   const prevRef = useRef<{
     depends: any[] | undefined
     selector: S
-    model: ModelPublicInstance<IModel>
+    model: ModelInstance<IModel>
   }>({ depends, selector, model })
 
   const prev = prevRef.current

@@ -9,7 +9,7 @@ export interface InternalQueryHandle<
   TArgs extends QueryArgsTuple = any[],
   TData = any,
 > extends QueryHandle<TArgs, TData> {
-  readonly _model: any // ModelPublicInstance — typed as any to avoid circular import
+  readonly _model: any // ModelInstance — typed as any to avoid circular import
   readonly _queryName: string
   readonly _spec: NormalizedQuerySpec<any, any>
   /** Runtime discriminator: true when the query's fn takes args. */

@@ -1,6 +1,6 @@
 import { State, AnyModel, AnyObjectModel } from './modelOptions'
 import { createModelInstance, ModelInternal, UnSubscribe } from './model'
-import { ModelPublicInstance } from './modelPublicInstance'
+import { ModelInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
 import { emptyObject, invariant, isArray, removeUnordered } from '../utils'
@@ -18,10 +18,10 @@ export type Model = AnyModel
 
 export interface ModelManager {
   getState(): Record<string, State>
-  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
   getDetachedModel<IModel extends AnyModel>(
     model: IModel
-  ): ModelPublicInstance<IModel>
+  ): ModelInstance<IModel>
   subscribe(fn: DouraSubscriptionCallback): UnSubscribe
   destroy(): void
 }
@@ -59,17 +59,17 @@ class ModelManagerInternal implements ModelManager {
     this._hooks.map((hook) => hook.onInit?.({ initialState }, { doura: this }))
   }
 
-  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
-  getModel(model: any): ModelPublicInstance<any> {
+  getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
+  getModel(model: any): ModelInstance<any> {
     const instance = this.getModelInstance({ model })
     return instance.publicInst
   }
 
   getDetachedModel<IModel extends AnyModel>(
     model: IModel
-  ): ModelPublicInstance<IModel> {
+  ): ModelInstance<IModel> {
     const instance = this.getModelInstance({ model, detached: true })
-    return instance.publicInst as ModelPublicInstance<IModel>
+    return instance.publicInst as ModelInstance<IModel>
   }
 
   getModelInstance({

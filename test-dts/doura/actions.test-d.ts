@@ -156,7 +156,7 @@ export const modelWithInvalidation = defineModel({
   },
 })
 
-// Query API shape applies identically on ModelPublicInstance (external
+// Query API shape applies identically on ModelInstance (external
 // callers via store.getModel).
 export function ExternalInvalidation() {
   const inst = douraStore.getModel(modelWithInvalidation)
@@ -228,7 +228,7 @@ export const modelWithOwnQueriesAndChildren = defineModel({
       const user = await this.fetchUser.fetch('1')
       expectType<{ id: string; name: string }>(user)
 
-      // Composed child via this — ModelPublicInstance<typeof child>
+      // Composed child via this — ModelInstance<typeof child>
       const ch = await this.child.fetchChild.fetch()
       expectType<string>(ch)
 

@@ -1,10 +1,4 @@
-import {
-  defineModel,
-  doura,
-  ModelManager,
-  ModelPublicInstance,
-  State,
-} from 'doura'
+import { defineModel, doura, ModelManager, ModelInstance, State } from 'doura'
 import { expectType } from '../helper'
 
 const store = doura()
@@ -37,11 +31,11 @@ const tModel = store.getModel(model)
 const implicitNamedModel = store.getModel(namedModel)
 
 // store apis
-expectType<ModelPublicInstance<typeof model>>(tModel)
-expectType<ModelPublicInstance<typeof namedModel>>(implicitNamedModel)
-expectType<ModelPublicInstance<typeof parentModel>>(store.getModel(parentModel))
-expectType<ModelPublicInstance<typeof model>>(store.getModel(parentModel).test)
-expectType<ModelPublicInstance<typeof model>>(
+expectType<ModelInstance<typeof model>>(tModel)
+expectType<ModelInstance<typeof namedModel>>(implicitNamedModel)
+expectType<ModelInstance<typeof parentModel>>(store.getModel(parentModel))
+expectType<ModelInstance<typeof model>>(store.getModel(parentModel).test)
+expectType<ModelInstance<typeof model>>(
   store.getModel(parentModel).$models.test
 )
 expectType<number>(store.getModel(parentModel).test.value)

@@ -1,6 +1,6 @@
 import { AnyModel, AnyObjectModel, ModelActions } from './modelOptions'
 import { ModelInternal, ModelAPI } from './model'
-import { ModelPublicInstance } from './modelPublicInstance'
+import { ModelInstance } from './modelPublicInstance'
 import { removeUnordered } from '../utils'
 
 export type Selector<Model extends AnyModel, TReturn = any> = (
@@ -17,9 +17,7 @@ export function createView<IModel extends AnyObjectModel, TReturn>(
   instance: ModelInternal<IModel>,
   selector: Selector<IModel, TReturn>
 ): ModelView<Selector<IModel, TReturn>> {
-  const view = instance.createView(function (
-    this: ModelPublicInstance<IModel>
-  ) {
+  const view = instance.createView(function (this: ModelInstance<IModel>) {
     return selector(this as unknown as ModelAPI<IModel>, this.$actions)
   })
 

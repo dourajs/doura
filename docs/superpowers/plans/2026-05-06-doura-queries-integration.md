@@ -1728,11 +1728,11 @@ Expected: FAIL
 
 ```ts
 // packages/react-doura/src/queryTypes.ts
-import type { ModelPublicInstance } from 'doura'
+import type { ModelInstance } from 'doura'
 
 export interface QueryDef<TArgs extends object | void = any, TData = any> {
   readonly _brand: 'QueryDef'
-  readonly _model: ModelPublicInstance<any>
+  readonly _model: ModelInstance<any>
   readonly _queryName: string
   readonly _spec: any
   // Phantom types for inference
@@ -1743,7 +1743,7 @@ export interface QueryDef<TArgs extends object | void = any, TData = any> {
 export interface ActionDef<TData = any, TArgs extends any[] = any[]> {
   (...args: TArgs): TData
   readonly _brand: 'ActionDef'
-  readonly _model: ModelPublicInstance<any>
+  readonly _model: ModelInstance<any>
   readonly _actionName: string
 }
 

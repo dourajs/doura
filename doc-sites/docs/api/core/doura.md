@@ -243,8 +243,8 @@ The store object returned by `doura()`. Manages named and detached model instanc
 ```ts
 interface Doura {
   getState(): Record<string, State>
-  getModel<IModel extends AnyModel>(name: string, model: IModel): ModelPublicInstance<IModel>
-  getDetachedModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  getModel<IModel extends AnyModel>(name: string, model: IModel): ModelInstance<IModel>
+  getDetachedModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
   subscribe(fn: () => any): () => void
   destroy(): void
 }

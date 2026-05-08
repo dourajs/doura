@@ -258,7 +258,7 @@ Returned as part of `useModel`'s third tuple element. Contains internal binding 
 ```ts
 interface QueryDef<TArgs extends object | void, TData> {
   /** @internal */ readonly _brand: 'QueryDef'
-  /** @internal */ readonly _model: ModelPublicInstance
+  /** @internal */ readonly _model: ModelInstance
   /** @internal */ readonly _queryName: string
   /** @internal */ readonly _args: TArgs   // phantom type
   /** @internal */ readonly _data: TData   // phantom type
@@ -273,7 +273,7 @@ Returned as part of `useModel`'s second tuple element. Callable as before, with 
 interface ActionDef<TData, TArgs extends any[]> {
   (...args: TArgs): TData
   /** @internal */ readonly _brand: 'ActionDef'
-  /** @internal */ readonly _model: ModelPublicInstance
+  /** @internal */ readonly _model: ModelInstance
   /** @internal */ readonly _actionName: string
 }
 ```

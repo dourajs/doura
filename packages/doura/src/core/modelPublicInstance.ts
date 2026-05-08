@@ -25,7 +25,7 @@ import { createView, Selector, ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
-export type ModelPublicInstance<IModel extends AnyModel> = {
+export type ModelInstance<IModel extends AnyModel> = {
   $name: string
   $rawState: ModelState<IModel>
   $state: ModelState<IModel>

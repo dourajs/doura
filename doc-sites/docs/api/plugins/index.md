@@ -19,7 +19,7 @@ export type PluginHook = {
   ): void
   onModel?(name: string, model: AnyObjectModel, context: PluginContext): void
   onModelInstance?(
-    instance: ModelPublicInstance<AnyObjectModel>,
+    instance: ModelInstance<AnyObjectModel>,
     context: PluginContext
   ): void
   onDestroy?(): void

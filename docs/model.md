@@ -246,4 +246,4 @@ _initModel:   hooks.onModel(name, model, { doura })
 destroy:      hooks.onDestroy()
 ```
 
-Plugin 通过 `onModelInstance` 拿到 `ModelPublicInstance`，可以调用 `$subscribe`、`$onAction` 等 API 扩展行为。
+Plugin 通过 `onModelInstance` 拿到 `ModelInstance`，可以调用 `$subscribe`、`$onAction` 等 API 扩展行为。

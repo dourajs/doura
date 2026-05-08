@@ -2,7 +2,7 @@ import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn, isArray } from '../utils'
 import { QueriesOption, QueryCtx, QueryHandle } from './queryTypes'
-import type { ModelPublicInstance } from './modelPublicInstance'
+import type { ModelInstance } from './modelPublicInstance'
 
 export type State = {
   [x: string]: any
@@ -56,7 +56,7 @@ type ModelName<M> = M extends { name: infer N }
 
 export type ModelChildren<Models> = Models extends readonly AnyObjectModel[]
   ? {
-      readonly [M in Models[number] as ModelName<M>]: ModelPublicInstance<M>
+      readonly [M in Models[number] as ModelName<M>]: ModelInstance<M>
     }
   : {}
 

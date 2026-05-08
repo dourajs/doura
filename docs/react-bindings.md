@@ -151,10 +151,10 @@ const createUseStaticModel = (doura) => (name, model) => {
 ```ts
 // batchManager.ts:4-10
 const modelBindRender = new WeakMap<
-  ModelPublicInstance,
+  ModelInstance,
   Set<() => void>         // 该 model 的所有 React 更新回调
 >()
-const douraUnSub = new WeakMap<ModelPublicInstance, () => void>()  // model 的 unsubscribe
+const douraUnSub = new WeakMap<ModelInstance, () => void>()  // model 的 unsubscribe
 ```
 
 ### 订阅流程

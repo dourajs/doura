@@ -1,7 +1,7 @@
 export * from './defineModel'
 export * from './model'
 export * from './modelOptions'
-export { ModelPublicInstance } from './modelPublicInstance'
+export { ModelInstance } from './modelPublicInstance'
 export * from './modelManager'
 export { Selector, ModelView } from './view'
 export * from './plugins'

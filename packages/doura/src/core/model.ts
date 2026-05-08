@@ -36,7 +36,7 @@ import {
   validateModelOptions,
 } from './modelOptions'
 import {
-  ModelPublicInstance,
+  ModelInstance,
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
@@ -108,9 +108,9 @@ export type Action = ModifyAction | PatchAction | ReplaceAction
 export interface ModelChangeEventBase {
   type: ActionType
   // the model to which the event is attached.
-  model: ModelPublicInstance<AnyModel>
+  model: ModelInstance<AnyModel>
   // the model that triggered the event.
-  target: ModelPublicInstance<AnyModel>
+  target: ModelInstance<AnyModel>
 }
 
 export interface ModelModifyEvent extends ModelChangeEventBase {
@@ -188,8 +188,8 @@ function patchObj(base: Record<string, any>, patch: Record<string, any>) {
 export interface ModelInternalOptions {
   name?: string
   initState?: State
-  models?: Record<string, ModelPublicInstance<any>>
-  modelProxies?: Record<string, ModelPublicInstance<any>>
+  models?: Record<string, ModelInstance<any>>
+  modelProxies?: Record<string, ModelInstance<any>>
 }
 
 function markViewShouldRun(view: View) {
@@ -212,19 +212,19 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   /**
    * proxy for this in the context of views and actions
    */
-  proxy: ModelPublicInstance<IModel>
+  proxy: ModelInstance<IModel>
 
   /**
    * proxy this public api
    */
-  publicInst: ModelPublicInstance<IModel>
+  publicInst: ModelInstance<IModel>
 
   // props
   actions: ModelActions<IModel>
   views: Views<ModelViews<IModel>>
   queries: Record<string, InternalQueryHandle>
-  models: Record<string, ModelPublicInstance<any>>
-  modelProxies: Record<string, ModelPublicInstance<any>>
+  models: Record<string, ModelInstance<any>>
+  modelProxies: Record<string, ModelInstance<any>>
   viewInstances: ViewExt[] = []
   private _modelViews: ViewExt[] = []
   accessContext: AccessContext
@@ -300,11 +300,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.proxy = new Proxy(
       this.ctx,
       InternalInstanceProxyHandlers
-    ) as ModelPublicInstance<IModel>
+    ) as ModelInstance<IModel>
     this.publicInst = new Proxy(
       this.ctx,
       PublicInstanceProxyHandlers
-    ) as ModelPublicInstance<IModel>
+    ) as ModelInstance<IModel>
 
     this.effectScope = effectScope()
     this._initModels()

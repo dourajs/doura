@@ -1,17 +1,18 @@
-import { Plugin, ModelPublicInstance } from 'doura'
+import { Plugin, ModelInstance } from 'doura'
 import createPersist from './createPersist'
 import getStoredState from './getStoredState'
 import { createWebStorage } from './storage'
 import { persistModel } from './persistModel'
 import { IStorageState, PersistOptions } from './types'
 
-type StoreProxy = Parameters<
-  ReturnType<typeof douraPersist>['onModelInstance'] & Function
-> extends infer P
-  ? P extends { 0: any }
-    ? P[0]
+type StoreProxy =
+  Parameters<
+    ReturnType<typeof douraPersist>['onModelInstance'] & Function
+  > extends infer P
+    ? P extends { 0: any }
+      ? P[0]
+      : undefined
     : undefined
-  : undefined
 
 function rehydrated(storageState: IStorageState, store: StoreProxy) {
   if (storageState && store.$name && storageState[store.$name]) {
@@ -21,7 +22,7 @@ function rehydrated(storageState: IStorageState, store: StoreProxy) {
 
 const douraPersist: Plugin = function (options: PersistOptions) {
   const persist = createPersist(options)
-  let persistStore: ModelPublicInstance<typeof persistModel>
+  let persistStore: ModelInstance<typeof persistModel>
   const unSubscribes = new Set<() => void>()
   const collectLoadingStore = new Set<StoreProxy>()
   let _storageState: IStorageState
