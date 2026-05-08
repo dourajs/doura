@@ -43,7 +43,7 @@ describe('createContainer', () => {
     })
 
     const SubApp = () => {
-      const _ignore = useSharedModel('count', countModel)
+      const _ignore = useSharedModel(countModel)
 
       return null
     }
@@ -61,7 +61,7 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const counter = useSharedModel('count', countModel)
+      const counter = useSharedModel(countModel)
 
       return (
         <>
@@ -96,8 +96,8 @@ describe('createContainer', () => {
       createContainer()
 
     const C = () => {
-      const counterA = useSharedModelA('count', countModel)
-      const counterB = useSharedModelB('count', countModel)
+      const counterA = useSharedModelA(countModel)
+      const counterB = useSharedModelB(countModel)
 
       return (
         <>
@@ -108,7 +108,7 @@ describe('createContainer', () => {
     }
 
     const A = () => {
-      const counterA = useSharedModelA('count', countModel)
+      const counterA = useSharedModelA(countModel)
 
       return (
         <>
@@ -122,7 +122,7 @@ describe('createContainer', () => {
     }
 
     const B = () => {
-      const counterB = useSharedModelB('count', countModel)
+      const counterB = useSharedModelB(countModel)
 
       return (
         <>
@@ -165,7 +165,7 @@ describe('createContainer', () => {
       createContainer()
 
     const A = (props: { id: number }) => {
-      const counter = useSharedModelA('count', countModel)
+      const counter = useSharedModelA(countModel)
 
       return (
         <>
@@ -216,8 +216,8 @@ describe('createContainer', () => {
       createContainer()
 
     const C = () => {
-      const counterA = useSharedModelA('count', countModel)
-      const counterB = useSharedModelB('count', countModel)
+      const counterA = useSharedModelA(countModel)
+      const counterB = useSharedModelB(countModel)
 
       return (
         <>
@@ -228,7 +228,7 @@ describe('createContainer', () => {
     }
 
     const A = () => {
-      const counterA = useSharedModelA('count', countModel)
+      const counterA = useSharedModelA(countModel)
 
       return (
         <>
@@ -242,7 +242,7 @@ describe('createContainer', () => {
     }
 
     const B = () => {
-      const counterB = useSharedModelB('count', countModel)
+      const counterB = useSharedModelB(countModel)
 
       return (
         <>
@@ -284,7 +284,7 @@ describe('createContainer', () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const counter = useSharedModel('count', countModel)
+      const counter = useSharedModel(countModel)
 
       return (
         <>
@@ -330,14 +330,14 @@ describe('createContainer', () => {
         ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await nextTick()
     })
-    douraStore.getModel('count', countModel).add(1)
+    douraStore.getModel(countModel).add(1)
   })
 
   test('container state should sync with douraStore', async () => {
     const { Provider: LocalProvider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const counter = useSharedModel('count', countModel)
+      const counter = useSharedModel(countModel)
 
       return (
         <>
@@ -396,7 +396,7 @@ describe('createContainer', () => {
     const { Provider, useSharedModel } = createContainer()
 
     const SubApp = () => {
-      const counter = useSharedModel('count', countModel)
+      const counter = useSharedModel(countModel)
       return (
         <>
           <div id="state">{counter.value}</div>
@@ -473,7 +473,7 @@ describe('createContainer', () => {
       })
 
       const SubApp = () => {
-        const counter = useSharedModel('count', countModel)
+        const counter = useSharedModel(countModel)
         return <div id="state">{counter.value}</div>
       }
 
@@ -515,7 +515,7 @@ describe('createContainer', () => {
       const { Provider, useSharedModel } = createContainer()
 
       const SubApp = () => {
-        const counter = useSharedModel('count', countModel)
+        const counter = useSharedModel(countModel)
         return <div id="state">{counter.value}</div>
       }
 
@@ -548,7 +548,7 @@ describe('createContainer', () => {
 
       expect(onDestroy).not.toHaveBeenCalled()
       // External store should still be usable
-      externalStore.getModel('count', countModel).add(1)
+      externalStore.getModel(countModel).add(1)
     })
 
     test('should destroy old internal store when switching to external store', async () => {
@@ -561,7 +561,7 @@ describe('createContainer', () => {
       const externalStore = doura()
 
       const SubApp = () => {
-        const counter = useSharedModel('count', countModel)
+        const counter = useSharedModel(countModel)
         return <div id="state">{counter.value}</div>
       }
 

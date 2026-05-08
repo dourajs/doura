@@ -14,6 +14,7 @@ beforeEach(() => {
 describe('useQuery', () => {
   test('should fetch data on mount', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => Promise.resolve(42),
@@ -21,7 +22,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t1', model)
+      const api = useModel(model)
       const { data, isLoading, isSuccess } = useQuery(api.fetchData)
       return (
         <div>
@@ -48,6 +49,7 @@ describe('useQuery', () => {
 
   test('should pass args to query', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchUser: {
@@ -58,7 +60,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t2', model)
+      const api = useModel(model)
       const { data } = useQuery(api.fetchUser, ['1'])
       return <div id="data">{data ? JSON.stringify(data) : 'none'}</div>
     }
@@ -76,6 +78,7 @@ describe('useQuery', () => {
   test('should not fetch when enabled is false', async () => {
     const fn = jest.fn(() => Promise.resolve(42))
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => fn(),
@@ -83,7 +86,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t3', model)
+      const api = useModel(model)
       const { data, isPending } = useQuery(api.fetchData, { enabled: false })
       return (
         <div>
@@ -107,6 +110,7 @@ describe('useQuery', () => {
 
   test('should apply select transform', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => Promise.resolve({ value: 42, extra: 'x' }),
@@ -114,7 +118,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t4', model)
+      const api = useModel(model)
       const { data } = useQuery(api.fetchData, {
         select: (d: any) => d.value,
       })
@@ -135,6 +139,7 @@ describe('useQuery', () => {
     let resolve!: (v: number) => void
     const slowFn = () => new Promise<number>((r) => (resolve = r))
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => slowFn(),
@@ -142,7 +147,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t5', model)
+      const api = useModel(model)
       const { data, isPlaceholderData } = useQuery(api.fetchData, {
         placeholderData: 99,
       })
@@ -174,6 +179,7 @@ describe('useQuery', () => {
 
   test('should handle fetch error', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => Promise.reject(new Error('fail')),
@@ -181,7 +187,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t6', model)
+      const api = useModel(model)
       const { error, isError } = useQuery(api.fetchData)
       return (
         <div>
@@ -205,6 +211,7 @@ describe('useQuery', () => {
   test('should refetch on refetch() call', async () => {
     let callCount = 0
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => Promise.resolve(++callCount),
@@ -212,7 +219,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t7', model)
+      const api = useModel(model)
       const { data, refetch } = useQuery(api.fetchData)
       return (
         <div>
@@ -245,6 +252,7 @@ describe('useQuery', () => {
 
   test('should work in StrictMode', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchData: (_ctx: any) => Promise.resolve(42),
@@ -252,7 +260,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t8', model)
+      const api = useModel(model)
       const { data } = useQuery(api.fetchData)
       return <div id="data">{data !== undefined ? String(data) : 'none'}</div>
     }
@@ -272,6 +280,7 @@ describe('useQuery', () => {
   test('should deduplicate concurrent fetches for same query+args', async () => {
     const fn = jest.fn((_ctx: any, id: string) => Promise.resolve({ id }))
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchUser: {
@@ -281,7 +290,7 @@ describe('useQuery', () => {
     })
 
     const App = () => {
-      const api = useModel('t9', model)
+      const api = useModel(model)
       // Two components consuming same query+args — should share fetch
       const a = useQuery(api.fetchUser, ['1'])
       const b = useQuery(api.fetchUser, ['1'])
@@ -309,6 +318,7 @@ describe('useQuery', () => {
     const store = doura({ query: { gcTime: 0 } })
     const { Provider, useSharedModel } = createContainer()
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchUser: {
@@ -319,7 +329,7 @@ describe('useQuery', () => {
     })
 
     const App = ({ id }: { id: string }) => {
-      const api = useSharedModel('t10', model)
+      const api = useSharedModel(model)
       const { data } = useQuery(api.fetchUser, [id])
       return <div id="data">{data ? data.id : 'none'}</div>
     }
@@ -334,7 +344,7 @@ describe('useQuery', () => {
       expect(container.querySelector('#data')?.textContent).toBe('1')
     })
 
-    const inst = store.getModel('t10', model)
+    const inst = store.getModel(model)
 
     rerender(
       <Provider store={store}>

@@ -8,6 +8,7 @@ interface User {
 }
 
 const userModel = defineModel({
+  name: 'user',
   state: {
     // Keep state literal-shaped — a Record<string, ...> in state would
     // introduce an index signature that widens ModelAPI enough for
@@ -43,7 +44,7 @@ const userModel = defineModel({
 export function TestUseModelQueryTypes() {
   // Named model — the returned api is the merged ModelAPI which includes
   // queries alongside state/views/actions.
-  const api = useModel('user', userModel)
+  const api = useModel(userModel)
 
   // --- Query handles surface with full inference, not `any` ---
 
@@ -122,8 +123,8 @@ export function TestUseModelQueryTypes() {
 
 // Anonymous model variant — same typing guarantees.
 export function TestUseModelAnonymousQueryTypes() {
-  // @ts-expect-error — useModel(model) requires defineModel({ name, ... })
-  useModel(userModel)
+  // @ts-expect-error — explicit name overloads were removed
+  useModel('user', userModel)
 
   const api = useAnonymousModel(userModel)
 

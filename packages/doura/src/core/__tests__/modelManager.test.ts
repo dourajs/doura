@@ -11,6 +11,7 @@ describe('modelManager', () => {
   it('should have the proper api', () => {
     const modelMgr = modelManager()
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         actionOne() {},
@@ -20,7 +21,7 @@ describe('modelManager', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(typeof store.$state).toBe('object')
     expect(typeof store.$actions).toBe('object')
     expect(typeof store.$views).toBe('object')
@@ -45,13 +46,15 @@ describe('modelManager', () => {
       },
     })
     const modelOne = defineModel({
+      name: 'one',
       state: { value: 0 },
     })
     const modelTwo = defineModel({
+      name: 'two',
       state: { value: 0 },
     })
-    const storeOne = modelMgr.getModel('one', modelOne)
-    const storeTwo = modelMgr.getModel('two', modelTwo)
+    const storeOne = modelMgr.getModel(modelOne)
+    const storeTwo = modelMgr.getModel(modelTwo)
     expect(storeOne.$state.value).toBe('one')
     expect(storeTwo.$state.value).toBe('two')
   })
@@ -59,6 +62,7 @@ describe('modelManager', () => {
   it('getState should return the newest state', async () => {
     const modelMgr = modelManager()
     const count0 = defineModel({
+      name: 'count0',
       state: { value: 0 },
       actions: {
         increment(v: number) {
@@ -67,6 +71,7 @@ describe('modelManager', () => {
       },
     })
     const count1 = defineModel({
+      name: 'count1',
       state: { value: 0 },
       actions: {
         increment(v: number) {
@@ -75,8 +80,8 @@ describe('modelManager', () => {
       },
     })
 
-    const store0 = modelMgr.getModel('count0', count0)
-    const store1 = modelMgr.getModel('count1', count1)
+    const store0 = modelMgr.getModel(count0)
+    const store1 = modelMgr.getModel(count1)
     expect(modelMgr.getState()).toEqual({
       count0: { value: 0 },
       count1: { value: 0 },
@@ -93,6 +98,7 @@ describe('modelManager', () => {
   it('should destroy', () => {
     const modelMgr = modelManager()
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         increment(v: number) {
@@ -101,12 +107,12 @@ describe('modelManager', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     store.increment(1)
     expect(store.$state.value).toBe(1)
 
     modelMgr.destroy()
-    const newStore = modelMgr.getModel('test', model)
+    const newStore = modelMgr.getModel(model)
     expect(newStore).not.toBe(store)
     expect(newStore.$state.value).toBe(0)
   })
@@ -131,29 +137,62 @@ describe('modelManager', () => {
     })
   })
 
-  it('should let an explicit name override the defineModel name option', () => {
+  it('should use the defineModel name option as the shared model name', () => {
     const modelMgr = modelManager()
     const model = defineModel({
       name: 'declared',
       state: { value: 0 },
     })
 
-    const store = modelMgr.getModel('override', model)
-    expect(store.$name).toBe('override')
+    const store = modelMgr.getModel(model)
+    expect(store.$name).toBe('declared')
     expect(modelMgr.getState()).toEqual({
-      override: { value: 0 },
+      declared: { value: 0 },
     })
   })
 
-  it('should not infer model names from function model function names', () => {
+  it('should read shared function model names from returned model options once', () => {
     const modelMgr = modelManager()
-    const model = defineModel(() => ({
+    const factory = jest.fn(() => ({
+      name: 'functionModel',
       state: { value: 0 },
     }))
+    const model = defineModel(factory)
+
+    const first = modelMgr.getModel(model)
+    const second = modelMgr.getModel(model)
+
+    expect(first).toBe(second)
+    expect(first.$name).toBe('functionModel')
+    expect(factory).toHaveBeenCalledTimes(1)
+  })
+
+  it('should reject missing function model names', () => {
+    const modelMgr = modelManager()
+    const model = defineModel(
+      () =>
+        ({
+          state: { value: 0 },
+        }) as any
+    )
 
     expect(() => modelMgr.getModel(model as any)).toThrow(
-      'model name is required'
+      'model name is required in model options'
     )
+  })
+
+  it('should reject missing or empty object model names', () => {
+    const modelMgr = modelManager()
+
+    expect(() => modelMgr.getModel({ state: { value: 0 } } as any)).toThrow(
+      'model name is required in model options'
+    )
+    expect(() =>
+      modelMgr.getModel({ name: '', state: { value: 0 } } as any)
+    ).toThrow('model name is required in model options')
+    expect(() =>
+      modelMgr.getDetachedModel({ state: { value: 0 } } as any)
+    ).toThrow('model name is required in model options')
   })
 
   it('should warn when the same name is requested with a different model options reference', () => {
@@ -200,6 +239,7 @@ describe('modelManager', () => {
     })
 
     const firstModel = defineModel({
+      name: 'first',
       state: { value: 0 },
       actions: {
         addOne() {
@@ -207,14 +247,15 @@ describe('modelManager', () => {
         },
       },
     })
-    const fisrt = modelMgr.getModel('first', firstModel)
+    const fisrt = modelMgr.getModel(firstModel)
 
     fisrt.$subscribe(() => {
       dependCount++
     })
     const secondModel = defineModel(() => {
-      void use('first', firstModel)
+      void use(firstModel)
       return {
+        name: 'second',
         state: { value: 0 },
         actions: {
           add(n: number) {
@@ -224,7 +265,7 @@ describe('modelManager', () => {
       }
     })
 
-    const second = modelMgr.getModel('second', secondModel)
+    const second = modelMgr.getModel(secondModel)
     second.$subscribe(() => {
       modelCount++
     })
@@ -251,6 +292,7 @@ describe('modelManager', () => {
       const fn = jest.fn()
       const modelMgr = modelManager()
       const modelA = defineModel({
+        name: 'modelA',
         state: { value: 0 },
         actions: {
           increment(n: number) {
@@ -261,6 +303,7 @@ describe('modelManager', () => {
       const modelB = defineModel(() => {
         const a = use(modelA)
         return {
+          name: 'b',
           state: { value: 0 },
           actions: {
             increment(n: number) {
@@ -272,7 +315,7 @@ describe('modelManager', () => {
       })
 
       modelMgr.subscribe(fn)
-      const store = modelMgr.getModel('b', modelB)
+      const store = modelMgr.getModel(modelB)
 
       expect(fn).toHaveBeenCalledTimes(0)
       store.increment(1)
@@ -306,10 +349,11 @@ describe('modelManager', () => {
       expect(onInit).toHaveBeenCalledWith({ initialState }, { doura: modelMgr })
 
       const model = defineModel({
+        name: 'model',
         state: { value: '' },
       })
-      modelMgr.getModel('test', model)
-      expect(onModel).toHaveBeenCalledWith('test', model, { doura: modelMgr })
+      modelMgr.getModel(model)
+      expect(onModel).toHaveBeenCalledWith('model', model, { doura: modelMgr })
       expect(typeof onModelInstance.mock.calls[0][0].$name).toBe('string')
       expect(typeof onModelInstance.mock.calls[0][0].$state).toBe('object')
       expect(typeof onModelInstance.mock.calls[0][0].$subscribe).toBe(

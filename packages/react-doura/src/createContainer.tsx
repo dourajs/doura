@@ -9,14 +9,8 @@ import React, {
 } from 'react'
 import { Doura, AnyModel, DouraOptions, Selector, doura, nextTick } from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
-import { UseNamedModel, UseStaticModel } from './types'
+import { UseSharedModel, UseStaticModel } from './types'
 import { DouraContext } from './context'
-
-function checkName(name: any) {
-  if (!name) {
-    throw new Error(`[react-doura]: "name" is required and can not be empty.`)
-  }
-}
 
 const createContainer = function (options?: DouraOptions) {
   const Context = createContext<{
@@ -97,22 +91,16 @@ const createContainer = function (options?: DouraOptions) {
     return context
   }
 
-  const useSharedModel: UseNamedModel = <
+  const useSharedModel: UseSharedModel = <
     IModel extends AnyModel,
     S extends Selector<IModel>,
   >(
-    name: string,
     model: IModel,
     selector?: S,
     depends?: any[]
   ) => {
-    if (__DEV__) {
-      checkName(name)
-    }
-
     const { store } = useDouraContext()
     return useMemo(() => createUseModel(store), [store])(
-      name,
       model,
       selector,
       depends
@@ -120,15 +108,10 @@ const createContainer = function (options?: DouraOptions) {
   }
 
   const useStaticModel: UseStaticModel = <IModel extends AnyModel>(
-    name: string,
     model: IModel
   ) => {
-    if (__DEV__) {
-      checkName(name)
-    }
-
     const { store } = useDouraContext()
-    return useMemo(() => createUseStaticModel(store), [store])(name, model)
+    return useMemo(() => createUseStaticModel(store), [store])(model)
   }
 
   return {

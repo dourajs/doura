@@ -53,7 +53,7 @@ export function defineModel<
   M extends ObjectModel<S, A, V>,
 >(
   modelOptions: M & {
-    name?: string
+    name: string
     state: S
     actions?: A
     views?: V & ThisType<ViewThis<S, V>>
@@ -79,7 +79,7 @@ export function defineModel<
   M extends ObjectModel<S, A, V>,
 >(
   modelOptions: () => M & {
-    name?: string
+    name: string
     state: S
     actions?: A
     views?: V & ThisType<ViewThis<S, V>>

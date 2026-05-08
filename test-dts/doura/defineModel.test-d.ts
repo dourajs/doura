@@ -3,6 +3,7 @@ import { expectType } from '../helper'
 
 // object model
 const countModel = defineModel({
+  name: 'test',
   state: {
     count: 0,
   },
@@ -21,6 +22,7 @@ const countModel = defineModel({
 // function model
 const countModelFn = defineModel(() => {
   return {
+    name: 'test',
     state: {
       count: 0,
     },
@@ -37,16 +39,26 @@ const countModelFn = defineModel(() => {
   }
 })
 
+// @ts-expect-error — model name is required in object model options
+defineModel({
+  state: {},
+})
+
+// @ts-expect-error — model name is required in function model return options
+defineModel(() => ({
+  state: {},
+}))
+
 // use
 export const fooModel = defineModel(() => {
   // local model
   const count = use(countModel)
   const count1 = use(countModelFn)
-  // named model
-  const count2 = use('test', countModel)
-  const count3 = use('test', countModelFn)
+  // @ts-expect-error — explicit name overloads were removed
+  use('test', countModel)
 
   return {
+    name: 'fooModel',
     state: {
       value: 0,
     },
@@ -61,14 +73,6 @@ export const fooModel = defineModel(() => {
         expectType<number>(count1.count)
         expectType<number>(count1.double)
         expectType<void>(count1.inc())
-
-        expectType<number>(count2.count)
-        expectType<number>(count2.double)
-        expectType<void>(count2.inc())
-
-        expectType<number>(count3.count)
-        expectType<number>(count3.double)
-        expectType<void>(count3.inc())
       },
     },
   }

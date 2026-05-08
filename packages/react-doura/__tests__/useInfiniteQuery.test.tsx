@@ -21,6 +21,7 @@ const getNextArgs = (lastPage: Page): [number] | undefined =>
 
 const makeModel = (fetchFn?: (cursor: number) => Promise<Page>) =>
   defineModel({
+    name: 'makeModel',
     state: {},
     queries: {
       fetchPage: {
@@ -38,7 +39,7 @@ describe('useInfiniteQuery — initial fetch', () => {
   test('loads the initial page on mount', async () => {
     const model = makeModel()
     const App = () => {
-      const api = useModel('inf1', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -71,7 +72,7 @@ describe('useInfiniteQuery — initial fetch', () => {
   test('hasNextPage is true when getNextArgs returns args', async () => {
     const model = makeModel()
     const App = () => {
-      const api = useModel('inf2', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -104,7 +105,7 @@ describe('useInfiniteQuery — initial fetch', () => {
     })
 
     const App = () => {
-      const api = useModel('inf3', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -129,7 +130,7 @@ describe('useInfiniteQuery — fetchNextPage', () => {
   test('appends new pages and updates hasNextPage', async () => {
     const model = makeModel()
     const App = () => {
-      const api = useModel('inf-next1', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -191,7 +192,7 @@ describe('useInfiniteQuery — fetchNextPage', () => {
       )
     })
     const App = () => {
-      const api = useModel('inf-next2', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [2], // last page, nextCursor=null
         getNextArgs,
@@ -236,7 +237,7 @@ describe('useInfiniteQuery — fetchNextPage', () => {
       return new Promise<Page>((r) => (resolveSecond = r))
     })
     const App = () => {
-      const api = useModel('inf-next3', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -299,6 +300,7 @@ describe('useInfiniteQuery — fetchPreviousPage', () => {
     }
 
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchSymPage: {
@@ -309,7 +311,7 @@ describe('useInfiniteQuery — fetchPreviousPage', () => {
     })
 
     const App = () => {
-      const api = useModel('inf-prev', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchSymPage, {
         initialArgs: [0],
         getNextArgs: (last: BiPage): [number] | undefined =>
@@ -370,7 +372,7 @@ describe('useInfiniteQuery — fetchPreviousPage', () => {
   test('hasPreviousPage is false when getPreviousArgs is not provided', async () => {
     const model = makeModel()
     const App = () => {
-      const api = useModel('inf-prev-none', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -399,7 +401,7 @@ describe('useInfiniteQuery — error handling', () => {
   test('initial fetch error surfaces via isError / error, keeps data undefined', async () => {
     const model = makeModel(() => Promise.reject(new Error('boom')))
     const App = () => {
-      const api = useModel('inf-err', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -431,7 +433,7 @@ describe('useInfiniteQuery — refetch', () => {
   test('resets to initial page', async () => {
     const model = makeModel()
     const App = () => {
-      const api = useModel('inf-ref', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,
@@ -481,6 +483,7 @@ describe('useInfiniteQuery — race guard', () => {
   test('refetch during an in-flight fetchNextPage — stale next-page does not append', async () => {
     const resolvers: Record<number, (v: Page) => void> = {}
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         fetchPage: {
@@ -493,7 +496,7 @@ describe('useInfiniteQuery — race guard', () => {
     })
 
     const App = () => {
-      const api = useModel('inf-race', model)
+      const api = useModel(model)
       const r = useInfiniteQuery(api.fetchPage, {
         initialArgs: [0],
         getNextArgs,

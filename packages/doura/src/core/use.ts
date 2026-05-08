@@ -6,11 +6,7 @@ import { currentModelContext } from './modelManager'
 export function use<IModel extends AnyModel>(
   model: IModel
 ): ModelPublicInstance<IModel>
-export function use<IModel extends AnyModel>(
-  name: string,
-  model: IModel
-): ModelPublicInstance<IModel>
-export function use(nameOrModel: any, model?: any): any {
+export function use(model: any): any {
   if (!currentModelContext) {
     throw new Error(
       `Invalid use() call. use() can only be called inside of the body of a function model. This could happen for one of the following reasons:
@@ -20,16 +16,7 @@ export function use(nameOrModel: any, model?: any): any {
   }
 
   const { manager, model: parentModel } = currentModelContext
-  let instance: ModelInternal
-
-  let name: string
-  if (typeof nameOrModel === 'string') {
-    name = nameOrModel
-    instance = manager.getModelInstance({ name, model })
-  } else {
-    model = nameOrModel
-    instance = manager.getModelInstance({ model })
-  }
+  const instance: ModelInternal = manager.getModelInstance({ model })
 
   parentModel.addChild(instance)
 

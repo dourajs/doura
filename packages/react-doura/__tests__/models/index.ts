@@ -8,6 +8,7 @@ export const sleep = (time: number) =>
   })
 
 export const countModel = defineModel({
+  name: 'countModel',
   state: {
     value: 1,
   },

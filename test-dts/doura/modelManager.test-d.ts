@@ -12,6 +12,7 @@ const store = doura()
 expectType<ModelManager>(store)
 
 const model = defineModel({
+  name: 'test',
   state: {
     value: 0,
   },
@@ -25,21 +26,23 @@ const namedModel = defineModel({
 })
 
 const functionModel = defineModel(() => ({
+  name: 'functionModel',
   state: {
     value: 0,
   },
 }))
 
-const tModel = store.getModel('test', model)
+const tModel = store.getModel(model)
 const implicitNamedModel = store.getModel(namedModel)
 
 // store apis
 expectType<ModelPublicInstance<typeof model>>(tModel)
 expectType<ModelPublicInstance<typeof namedModel>>(implicitNamedModel)
-// @ts-expect-error — getModel(model) requires defineModel({ name, ... })
-store.getModel(model)
-// @ts-expect-error — implicit name lookup is object-model only
-store.getModel(functionModel)
+expectType<ModelPublicInstance<typeof functionModel>>(
+  store.getModel(functionModel)
+)
+// @ts-expect-error — explicit name overloads were removed
+store.getModel('test', model)
 expectType<void>(store.destroy())
 expectType<{ [modelName: string]: State }>(store.getState())
 expectType<() => void>(store.subscribe(() => {}))

@@ -4,6 +4,7 @@ import { defineModel } from 'doura'
 import { DouraRoot, useModel } from '../src/useModel'
 
 const model = defineModel({
+  name: 'model',
   state: { value: 0 },
   actions: {
     increment() {
@@ -22,7 +23,7 @@ describe('useModel with queries', () => {
   test('backward compatible — existing merged API access still works', () => {
     let apiRef: any = null
     const App = () => {
-      const counter = useModel('test', model)
+      const counter = useModel(model)
       apiRef = counter
       return <div>{counter.value}</div>
     }
@@ -39,7 +40,7 @@ describe('useModel with queries', () => {
   test('query names appear on merged API as QueryHandle', () => {
     let apiRef: any = null
     const App = () => {
-      const counter = useModel('test2', model)
+      const counter = useModel(model)
       apiRef = counter
       return <div>ok</div>
     }
@@ -61,6 +62,7 @@ describe('useModel with queries', () => {
 
   test('no queries — no QueryHandles in merged API', () => {
     const noQueryModel = defineModel({
+      name: 'test3',
       state: { count: 0 },
       actions: {
         inc() {
@@ -71,7 +73,7 @@ describe('useModel with queries', () => {
 
     let apiRef: any = null
     const App = () => {
-      const inst = useModel('test3', noQueryModel)
+      const inst = useModel(noQueryModel)
       apiRef = inst
       return <div>ok</div>
     }
@@ -91,7 +93,7 @@ describe('useModel with queries', () => {
   test('queries binding persists across state changes', () => {
     let firstFetchData: any = null
     const App = () => {
-      const counter = useModel('test4', model)
+      const counter = useModel(model)
       if (firstFetchData === null) firstFetchData = counter.fetchData
       // Same reference should persist (QueryHandle is cached)
       expect(counter.fetchData).toBe(firstFetchData)

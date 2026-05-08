@@ -1,6 +1,7 @@
 import { defineModel } from 'doura'
 
 export const persistModel = defineModel({
+  name: 'persistModel',
   state: {
     rehydrated: false,
     version: -1,

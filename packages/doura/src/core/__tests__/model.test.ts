@@ -11,10 +11,20 @@ afterAll(() => {
   process.env.NODE_ENV = oldEnv
 })
 
+type TestModelOptions = Omit<AnyObjectModel, 'name'> & { name?: string }
+
+let modelId = 0
 const createModel = (
-  model: AnyObjectModel,
+  model: TestModelOptions,
   options: ModelInternalOptions = {}
-) => new ModelInternal(model, options)
+) =>
+  new ModelInternal(
+    {
+      name: model.name || `model-${++modelId}`,
+      ...model,
+    } as AnyObjectModel,
+    options
+  )
 
 export const sleep = (time: number) =>
   new Promise((resolve) => {

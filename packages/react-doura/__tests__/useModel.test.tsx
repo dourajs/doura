@@ -27,6 +27,7 @@ beforeEach(() => {
 describe('useAnonymousModel', () => {
   test('should work', async () => {
     const count = defineModel({
+      name: 'count',
       state: {
         value: 1,
       },
@@ -121,7 +122,7 @@ describe('useAnonymousModel', () => {
   describe('should always be isolation', () => {
     test('should isolation with named model', async () => {
       const App = () => {
-        const counter = useModel('count', countModel)
+        const counter = useModel(countModel)
         const loacalCounter = useAnonymousModel(countModel)
 
         return (
@@ -244,6 +245,7 @@ describe('useAnonymousModel', () => {
 
     it('should render only sub props changed', async () => {
       const model = defineModel({
+        name: 'model',
         state: {
           anObject: {
             value: 1,
@@ -322,8 +324,6 @@ describe('useAnonymousModel', () => {
       // Anonymous useModel creates a per-component doura() store internally.
       // We simulate this by creating our own store + createUseModel, which is
       // the exact same code path useAnonymousModel takes.
-      const ANONYMOUS_MODEL_NAME = 'anonymous model'
-
       function makeAnonymousHook(store: ReturnType<typeof doura>) {
         return <IModel extends AnyModel, S extends Selector<IModel>>(
           model: IModel,
@@ -331,7 +331,6 @@ describe('useAnonymousModel', () => {
           depends?: any[]
         ) => {
           return React.useMemo(() => createUseModel(store), [store])(
-            ANONYMOUS_MODEL_NAME,
             model,
             selector,
             depends
@@ -364,8 +363,8 @@ describe('useAnonymousModel', () => {
         }
 
         // Pre-create model to capture baseline effects
-        localStore.getModel(ANONYMOUS_MODEL_NAME, countModel)
-        const internal = getInternal(localStore, ANONYMOUS_MODEL_NAME)
+        localStore.getModel(countModel)
+        const internal = getInternal(localStore, countModel.name)
         const baseline = internal.effectScope.effects.length
 
         const { container } = render(<App />)
@@ -407,8 +406,8 @@ describe('useAnonymousModel', () => {
           )
         }
 
-        localStore.getModel(ANONYMOUS_MODEL_NAME, countModel)
-        const internal = getInternal(localStore, ANONYMOUS_MODEL_NAME)
+        localStore.getModel(countModel)
+        const internal = getInternal(localStore, countModel.name)
         const baseline = internal.effectScope.effects.length
 
         const { container } = render(<App />)
@@ -474,7 +473,7 @@ describe('useModel (with name)', () => {
 
     test('DouraRoot should worked without props douraStore', async () => {
       const App = () => {
-        const counter = useModel('count', countModel)
+        const counter = useModel(countModel)
         return (
           <>
             <div id="value">{counter.value}</div>
@@ -503,7 +502,7 @@ describe('useModel (with name)', () => {
 
     test('DouraRoot props douraStore could overwrite default douraStore', () => {
       const App = () => {
-        const counter = useModel('count', countModel)
+        const counter = useModel(countModel)
         return (
           <>
             <div id="value">{counter.value}</div>
@@ -513,7 +512,7 @@ describe('useModel (with name)', () => {
 
       const douraStore = doura({
         initialState: {
-          count: {
+          countModel: {
             value: 2,
           },
         },
@@ -529,8 +528,9 @@ describe('useModel (with name)', () => {
     })
   })
 
-  test('name should not be empty', async () => {
+  test('model options name is required', async () => {
     const countModel = defineModel({
+      name: 'countModel',
       state: {
         value: 1,
       },
@@ -542,7 +542,7 @@ describe('useModel (with name)', () => {
     })
 
     const App = () => {
-      const counter = useModel('', countModel)
+      const counter = useModel({ ...countModel, name: '' } as typeof countModel)
       return <div id="value">{counter.value}</div>
     }
 
@@ -560,7 +560,7 @@ describe('useModel (with name)', () => {
       state: {
         value: 1,
       },
-    })
+    } as any)
 
     const App = () => {
       const counter: any = useModel(unnamed as any)
@@ -578,6 +578,7 @@ describe('useModel (with name)', () => {
 
   test('should throw if DouraRoot has not been found', async () => {
     const countModel = defineModel({
+      name: 'countModel',
       state: {
         value: 1,
       },
@@ -589,7 +590,7 @@ describe('useModel (with name)', () => {
     })
 
     const App = () => {
-      const counter = useModel('count', countModel)
+      const counter = useModel(countModel)
 
       return (
         <>
@@ -610,7 +611,7 @@ describe('useModel (with name)', () => {
     let ref1: any = null
     let ref2: any = null
     const App = () => {
-      const counter = useModel('count', countModel)
+      const counter = useModel(countModel)
       ref1 = counter
       return (
         <>
@@ -623,7 +624,7 @@ describe('useModel (with name)', () => {
       )
     }
     function SubApp() {
-      const counter = useModel('count', countModel)
+      const counter = useModel(countModel)
       ref2 = counter
       return <></>
     }
@@ -656,7 +657,7 @@ describe('useModel (with name)', () => {
       return { value: s.value, ...a }
     }
     const App = () => {
-      const counter = useModel('count', countModel, selector)
+      const counter = useModel(countModel, selector)
       ref1 = counter
       return (
         <>
@@ -669,7 +670,7 @@ describe('useModel (with name)', () => {
       )
     }
     function SubApp() {
-      const counter = useModel('count', countModel, selector)
+      const counter = useModel(countModel, selector)
       ref2 = counter
       return <></>
     }
@@ -696,7 +697,7 @@ describe('useModel (with name)', () => {
 
   test("should keep data's state with component unmount or not", async () => {
     const SubApp = () => {
-      const counter = useModel('count', countModel)
+      const counter = useModel(countModel)
 
       return (
         <>
@@ -757,13 +758,12 @@ describe('useModel (with name)', () => {
 
       // Instantiate the model before mounting the selector component
       // to capture the baseline effect count (model's own view effects).
-      douraStore.getModel('count', countModel)
-      const internal = getInternal(douraStore, 'count')
+      douraStore.getModel(countModel)
+      const internal = getInternal(douraStore, countModel.name)
       const baseline = internal.effectScope.effects.length
 
       const Child = () => {
         const data = useSharedModel(
-          'count',
           countModel,
           (s, actions) => ({ value: s.value, add: actions.add }),
           []
@@ -806,13 +806,12 @@ describe('useModel (with name)', () => {
       const douraStore = doura()
       const { Provider, useSharedModel } = createContainer()
 
-      douraStore.getModel('count', countModel)
-      const internal = getInternal(douraStore, 'count')
+      douraStore.getModel(countModel)
+      const internal = getInternal(douraStore, countModel.name)
       const baseline = internal.effectScope.effects.length
 
       const Child = () => {
         const data = useSharedModel(
-          'count',
           countModel,
           (s, actions) => ({ value: s.value, add: actions.add }),
           []
@@ -863,8 +862,9 @@ describe('useModel (with name)', () => {
 // View cleanup is handled by useModelWithSelector's own useEffect.
 
 describe('useStaticModel', () => {
-  test('name should not be empty', async () => {
+  test('model options name should not be empty', async () => {
     const count = defineModel({
+      name: 'count',
       state: {
         value: 1,
       },
@@ -876,11 +876,11 @@ describe('useStaticModel', () => {
     })
 
     const App1 = () => {
-      const counter = useStaticModel(undefined as any, count)
+      const counter = useStaticModel({ ...count, name: '' } as typeof count)
       return <div id="value">{counter.value}</div>
     }
     const App2 = () => {
-      const counter = useStaticModel('', count)
+      const counter = useStaticModel(count)
       return <div id="value">{counter.value}</div>
     }
 
@@ -891,17 +891,17 @@ describe('useStaticModel', () => {
         </DouraRoot>
       )
     }).toThrow()
-    expect(() => {
-      render(
-        <DouraRoot>
-          <App2 />
-        </DouraRoot>
-      )
-    }).toThrow()
+    const { container } = render(
+      <DouraRoot>
+        <App2 />
+      </DouraRoot>
+    )
+    expect(container.querySelector('#value')?.innerHTML).toEqual('1')
   })
 
   test('should throw if DouraRoot has not been found', async () => {
     const count = defineModel({
+      name: 'count',
       state: {
         value: 1,
       },
@@ -913,7 +913,7 @@ describe('useStaticModel', () => {
     })
 
     const App = () => {
-      const counter = useStaticModel('count', count)
+      const counter = useStaticModel(count)
 
       return (
         <>
@@ -935,7 +935,7 @@ describe('useStaticModel', () => {
     let stateRef1: any
 
     const StaticApp = () => {
-      const counter = useStaticModel('count', countModel)
+      const counter = useStaticModel(countModel)
       const [_, setValue] = React.useState(false)
 
       if (!stateRef) {
@@ -997,7 +997,6 @@ describe('StrictMode: useModelWithSelector view lifecycle', () => {
 
     const Child = () => {
       const data = useSharedModel(
-        'count',
         countModel,
         (s, actions) => ({ value: s.value, add: actions.add }),
         []

@@ -18,6 +18,7 @@ afterAll(() => {
 describe('defineModel', () => {
   it('should return the model', () => {
     const model = {
+      name: 'model',
       state: {},
       reducers: {},
     }
@@ -29,6 +30,7 @@ describe('defineModel', () => {
 
   it("should return snapshot of the model's state", () => {
     const model = {
+      name: 'one',
       state: {
         foo: {},
       },
@@ -36,7 +38,7 @@ describe('defineModel', () => {
 
     const modelA = defineModel(model)
 
-    const storeA = modelMgr.getModel('one', modelA)
+    const storeA = modelMgr.getModel(modelA)
 
     expect(isDraft(storeA.foo)).toBeFalsy()
   })
@@ -44,6 +46,7 @@ describe('defineModel', () => {
   describe('composing models', () => {
     it('should consume other models by "use()"', () => {
       const depOne = defineModel({
+        name: 'one',
         state: { count: 0 },
         actions: {
           add(p: number) {
@@ -53,6 +56,7 @@ describe('defineModel', () => {
       })
 
       const depTwo = defineModel({
+        name: 'two',
         state: { count: 0 },
         actions: {
           add(p: number) {
@@ -62,10 +66,11 @@ describe('defineModel', () => {
       })
 
       const model = defineModel(() => {
-        const one = use('one', depOne)
-        const two = use('two', depTwo)
+        const one = use(depOne)
+        const two = use(depTwo)
 
         return {
+          name: 'test',
           state: { value: 0 },
           actions: {
             add(p: number) {
@@ -79,9 +84,9 @@ describe('defineModel', () => {
         }
       })
 
-      const depOneStore = modelMgr.getModel('one', depOne)
-      const depTwoStore = modelMgr.getModel('two', depTwo)
-      const store = modelMgr.getModel('test', model)
+      const depOneStore = modelMgr.getModel(depOne)
+      const depTwoStore = modelMgr.getModel(depTwo)
+      const store = modelMgr.getModel(model)
 
       store.addDep()
       expect(store.$state).toEqual({ value: 0 })
@@ -94,6 +99,7 @@ describe('defineModel', () => {
 
     it("should reactive to dep's view", () => {
       const countModel = defineModel({
+        name: 'count',
         state: { count: 1 },
         actions: {
           add(p: number) {
@@ -108,8 +114,9 @@ describe('defineModel', () => {
       })
 
       const model = defineModel(() => {
-        const count = use('count', countModel)
+        const count = use(countModel)
         return {
+          name: 'test',
           state: { value: 0 },
           actions: {
             add(p: number) {
@@ -127,8 +134,8 @@ describe('defineModel', () => {
         }
       })
 
-      const store = modelMgr.getModel('test', model)
-      const depStore = modelMgr.getModel('count', countModel)
+      const store = modelMgr.getModel(model)
+      const depStore = modelMgr.getModel(countModel)
 
       let v = store.all
       expect(v).toEqual({
@@ -156,7 +163,7 @@ describe('defineModel', () => {
   })
 
   it('should throw when calling use() outside of a function model', () => {
-    expect(() => use({ state: {} })).toThrow(/Invalid use\(\) call/)
+    expect(() => use({ state: {} } as any)).toThrow(/Invalid use\(\) call/)
   })
 
   it('should not trigger updates in nested action', async () => {
@@ -167,6 +174,7 @@ describe('defineModel', () => {
       anArr: [] as number[],
     }
     const mA = defineModel({
+      name: 'a',
       state: stateA,
       actions: {
         async update(v: number) {
@@ -175,8 +183,9 @@ describe('defineModel', () => {
       },
     })
     const mB = defineModel(() => {
-      const a = use('a', mA)
+      const a = use(mA)
       return {
+        name: 'b',
         state: stateB,
         views: {
           double() {
@@ -192,8 +201,8 @@ describe('defineModel', () => {
       }
     })
 
-    const a = modelMgr.getModel('a', mA)
-    const b = modelMgr.getModel('b', mB)
+    const a = modelMgr.getModel(mA)
+    const b = modelMgr.getModel(mB)
     b.$subscribe(() => {
       void b.double
     })

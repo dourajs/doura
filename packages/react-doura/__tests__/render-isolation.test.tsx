@@ -22,6 +22,7 @@ beforeEach(() => {
 
 const makeTwoQueryModel = () =>
   defineModel({
+    name: 'makeTwoQueryModel',
     state: { version: 0 },
     actions: {
       bumpVersion() {
@@ -43,7 +44,7 @@ describe('render isolation — cross-query cache updates', () => {
     let handleARef: any = null
 
     const CompA = () => {
-      const api = useModel('iso1', model)
+      const api = useModel(model)
       handleARef = api.qA
       rendersA++
       const { data } = useQuery(api.qA)
@@ -51,7 +52,7 @@ describe('render isolation — cross-query cache updates', () => {
     }
 
     const CompB = () => {
-      const api = useModel('iso1', model)
+      const api = useModel(model)
       rendersB++
       const { data } = useQuery(api.qB)
       return <span data-testid="b">{String(data ?? 'none')}</span>
@@ -102,7 +103,7 @@ describe('render isolation — cross-query cache updates', () => {
     let handleARef: any = null
 
     const CompA = () => {
-      const api = useModel('iso2', model)
+      const api = useModel(model)
       handleARef = api.qA
       rendersA++
       const { data } = useQuery(api.qA)
@@ -110,7 +111,7 @@ describe('render isolation — cross-query cache updates', () => {
     }
 
     const CompB = () => {
-      const api = useModel('iso2', model)
+      const api = useModel(model)
       rendersB++
       const { data } = useQuery(api.qB)
       return <span data-testid="b-data">{String(data ?? 'none')}</span>
@@ -154,7 +155,7 @@ describe('render isolation — cross-query cache updates', () => {
     let handleARef: any = null
 
     const CompA = () => {
-      const api = useModel('iso3', model)
+      const api = useModel(model)
       handleARef = api.qA
       rendersA++
       const { data } = useQuery(api.qA)
@@ -162,7 +163,7 @@ describe('render isolation — cross-query cache updates', () => {
     }
 
     const CompB = () => {
-      const api = useModel('iso3', model)
+      const api = useModel(model)
       rendersB++
       const { data } = useQuery(api.qB)
       return <span data-testid="b3-data">{String(data ?? 'none')}</span>
@@ -199,6 +200,7 @@ describe('render isolation — same query shared across components', () => {
   test('components reading the same query share one fetch and both re-render on update', async () => {
     let fetchCount = 0
     const model = defineModel({
+      name: 'model',
       state: {},
       queries: {
         shared: (_ctx: any) => {
@@ -213,14 +215,14 @@ describe('render isolation — same query shared across components', () => {
     let handleRef: any = null
 
     const CompA = () => {
-      const api = useModel('iso-shared', model)
+      const api = useModel(model)
       handleRef = api.shared
       rendersA++
       const { data } = useQuery(api.shared)
       return <span data-testid="a">{String(data ?? 'none')}</span>
     }
     const CompB = () => {
-      const api = useModel('iso-shared', model)
+      const api = useModel(model)
       rendersB++
       const { data } = useQuery(api.shared)
       return <span data-testid="b">{String(data ?? 'none')}</span>
@@ -271,7 +273,7 @@ describe('render isolation — state change still affects useModel consumers', (
     let apiRef: any = null
 
     const CompA = () => {
-      const api = useModel('iso-state', model)
+      const api = useModel(model)
       apiRef = api
       rendersA++
       const q = useQuery(api.qA)
@@ -282,7 +284,7 @@ describe('render isolation — state change still affects useModel consumers', (
       )
     }
     const CompB = () => {
-      const api = useModel('iso-state', model)
+      const api = useModel(model)
       rendersB++
       const q = useQuery(api.qB)
       return (

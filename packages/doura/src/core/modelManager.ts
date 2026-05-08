@@ -8,7 +8,7 @@ import { createModelInstance, ModelInternal, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
-import { emptyObject, removeUnordered } from '../utils'
+import { emptyObject, invariant, removeUnordered } from '../utils'
 import { warn } from '../warning'
 import { QueryConfig } from './queryTypes'
 import { QueryCoordinator } from './queryCoordinator'
@@ -23,13 +23,7 @@ export type Model = AnyModel | AnyFunctionModel
 
 export interface ModelManager {
   getState(): Record<string, State>
-  getModel<IModel extends AnyObjectModel & { name: string }>(
-    model: IModel
-  ): ModelPublicInstance<IModel>
-  getModel<IModel extends AnyModel>(
-    name: string,
-    model: IModel
-  ): ModelPublicInstance<IModel>
+  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
   getDetachedModel<IModel extends AnyModel>(
     model: IModel
   ): ModelPublicInstance<IModel>
@@ -62,6 +56,7 @@ class ModelManagerInternal implements ModelManager {
   private _hooks: PluginHook[]
   private _models = new Map<string, ModelInternal>()
   private _modelOptions = new Map<string, AnyModel>()
+  private _sourceModelNames = new Map<AnyModel, string>()
   private _subscribers: DouraSubscriptionCallback[] = []
   private _onModelChange: DouraSubscriptionCallback
   _queryCoordinator: QueryCoordinator
@@ -86,48 +81,47 @@ class ModelManagerInternal implements ModelManager {
     this._hooks.map((hook) => hook.onInit?.({ initialState }, { doura: this }))
   }
 
-  getModel<IModel extends AnyObjectModel & { name: string }>(
-    model: IModel
-  ): ModelPublicInstance<IModel>
-  getModel<IModel extends AnyModel>(
-    name: string,
-    model: IModel
-  ): ModelPublicInstance<IModel>
-  getModel(nameOrModel: any, maybeModel?: any): ModelPublicInstance<any> {
-    const hasExplicitName = typeof nameOrModel === 'string'
-    const name = hasExplicitName
-      ? nameOrModel
-      : typeof nameOrModel === 'object'
-        ? nameOrModel?.name
-        : undefined
-    const model = hasExplicitName ? maybeModel : nameOrModel
-
-    if (!name) {
-      throw new Error(
-        `model name is required; pass getModel(name, model) or define the model with a "name" option`
-      )
-    }
-
-    const instance = this.getModelInstance({ name, model })
+  getModel<IModel extends AnyModel>(model: IModel): ModelPublicInstance<IModel>
+  getModel(model: any): ModelPublicInstance<any> {
+    const instance = this.getModelInstance({ model })
     return instance.publicInst
   }
 
   getDetachedModel<IModel extends AnyModel>(
     model: IModel
   ): ModelPublicInstance<IModel> {
-    const instance = this.getModelInstance({ model })
+    const instance = this.getModelInstance({ model, detached: true })
     return instance.publicInst as ModelPublicInstance<IModel>
   }
 
-  getModelInstance({ name, model }: { name?: string; model: AnyModel }) {
-    const cachedInstace = name && this._models.get(name)
-    if (cachedInstace) {
-      if (this._modelOptions.get(name) !== model) {
-        warn(
-          `model "${name}" has already been initialized with a different model options reference`
-        )
+  getModelInstance({
+    model,
+    detached = false,
+  }: {
+    model: AnyModel
+    detached?: boolean
+  }) {
+    if (typeof model === 'function' && !detached) {
+      const cachedName = this._sourceModelNames.get(model)
+      if (cachedName) {
+        const cachedInstace = this._models.get(cachedName)
+        if (cachedInstace) {
+          return cachedInstace
+        }
       }
-      return cachedInstace
+    }
+
+    if (typeof model === 'object' && !detached) {
+      const name = getModelName(model)
+      const cachedInstace = this._models.get(name)
+      if (cachedInstace) {
+        if (this._modelOptions.get(name) !== model) {
+          warn(
+            `model "${name}" has already been initialized with a different model options reference`
+          )
+        }
+        return cachedInstace
+      }
     }
 
     let instance: ModelInternal
@@ -139,13 +133,41 @@ class ModelManagerInternal implements ModelManager {
           manager: this,
           model: modelProxy,
         })
-        instance = this._initModel({ name, model: model(), sourceModel: model })
+        const modelOptions = model()
+        const name = getModelName(modelOptions)
+
+        if (!detached) {
+          const cachedInstace = this._models.get(name)
+          if (cachedInstace) {
+            if (this._modelOptions.get(name) !== model) {
+              warn(
+                `model "${name}" has already been initialized with a different model options reference`
+              )
+            }
+            this._sourceModelNames.set(model, name)
+            return cachedInstace
+          }
+        }
+
+        instance = this._initModel({
+          name: detached ? undefined : name,
+          model: modelOptions,
+          sourceModel: model,
+        })
+        if (!detached) {
+          this._sourceModelNames.set(model, name)
+        }
       } finally {
         setCurrentModelContext(preCtx)
       }
       modelProxy.setModel(instance)
     } else if (typeof model === 'object') {
-      instance = this._initModel({ name, model, sourceModel: model })
+      const name = getModelName(model)
+      instance = this._initModel({
+        name: detached ? undefined : name,
+        model,
+        sourceModel: model,
+      })
     } else {
       throw new Error('invalid model')
     }
@@ -175,6 +197,7 @@ class ModelManagerInternal implements ModelManager {
     this._models.forEach((m) => m.destroy())
     this._models.clear()
     this._modelOptions.clear()
+    this._sourceModelNames.clear()
     this._subscribers.length = 0
     this._initialState = emptyObject
     this._queryCoordinator.destroy()
@@ -245,4 +268,12 @@ export function modelManager({
   query,
 }: ModelManagerOptions = {}): ModelManager {
   return new ModelManagerInternal(initialState, plugins, query)
+}
+
+function getModelName(model: AnyObjectModel): string {
+  invariant(
+    typeof model.name === 'string' && model.name.length > 0,
+    'model name is required in model options'
+  )
+  return model.name
 }

@@ -2,7 +2,7 @@ import { defineModel } from 'doura'
 import {
   createContainer,
   useStaticModel,
-  UseNamedModel,
+  UseSharedModel,
   UseStaticModel,
 } from 'react-doura'
 import { expectType } from '../helper'
@@ -14,10 +14,11 @@ export function Test() {
     useStaticModel: _useStaticModel,
   } = createContainer()
 
-  expectType<UseNamedModel>(_useSharedModel)
+  expectType<UseSharedModel>(_useSharedModel)
   expectType<UseStaticModel>(_useStaticModel)
 
   const tempModel = defineModel({
+    name: 'temp',
     state: {
       value: {
         n: 1,
@@ -30,7 +31,7 @@ export function Test() {
       },
     },
   })
-  const model = useStaticModel('temp', tempModel)
+  const model = useStaticModel(tempModel)
 
   // useStaticModel returns the ModelAPI directly; state is accessed by key.
   // (The previous `.current` indirection type-checked only because a leaked

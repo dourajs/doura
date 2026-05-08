@@ -24,13 +24,14 @@ describe('model queries', () => {
     it('should normalize shorthand (bare function) into { fn: ... }', () => {
       const fetchUser = async () => ({ id: 1 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser,
         },
       })
 
-      const inst = modelMgr.getModel('norm1', model)
+      const inst = modelMgr.getModel(model)
       expect(inst.$queries.fetchUser).toBeDefined()
       expect((inst.$queries.fetchUser as any)._spec.fn).toBe(fetchUser)
     })
@@ -43,6 +44,7 @@ describe('model queries', () => {
       }
 
       const model = defineModel({
+        name: 'model',
         state: { user: null as { id: number } | null },
         queries: {
           fetchUser: {
@@ -54,7 +56,7 @@ describe('model queries', () => {
         },
       })
 
-      const inst = modelMgr.getModel('norm2', model)
+      const inst = modelMgr.getModel(model)
       const handle = inst.$queries.fetchUser as any
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
@@ -70,9 +72,10 @@ describe('model queries', () => {
 
     it('should have no queries when no queries option', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
       })
-      const inst = modelMgr.getModel('norm3', model)
+      const inst = modelMgr.getModel(model)
       expect(Object.keys(inst.$queries)).toHaveLength(0)
     })
   })
@@ -80,13 +83,14 @@ describe('model queries', () => {
   describe('query name conflict detection', () => {
     it('should warn when query name conflicts with state key', () => {
       const model = defineModel({
+        name: 'model',
         state: { fetchUser: 'existing' },
         queries: {
           fetchUser: async () => ({ id: 1, name: '' }),
         },
       })
 
-      modelMgr.getModel('test', model)
+      modelMgr.getModel(model)
       expect(
         'key "fetchUser" in "queries" is conflicted with the key in "state"'
       ).toHaveBeenWarned()
@@ -96,26 +100,28 @@ describe('model queries', () => {
   describe('queries initialization', () => {
     it('should freeze the queries object', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1, name: '' }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       expect(Object.isFrozen(store.$queries)).toBe(true)
     })
 
     it('should expose queries via $queries', () => {
       const fn = async () => ({ id: 1 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: fn,
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       expect(store.$queries.fetchUser).toBeDefined()
       expect((store.$queries.fetchUser as any)._spec.fn).toBe(fn)
     })
@@ -123,26 +129,28 @@ describe('model queries', () => {
     it('should resolve query names from proxy', () => {
       const fn = async () => ({ id: 1 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: fn,
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       expect((store as any).fetchUser).toBeDefined()
       expect((store as any).fetchUser._spec.fn).toBe(fn)
     })
 
     it('should reject writes to queries', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1, name: '' }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       expect(() => {
         ;(store as any).fetchUser = 'something'
       }).toThrow()
@@ -153,13 +161,14 @@ describe('model queries', () => {
   describe('QueryHandle getData / setData with isolated storage', () => {
     it('should store and retrieve data from query cache', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1, name: '' }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData({ id: 42, name: 'Alice' })
 
       const data = store.$queries.fetchUser.getData()
@@ -168,6 +177,7 @@ describe('model queries', () => {
 
     it('should differentiate by args', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: {
@@ -179,7 +189,7 @@ describe('model queries', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData(1, { id: 1, name: 'Alice' })
       store.$queries.fetchUser.setData(2, { id: 2, name: 'Bob' })
 
@@ -197,13 +207,14 @@ describe('model queries', () => {
   describe('inline query state mutation', () => {
     it('setData should write cache without mutating model state', () => {
       const model = defineModel({
+        name: 'model',
         state: { user: null as any },
         queries: {
           fetchUser: async () => ({ id: 1, name: '' }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData({
         id: 1,
         name: 'Alice',
@@ -218,19 +229,21 @@ describe('model queries', () => {
 
     it('should read from query cache even when model state is populated', () => {
       const model = defineModel({
+        name: 'model',
         state: { user: { id: 1, name: 'Alice' } },
         queries: {
           fetchUser: async () => ({ id: 1 }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const data = store.$queries.fetchUser.getData()
       expect(data).toBeUndefined()
     })
 
     it('should apply state writes made inside the query function', async () => {
       const model = defineModel({
+        name: 'model',
         state: { user: null as any },
         queries: {
           fetchUser: {
@@ -243,7 +256,7 @@ describe('model queries', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       await store.$queries.fetchUser.fetch()
 
       expect(store.$rawState.user).toEqual({ id: 1, name: 'Alice' })
@@ -257,6 +270,7 @@ describe('model queries', () => {
   describe('query invalidation', () => {
     it('handle.invalidate should invalidate a specific args slot', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: {
@@ -268,7 +282,7 @@ describe('model queries', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData(1, { id: 1, name: 'Alice' })
       store.$queries.fetchUser.setData(2, { id: 2, name: 'Bob' })
 
@@ -286,6 +300,7 @@ describe('model queries', () => {
 
     it('should invalidate all queries when called with no args', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1 }),
@@ -293,7 +308,7 @@ describe('model queries', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData({ id: 1 })
       store.$queries.fetchPosts.setData([{ id: 1 }])
 
@@ -307,6 +322,7 @@ describe('model queries', () => {
 
     it('handle.invalidate should invalidate all args slots for one query', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: {
@@ -317,7 +333,7 @@ describe('model queries', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData(1, { id: 1 })
       store.$queries.fetchUser.setData(2, { id: 2 })
 
@@ -333,13 +349,14 @@ describe('model queries', () => {
   describe('query reset', () => {
     it('should clear query data', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1 }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData({ id: 1 })
       expect(store.$queries.fetchUser.getData()).toEqual({ id: 1 })
 
@@ -349,6 +366,7 @@ describe('model queries', () => {
 
     it('should clear all queries when called with no args', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1 }),
@@ -356,7 +374,7 @@ describe('model queries', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.$queries.fetchUser.setData({ id: 1 })
       store.$queries.fetchPosts.setData([{ id: 1 }])
 
@@ -370,13 +388,14 @@ describe('model queries', () => {
   describe('query cache subscription and notification', () => {
     it('should notify subscribers when query state changes', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1 }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const listener = jest.fn()
 
       const unsub = (store as any)._.subscribeQuery('fetchUser', [], listener)
@@ -396,13 +415,14 @@ describe('model queries', () => {
   describe('destroy cleanup', () => {
     it('should clear all query caches on destroy', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: async () => ({ id: 1 }),
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const instance = (store as any)._
 
       store.$queries.fetchUser.setData({ id: 1 })
@@ -417,6 +437,7 @@ describe('model queries', () => {
 
   describe('observer notification after invalidation/reset', () => {
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       queries: {
         fetchData: {
@@ -426,7 +447,7 @@ describe('model queries', () => {
     })
 
     it('handle.invalidate should notify observers and produce new entry reference', () => {
-      const inst = modelMgr.getModel('inv-notify', model)
+      const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
       // Seed data
@@ -451,7 +472,7 @@ describe('model queries', () => {
     })
 
     it('$invalidateQueries() without args should notify all observers', () => {
-      const inst = modelMgr.getModel('inv-notify-all', model)
+      const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
       inst.$queries.fetchData.setData('1', { id: '1' })
@@ -468,7 +489,7 @@ describe('model queries', () => {
     })
 
     it('handle.reset should notify observers', () => {
-      const inst = modelMgr.getModel('reset-notify', model)
+      const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
       inst.$queries.fetchData.setData('1', { id: '1' })
@@ -481,7 +502,7 @@ describe('model queries', () => {
     })
 
     it('$resetQueries() without args should notify all observers', () => {
-      const inst = modelMgr.getModel('reset-notify-all', model)
+      const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
       inst.$queries.fetchData.setData('1', { id: '1' })
@@ -497,6 +518,7 @@ describe('model queries', () => {
   describe('removed onData option', () => {
     it('should ignore onData at runtime without wedging the model', () => {
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           broken: {
@@ -508,7 +530,7 @@ describe('model queries', () => {
         },
       })
 
-      const inst = modelMgr.getModel('setdata-throw', model)
+      const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
       inst.$queries.broken.setData(42)
@@ -528,6 +550,7 @@ describe('model queries', () => {
 
   describe('QueryHandle runtime methods', () => {
     const voidModel = defineModel({
+      name: 'voidModel',
       state: { sentinel: 0 },
       queries: {
         fetchData: (_ctx: any) => Promise.resolve(42),
@@ -535,6 +558,7 @@ describe('model queries', () => {
     })
 
     const argsModel = defineModel({
+      name: 'argsModel',
       state: { sentinel: 0 },
       queries: {
         fetchUser: {
@@ -545,7 +569,7 @@ describe('model queries', () => {
     })
 
     it('handle identity matches $queries, proxy access, and getApi()', () => {
-      const inst = modelMgr.getModel('handleIdentity', voidModel)
+      const inst = modelMgr.getModel(voidModel)
       const viaQueries = inst.$queries.fetchData
       const viaProxy = (inst as any).fetchData
       const viaApi = (inst.$getApi() as any).fetchData
@@ -559,13 +583,13 @@ describe('model queries', () => {
     })
 
     it('getData / getState — void query returns undefined before any cache write', () => {
-      const inst = modelMgr.getModel('voidEmpty', voidModel)
+      const inst = modelMgr.getModel(voidModel)
       expect(inst.$queries.fetchData.getData()).toBeUndefined()
       expect(inst.$queries.fetchData.getState()).toBeUndefined()
     })
 
     it('getData / getState reflect setQueryData — void query', () => {
-      const inst = modelMgr.getModel('voidGet', voidModel)
+      const inst = modelMgr.getModel(voidModel)
       inst.$queries.fetchData.setData(7)
       expect(inst.$queries.fetchData.getData()).toBe(7)
       const state = inst.$queries.fetchData.getState()
@@ -576,7 +600,7 @@ describe('model queries', () => {
     })
 
     it('getData / getState reflect setQueryData — args query', () => {
-      const inst = modelMgr.getModel('argsGet', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       inst.$queries.fetchUser.setData('1', { id: '1', name: 'Alice' })
       expect(inst.$queries.fetchUser.getData('1')).toEqual({
         id: '1',
@@ -586,7 +610,7 @@ describe('model queries', () => {
     })
 
     it('setData via handle — void case writes cache and triggers notifier', () => {
-      const inst = modelMgr.getModel('voidSet', voidModel)
+      const inst = modelMgr.getModel(voidModel)
       const listener = jest.fn()
       const internal = (inst as any)._
       const unsub = internal.subscribeQuery('fetchData', [], listener)
@@ -599,7 +623,7 @@ describe('model queries', () => {
     })
 
     it('setData via handle — args case writes cache for the given args', () => {
-      const inst = modelMgr.getModel('argsSet', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       inst.$queries.fetchUser.setData('x', { id: 'x', name: 'Xena' })
       expect(inst.$queries.fetchUser.getData('x')).toEqual({
         id: 'x',
@@ -608,7 +632,7 @@ describe('model queries', () => {
     })
 
     it('isFetching reflects fetchStatus transitions', () => {
-      const inst = modelMgr.getModel('fetchStatus', voidModel)
+      const inst = modelMgr.getModel(voidModel)
       expect(inst.$queries.fetchData.isFetching()).toBe(false)
 
       const internal = (inst as any)._
@@ -631,6 +655,7 @@ describe('model queries', () => {
 
     it('isStale — no data is always stale; fresh data under staleTime is not', () => {
       const freshModel = defineModel({
+        name: 'stale',
         state: {},
         queries: {
           fetchFresh: {
@@ -639,7 +664,7 @@ describe('model queries', () => {
           },
         },
       })
-      const inst = modelMgr.getModel('stale', freshModel)
+      const inst = modelMgr.getModel(freshModel)
 
       // No data yet → stale
       expect(inst.$queries.fetchFresh.isStale()).toBe(true)
@@ -664,7 +689,7 @@ describe('model queries', () => {
     })
 
     it('fetch via handle — delegates to coordinator and populates cache', async () => {
-      const inst = modelMgr.getModel('handleFetch', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       const result = await inst.$queries.fetchUser.fetch('7')
       expect(result).toEqual({ id: '7', name: 'User 7' })
       expect(inst.$queries.fetchUser.getData('7')).toEqual({
@@ -674,7 +699,7 @@ describe('model queries', () => {
     })
 
     it('prefetch via handle — resolves void and populates cache', async () => {
-      const inst = modelMgr.getModel('handlePrefetch', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       const result = await inst.$queries.fetchUser.prefetch('8')
 
       expect(result).toBeUndefined()
@@ -686,12 +711,13 @@ describe('model queries', () => {
 
     it('fetch via handle — rejects on spec fn rejection', async () => {
       const failModel = defineModel({
+        name: 'handleFetchFail',
         state: {},
         queries: {
           fetchBroken: (_ctx: any) => Promise.reject(new Error('boom')),
         },
       })
-      const inst = modelMgr.getModel('handleFetchFail', failModel)
+      const inst = modelMgr.getModel(failModel)
       await expect(inst.$queries.fetchBroken.fetch()).rejects.toThrow('boom')
       // Error is stored in cache
       const state = inst.$queries.fetchBroken.getState()
@@ -699,7 +725,7 @@ describe('model queries', () => {
     })
 
     it('invalidate via handle — marks specific args entry stale', () => {
-      const inst = modelMgr.getModel('handleInv', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       inst.$queries.fetchUser.setData('1', { id: '1', name: 'A' })
       inst.$queries.fetchUser.setData('2', { id: '2', name: 'B' })
 
@@ -711,7 +737,7 @@ describe('model queries', () => {
     })
 
     it('invalidate via handle — no args marks all entries of this query stale', () => {
-      const inst = modelMgr.getModel('handleInvAll', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       inst.$queries.fetchUser.setData('1', { id: '1', name: 'A' })
       inst.$queries.fetchUser.setData('2', { id: '2', name: 'B' })
 
@@ -723,6 +749,7 @@ describe('model queries', () => {
     it('cancel via handle — cancels a specific args slot', async () => {
       const signals: Record<string, AbortSignal> = {}
       const model = defineModel({
+        name: 'model',
         state: {},
         queries: {
           fetchUser: {
@@ -733,7 +760,7 @@ describe('model queries', () => {
           },
         },
       })
-      const inst = modelMgr.getModel('handleCancelSlot', model)
+      const inst = modelMgr.getModel(model)
 
       const p1 = inst.$queries.fetchUser.fetch('1').catch(() => undefined)
       const p2 = inst.$queries.fetchUser.fetch('2').catch(() => undefined)
@@ -749,7 +776,7 @@ describe('model queries', () => {
     })
 
     it('reset via handle — clears cache entry', () => {
-      const inst = modelMgr.getModel('handleReset', argsModel)
+      const inst = modelMgr.getModel(argsModel)
       inst.$queries.fetchUser.setData('1', { id: '1', name: 'A' })
       expect(inst.$queries.fetchUser.getData('1')).toBeDefined()
 
@@ -761,8 +788,9 @@ describe('model queries', () => {
       const { use: useChild } = require('../use')
 
       const parent = defineModel(() => {
-        const child = useChild('handleChild', argsModel)
+        const child = useChild(argsModel)
         return {
+          name: 'handleParent',
           state: { touched: 0 },
           actions: {
             async prime() {
@@ -778,8 +806,8 @@ describe('model queries', () => {
         }
       })
 
-      const parentInst = modelMgr.getModel('handleParent', parent)
-      const childInst = modelMgr.getModel('handleChild', argsModel)
+      const parentInst = modelMgr.getModel(parent)
+      const childInst = modelMgr.getModel(argsModel)
 
       await parentInst.prime()
       expect(parentInst.touched).toBe(1)
@@ -798,6 +826,7 @@ describe('model queries', () => {
       const { use: useChild } = require('../use')
 
       const userModel = defineModel({
+        name: 'userModel',
         state: {},
         queries: {
           fetchUser: {
@@ -807,6 +836,7 @@ describe('model queries', () => {
       })
 
       const postModel = defineModel({
+        name: 'crossPosts',
         state: {},
         queries: {
           fetchPosts: (_ctx: any) => Promise.resolve([] as string[]),
@@ -814,10 +844,11 @@ describe('model queries', () => {
       })
 
       const composedModel = defineModel(() => {
-        const users = useChild('crossUsers', userModel)
-        const posts = useChild('crossPosts', postModel)
+        const users = useChild(userModel)
+        const posts = useChild(postModel)
 
         return {
+          name: 'composedModel',
           state: {},
           actions: {
             invalidateAll() {
@@ -829,8 +860,8 @@ describe('model queries', () => {
       })
 
       // Prime the child caches with data.
-      const usersInst = modelMgr.getModel('crossUsers', userModel)
-      const postsInst = modelMgr.getModel('crossPosts', postModel)
+      const usersInst = modelMgr.getModel(userModel)
+      const postsInst = modelMgr.getModel(postModel)
       usersInst.$queries.fetchUser.setData('1', { id: '1' })
       usersInst.$queries.fetchUser.setData('2', { id: '2' })
       postsInst.$queries.fetchPosts.setData([])
@@ -864,7 +895,7 @@ describe('model queries', () => {
       ).toBeGreaterThan(0)
 
       // Trigger cross-model invalidation from the composed model's action.
-      const composed = modelMgr.getModel('crossComposed', composedModel)
+      const composed = modelMgr.getModel(composedModel)
       composed.invalidateAll()
 
       // All matching entries across both children are now stale.
@@ -877,6 +908,7 @@ describe('model queries', () => {
       const { use: useChild } = require('../use')
 
       const userModel = defineModel({
+        name: 'userModel',
         state: {},
         queries: {
           fetchUser: {
@@ -886,8 +918,9 @@ describe('model queries', () => {
       })
 
       const composedModel = defineModel(() => {
-        const users = useChild('resetUsers', userModel)
+        const users = useChild(userModel)
         return {
+          name: 'composedModel',
           state: {},
           actions: {
             resetUsers() {
@@ -897,13 +930,13 @@ describe('model queries', () => {
         }
       })
 
-      const usersInst = modelMgr.getModel('resetUsers', userModel)
+      const usersInst = modelMgr.getModel(userModel)
       usersInst.$queries.fetchUser.setData('1', { id: '1' })
       expect(usersInst.$queries.fetchUser.getData('1')).toEqual({
         id: '1',
       })
 
-      const composed = modelMgr.getModel('resetComposed', composedModel)
+      const composed = modelMgr.getModel(composedModel)
       composed.resetUsers()
 
       expect(usersInst.$queries.fetchUser.getData('1')).toBeUndefined()

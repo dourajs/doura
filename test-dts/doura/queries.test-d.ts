@@ -17,6 +17,7 @@ interface User {
 }
 
 const userModel = defineModel({
+  name: 'userModel',
   state: {
     users: {} as Record<string, User>,
   },
@@ -63,7 +64,7 @@ const userModel = defineModel({
 // --- Model instance with queries ---
 
 const store = doura()
-const inst = store.getModel('user', userModel)
+const inst = store.getModel(userModel)
 
 // $queries has full type inference
 expectType<ModelQueries<typeof userModel>>(inst.$queries)
@@ -156,9 +157,10 @@ inst.$prefetchQuery('fetchUser', ['1'])
 // --- Cross-model invalidation via use() ---
 
 const composedModel = defineModel(() => {
-  const users = use('users', userModel)
+  const users = use(userModel)
 
   return {
+    name: 'composed',
     state: {},
     actions: {
       invalidateUsers() {
@@ -174,6 +176,7 @@ const composedModel = defineModel(() => {
 // --- defineModel with queries alongside actions and views ---
 
 const fullModel = defineModel({
+  name: 'full',
   state: {
     count: 0,
   },
@@ -197,14 +200,14 @@ const fullModel = defineModel({
   },
 })
 
-const fullInst = store.getModel('full', fullModel)
+const fullInst = store.getModel(fullModel)
 expectType<number>(fullInst.count)
 expectType<number>(fullInst.double)
 expectType<void>(fullInst.increment())
 expectType<ModelQueries<typeof fullModel>>(fullInst.$queries)
 
 // Use composedModel to prevent unused error
-store.getModel('composed', composedModel)
+store.getModel(composedModel)
 
 // =============================================================
 // Downstream handle typing — fn signatures reach ModelQueries
@@ -215,6 +218,7 @@ store.getModel('composed', composedModel)
 // handle typing extracts TArgs/TData correctly.
 
 const inferredModel = defineModel({
+  name: 'inferred',
   state: { count: 0 },
   queries: {
     fetchCount: (_ctx) => Promise.resolve(42),
@@ -222,7 +226,7 @@ const inferredModel = defineModel({
   },
 })
 
-const inferredInst = store.getModel('inferred', inferredModel)
+const inferredInst = store.getModel(inferredModel)
 expectType<QueryHandle<[], number>>(inferredInst.fetchCount)
 expectType<QueryHandle<[string], { id: string; value: number }>>(
   inferredInst.fetchThing
@@ -246,6 +250,7 @@ interface InferredState {
 }
 
 defineModel({
+  name: 'queryHelper',
   state: { users: {} as Record<string, User> } as InferredState,
   queries: {
     // No-args form.

@@ -67,7 +67,7 @@ export type ObjectModel<
   A extends ActionOptions,
   V extends ViewOptions,
 > = {
-  name?: string
+  name: string
   state: S
   actions?: A
   views?: V & ThisType<ViewThis<S, V>>
@@ -217,6 +217,10 @@ function checkConflictedKey(
 }
 
 export const validateModelOptions = (model: AnyObjectModel): void => {
+  invariant(
+    typeof model.name === 'string' && model.name.length > 0,
+    'model name is required in model options'
+  )
   invariant(hasOwn(model, 'state'), 'state is required')
   invariant(
     typeof model.state !== 'bigint' && typeof model.state !== 'symbol',

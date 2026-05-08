@@ -54,6 +54,7 @@ describe('QueryCoordinator', () => {
     it('should store result in query cache', async () => {
       const coordinator = new QueryCoordinator()
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: async () => 'result',
@@ -61,7 +62,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
 
       // Access internal model for direct coordinator test
       const internalModel = (inst as any)._.getQueryState
@@ -85,6 +86,7 @@ describe('QueryCoordinator', () => {
       const coordinator = new QueryCoordinator()
       const fn = jest.fn(async () => 'result')
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: fn,
@@ -92,7 +94,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       const p1 = coordinator.fetch(internal, 'fetchData', [])
@@ -113,6 +115,7 @@ describe('QueryCoordinator', () => {
         return 1
       })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: {
@@ -122,7 +125,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       const [r1, r2] = await Promise.all([
@@ -144,6 +147,7 @@ describe('QueryCoordinator', () => {
         throw new Error('onData exploded')
       })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: {
@@ -153,7 +157,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       const p1 = coordinator.fetch(internal, 'fetchData', [])
@@ -174,12 +178,14 @@ describe('QueryCoordinator', () => {
       const fnB = jest.fn(async () => 'B')
 
       const modelA = defineModel({
+        name: 'modelA',
         state: {},
         queries: {
           fetchData: fnA,
         },
       })
       const modelB = defineModel({
+        name: 'modelB',
         state: {},
         queries: {
           fetchData: fnB,
@@ -211,6 +217,7 @@ describe('QueryCoordinator', () => {
         () => new Promise((resolve) => (resolveFetch = resolve))
       )
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: fn,
@@ -218,7 +225,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       const promise = coordinator.fetch(internal, 'fetchData', [])
@@ -237,6 +244,7 @@ describe('QueryCoordinator', () => {
       const coordinator = new QueryCoordinator()
       const error = new Error('fail')
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: async () => {
@@ -246,7 +254,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       await expect(
@@ -263,11 +271,12 @@ describe('QueryCoordinator', () => {
     it('should throw when query name not found', async () => {
       const coordinator = new QueryCoordinator()
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       await expect(
@@ -283,6 +292,7 @@ describe('QueryCoordinator', () => {
       const coordinator = new QueryCoordinator()
       let signal!: AbortSignal
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: (ctx: any) => {
@@ -295,7 +305,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       const promise = coordinator.fetch(internal, 'fetchData', [])
@@ -311,6 +321,7 @@ describe('QueryCoordinator', () => {
       const coordinator = new QueryCoordinator()
       let signal!: AbortSignal
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: (ctx: any) => {
@@ -323,7 +334,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       const promise = coordinator.fetch(internal, 'fetchData', [])
@@ -341,6 +352,7 @@ describe('QueryCoordinator', () => {
       const coordinator = new QueryCoordinator()
       const signals: AbortSignal[] = []
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchA: (ctx: any) => {
@@ -355,7 +367,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('test', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       coordinator.fetch(internal, 'fetchA', []).catch(() => {})
@@ -373,6 +385,7 @@ describe('QueryCoordinator', () => {
       const coordinator = new QueryCoordinator()
       const signals: AbortSignal[] = []
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: (ctx: any, id: number) => {
@@ -383,7 +396,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('test', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       coordinator.fetch(internal, 'fetchData', [1]).catch(() => {})
@@ -402,6 +415,7 @@ describe('QueryCoordinator', () => {
       const usersSignals: AbortSignal[] = []
       const postsSignals: AbortSignal[] = []
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           'fetch"Users': (ctx: any, id: number) => {
@@ -416,7 +430,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('te"st', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'te"st', model)
 
       coordinator.fetch(internal, 'fetch"Users', [1]).catch(() => {})
@@ -437,6 +451,7 @@ describe('QueryCoordinator', () => {
     it('should return true when no data exists', () => {
       const coordinator = new QueryCoordinator()
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: async () => 'result',
@@ -444,7 +459,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('test', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       expect(coordinator.isStale(internal, 'fetchData', [])).toBe(true)
@@ -455,6 +470,7 @@ describe('QueryCoordinator', () => {
     it('should return false when data is fresh', async () => {
       const coordinator = new QueryCoordinator({ staleTime: 60000 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: async () => 'result',
@@ -462,7 +478,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: { staleTime: 60000 } })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       await coordinator.fetch(internal, 'fetchData', [])
@@ -475,6 +491,7 @@ describe('QueryCoordinator', () => {
     it('should return true when data is stale', async () => {
       const coordinator = new QueryCoordinator({ staleTime: 0 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: async () => 'result',
@@ -482,7 +499,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: { staleTime: 0 } })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       await coordinator.fetch(internal, 'fetchData', [])
@@ -498,6 +515,7 @@ describe('QueryCoordinator', () => {
     it('should use override staleTime when provided', () => {
       const coordinator = new QueryCoordinator({ staleTime: 1000 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: {
@@ -508,7 +526,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('test', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       expect(coordinator.resolveStaleTime(internal, 'fetchData', 9999)).toBe(
@@ -520,6 +538,7 @@ describe('QueryCoordinator', () => {
     it('should use query spec staleTime over store default', () => {
       const coordinator = new QueryCoordinator({ staleTime: 1000 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: {
@@ -530,7 +549,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('test', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       expect(coordinator.resolveStaleTime(internal, 'fetchData')).toBe(5000)
@@ -540,6 +559,7 @@ describe('QueryCoordinator', () => {
     it('should fall back to store default staleTime', () => {
       const coordinator = new QueryCoordinator({ staleTime: 3000 })
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: async () => 'result',
@@ -547,7 +567,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      mgr.getModel('test', model)
+      mgr.getModel(model)
       const internal = getInternal(mgr, 'test', model)
 
       expect(coordinator.resolveStaleTime(internal, 'fetchData')).toBe(3000)
@@ -559,6 +579,7 @@ describe('QueryCoordinator', () => {
     it('should return a promise that resolves after the cache is warmed', async () => {
       let resolveFetch!: (value: string) => void
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: () =>
@@ -569,7 +590,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
 
       const promise = inst.$queries.fetchData.prefetch()
       let settled = false
@@ -591,6 +612,7 @@ describe('QueryCoordinator', () => {
     it('should work when coordinator is wired by modelManager', async () => {
       const fn = jest.fn(async () => 'prefetched')
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: fn,
@@ -598,7 +620,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
 
       inst.$queries.fetchData.prefetch()
       // Wait for the fetch to complete
@@ -614,6 +636,7 @@ describe('QueryCoordinator', () => {
     it('should be a no-op when coordinator is not wired', async () => {
       const fn = jest.fn(async () => 'prefetched')
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: fn,
@@ -622,7 +645,7 @@ describe('QueryCoordinator', () => {
 
       // Create a model manager WITHOUT query config — coordinator should still be created
       const mgr = modelManager()
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
 
       // QueryHandle.prefetch should still work since coordinator is always created
       inst.$queries.fetchData.prefetch()
@@ -639,6 +662,7 @@ describe('QueryCoordinator', () => {
     it('should cancel inflight queries through a query handle', async () => {
       let signal!: AbortSignal
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: (ctx: any) => {
@@ -649,7 +673,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test', model)
+      const inst = mgr.getModel(model)
 
       inst.$queries.fetchData.prefetch()
       // Let the fetch start
@@ -664,6 +688,7 @@ describe('QueryCoordinator', () => {
     it('$cancelQueries should cancel all inflight queries on the model', async () => {
       const signals: Record<string, AbortSignal> = {}
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchUser: (ctx: any, id: string) => {
@@ -678,7 +703,7 @@ describe('QueryCoordinator', () => {
       })
 
       const mgr = modelManager({ query: {} })
-      const inst = mgr.getModel('test-batch-cancel', model)
+      const inst = mgr.getModel(model)
 
       inst.$queries.fetchUser.prefetch('1')
       inst.$queries.fetchPosts.prefetch()
@@ -696,6 +721,7 @@ describe('QueryCoordinator', () => {
     it('should pass query config through to modelManager', async () => {
       const fn = jest.fn(async () => 'from-doura')
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: fn,
@@ -703,7 +729,7 @@ describe('QueryCoordinator', () => {
       })
 
       const store = doura({ query: { staleTime: 5000, gcTime: 30000 } })
-      const inst = store.getModel('test', model)
+      const inst = store.getModel(model)
 
       inst.$queries.fetchData.prefetch()
       await new Promise((r) => setTimeout(r, 10))
@@ -716,6 +742,7 @@ describe('QueryCoordinator', () => {
     it('should abort inflight fetches and keep destroyed caches empty', async () => {
       let signal!: AbortSignal
       const model = defineModel({
+        name: 'model',
         state: { value: 0 },
         queries: {
           fetchData: {
@@ -730,7 +757,7 @@ describe('QueryCoordinator', () => {
       })
 
       const store = doura({ query: {} })
-      const inst = store.getModel('test', model)
+      const inst = store.getModel(model)
       const internal = (inst as any)._
 
       const promise = inst.$queries.fetchData.fetch()
@@ -746,9 +773,9 @@ describe('QueryCoordinator', () => {
 // Helper to get the internal ModelInternal from modelManager
 function getInternal(
   mgr: ReturnType<typeof modelManager>,
-  name: string,
+  _name: string,
   model: any
 ) {
-  const inst = mgr.getModel(name, model)
+  const inst = mgr.getModel(model)
   return (inst as any)._ as any
 }

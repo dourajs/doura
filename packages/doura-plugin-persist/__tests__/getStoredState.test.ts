@@ -15,7 +15,7 @@ let config = {
 describe('getStoredState worked:', () => {
   test('get persist state and model state', async () => {
     const douraStore = doura({ plugins: [[douraPersist, config]] })
-    const aStore = douraStore.getModel('a', a)
+    const aStore = douraStore.getModel(a)
     aStore.add()
     await aStore.addAsync()
     await delay(100)

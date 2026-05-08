@@ -11,6 +11,7 @@ beforeEach(() => {
 describe('useAction — initial state', () => {
   test('should start in idle state', () => {
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         bump() {
@@ -20,7 +21,7 @@ describe('useAction — initial state', () => {
     })
 
     const App = () => {
-      const api = useModel('a1', model)
+      const api = useModel(model)
       const r = useAction(api.bump)
       return (
         <div>
@@ -51,6 +52,7 @@ describe('useAction — initial state', () => {
 describe('useAction — sync action', () => {
   test('sync success: skips pending, jumps to success with return value', async () => {
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         compute(x: number) {
@@ -62,7 +64,7 @@ describe('useAction — sync action', () => {
 
     const pendingFlashes: boolean[] = []
     const App = () => {
-      const api = useModel('a2', model)
+      const api = useModel(model)
       const r = useAction(api.compute)
       pendingFlashes.push(r.isPending)
       return (
@@ -97,6 +99,7 @@ describe('useAction — sync action', () => {
 
   test('sync error: goes to error state, does not throw from run', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         explode(msg: string) {
@@ -106,7 +109,7 @@ describe('useAction — sync action', () => {
     })
 
     const App = () => {
-      const api = useModel('a3', model)
+      const api = useModel(model)
       const r = useAction(api.explode)
       return (
         <div>
@@ -140,6 +143,7 @@ describe('useAction — async action', () => {
   test('async success: pending → success with resolved data', async () => {
     let resolveSave!: (x: number) => void
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         async save(x: number) {
@@ -151,7 +155,7 @@ describe('useAction — async action', () => {
     })
 
     const App = () => {
-      const api = useModel('a4', model)
+      const api = useModel(model)
       // Disable pending delay so the test sees the intermediate state
       // deterministically without having to advance timers.
       const r = useAction(api.save, { pendingDelay: 0 })
@@ -194,6 +198,7 @@ describe('useAction — async action', () => {
 
   test('async error: pending → error', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async failAction() {
@@ -203,7 +208,7 @@ describe('useAction — async action', () => {
     })
 
     const App = () => {
-      const api = useModel('a5', model)
+      const api = useModel(model)
       const r = useAction(api.failAction)
       return (
         <div>
@@ -240,6 +245,7 @@ describe('useAction — callbacks', () => {
     const onSuccess = jest.fn()
     const onSettled = jest.fn()
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         add(x: number) {
@@ -249,7 +255,7 @@ describe('useAction — callbacks', () => {
     })
 
     const App = () => {
-      const api = useModel('a6', model)
+      const api = useModel(model)
       const r = useAction(api.add, { onSuccess, onSettled })
       return (
         <button id="btn" onClick={() => r.run(4)}>
@@ -275,6 +281,7 @@ describe('useAction — callbacks', () => {
     const onError = jest.fn()
     const onSettled = jest.fn()
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async flop() {
@@ -284,7 +291,7 @@ describe('useAction — callbacks', () => {
     })
 
     const App = () => {
-      const api = useModel('a7', model)
+      const api = useModel(model)
       const r = useAction(api.flop, { onError, onSettled })
       return (
         <button id="btn" onClick={() => r.run()}>
@@ -316,6 +323,7 @@ describe('useAction — callbacks', () => {
 describe('useAction — runAsync', () => {
   test('returns a Promise resolving to the action result', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async double(x: number) {
@@ -326,7 +334,7 @@ describe('useAction — runAsync', () => {
 
     let awaited: number | undefined
     const App = () => {
-      const api = useModel('a8', model)
+      const api = useModel(model)
       const r = useAction(api.double)
       return (
         <button
@@ -354,6 +362,7 @@ describe('useAction — runAsync', () => {
 
   test('rejects on error so callers can catch', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async always() {
@@ -364,7 +373,7 @@ describe('useAction — runAsync', () => {
 
     let caught: Error | undefined
     const App = () => {
-      const api = useModel('a9', model)
+      const api = useModel(model)
       const r = useAction(api.always)
       return (
         <button
@@ -398,6 +407,7 @@ describe('useAction — runAsync', () => {
 describe('useAction — reset', () => {
   test('returns to idle state and clears data/error', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         identity(x: number) {
@@ -407,7 +417,7 @@ describe('useAction — reset', () => {
     })
 
     const App = () => {
-      const api = useModel('a10', model)
+      const api = useModel(model)
       const r = useAction(api.identity)
       return (
         <div>
@@ -452,6 +462,7 @@ describe('useAction — reset', () => {
 describe('useAction — variadic args', () => {
   test('forwards multiple arguments', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         concat(a: string, b: string, c: string) {
@@ -461,7 +472,7 @@ describe('useAction — variadic args', () => {
     })
 
     const App = () => {
-      const api = useModel('a11', model)
+      const api = useModel(model)
       const r = useAction(api.concat)
       return (
         <div>
@@ -491,6 +502,7 @@ describe('useAction — variadic args', () => {
 describe('useAction — StrictMode', () => {
   test('works correctly under double-mount', async () => {
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute(x: number) {
@@ -500,7 +512,7 @@ describe('useAction — StrictMode', () => {
     })
 
     const App = () => {
-      const api = useModel('a12', model)
+      const api = useModel(model)
       const r = useAction(api.compute)
       return (
         <div>
@@ -538,6 +550,7 @@ describe('useAction — race guard', () => {
     const onSuccess = jest.fn()
 
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute(x: number) {
@@ -550,7 +563,7 @@ describe('useAction — race guard', () => {
     })
 
     const App = () => {
-      const api = useModel('race1', model)
+      const api = useModel(model)
       const r = useAction(api.compute, { pendingDelay: 0, onSuccess })
       return (
         <div>
@@ -615,6 +628,7 @@ describe('useAction — race guard', () => {
     const onError = jest.fn()
 
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute(x: number) {
@@ -627,7 +641,7 @@ describe('useAction — race guard', () => {
     })
 
     const App = () => {
-      const api = useModel('race2', model)
+      const api = useModel(model)
       const r = useAction(api.compute, { pendingDelay: 0, onError })
       return (
         <div>
@@ -698,6 +712,7 @@ describe('useAction — pendingDelay', () => {
   test('fast op completes within delay — never shows pending, data replaces atomically', async () => {
     let resolveSave!: (v: number) => void
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute() {
@@ -708,7 +723,7 @@ describe('useAction — pendingDelay', () => {
 
     const pendingSeen: boolean[] = []
     const App = () => {
-      const api = useModel('delay1', model)
+      const api = useModel(model)
       // Explicit default-ish delay to assert behavior.
       const r = useAction(api.compute, { pendingDelay: 300 })
       pendingSeen.push(r.isPending)
@@ -758,6 +773,7 @@ describe('useAction — pendingDelay', () => {
     let callCount = 0
 
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute() {
@@ -771,7 +787,7 @@ describe('useAction — pendingDelay', () => {
     })
 
     const App = () => {
-      const api = useModel('delay2', model)
+      const api = useModel(model)
       const r = useAction(api.compute, { pendingDelay: 300 })
       return (
         <div>
@@ -832,6 +848,7 @@ describe('useAction — pendingDelay', () => {
   test('pendingDelay=0 enters pending synchronously (no timer)', async () => {
     let resolveSave!: (v: number) => void
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute() {
@@ -841,7 +858,7 @@ describe('useAction — pendingDelay', () => {
     })
 
     const App = () => {
-      const api = useModel('delay3', model)
+      const api = useModel(model)
       const r = useAction(api.compute, { pendingDelay: 0 })
       return (
         <div>
@@ -880,6 +897,7 @@ describe('useAction — reset cancels in-flight', () => {
     const onSettled = jest.fn()
 
     const model = defineModel({
+      name: 'model',
       state: {},
       actions: {
         async compute() {
@@ -889,7 +907,7 @@ describe('useAction — reset cancels in-flight', () => {
     })
 
     const App = () => {
-      const api = useModel('reset-cancel', model)
+      const api = useModel(model)
       const r = useAction(api.compute, {
         pendingDelay: 0,
         onSuccess,

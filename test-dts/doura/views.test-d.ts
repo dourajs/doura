@@ -12,6 +12,7 @@ interface storeState {
 }
 
 const depModel = defineModel({
+  name: 'test',
   state: {
     count: 0,
   },
@@ -35,6 +36,7 @@ const depModel = defineModel({
 })
 
 const model = defineModel({
+  name: 'model',
   state: {
     text: 'initial',
   },
@@ -52,8 +54,8 @@ const model = defineModel({
   },
 })
 
-const store = douraStore.getModel('model', model)
-const depStore = douraStore.getModel('test', depModel)
+const store = douraStore.getModel(model)
+const depStore = douraStore.getModel(depModel)
 
 expectType<void>(store.setText)
 expectType<storeState>(store.$state)

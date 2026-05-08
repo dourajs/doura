@@ -5,6 +5,7 @@ import { expectType } from '../helper'
 type customType = 'custom' | 'custom0'
 
 const count = defineModel({
+  name: 'count',
   state: {
     value: 1,
     s: '',
@@ -68,6 +69,7 @@ const namedCount = defineModel({
 })
 
 const functionCount = defineModel(() => ({
+  name: 'functionCount',
   state: {
     value: 1,
   },
@@ -87,11 +89,6 @@ const countSelector: Selector<typeof count> = function (
 }
 
 export function Test() {
-  // @ts-expect-error — useModel(model) requires defineModel({ name, ... })
-  useModel(count, countSelector)
-  // @ts-expect-error — implicit name lookup is object-model only
-  useModel(functionCount)
-
   const model = useAnonymousModel(count, countSelector)
   const anonymousFunctionModel = useAnonymousModel(functionCount)
   expectType<number>(anonymousFunctionModel.value)
@@ -106,8 +103,12 @@ export function Test() {
   const implicitNamedModel = useModel(namedCount, countSelector)
   expectType<number>(implicitNamedModel.n)
   expectType<void>(implicitNamedModel.addValue())
+  expectType<number>(useModel(functionCount).value)
 
-  const namedModel = useModel('count', count, countSelector)
+  // @ts-expect-error — explicit name overloads were removed
+  useModel('count', count)
+
+  const namedModel = useModel(count, countSelector)
   expectType<number>(namedModel.n)
   expectType<number>(namedModel.v)
   expectType<string>(namedModel.s)

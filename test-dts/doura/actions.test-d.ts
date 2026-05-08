@@ -8,6 +8,7 @@ interface State {
 }
 
 const model = defineModel({
+  name: 'test',
   state: {
     count: 0,
   },
@@ -45,7 +46,7 @@ const model = defineModel({
   },
 })
 
-const store = douraStore.getModel('test', model)
+const store = douraStore.getModel(model)
 
 // props
 expectType<State>(store.$state)
@@ -81,6 +82,7 @@ store.$replace(Symbol(1))
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 export const modelWithQueries = defineModel({
+  name: 'modelWithQueries',
   state: { count: 0 },
   actions: {
     async runBoth() {
@@ -115,6 +117,7 @@ export const modelWithQueries = defineModel({
 })
 
 export const modelWithInvalidation = defineModel({
+  name: 'modelD',
   state: {},
   actions: {
     async mutate() {
@@ -156,7 +159,7 @@ export const modelWithInvalidation = defineModel({
 // Query API shape applies identically on ModelPublicInstance (external
 // callers via store.getModel).
 export function ExternalInvalidation() {
-  const inst = douraStore.getModel('modelD', modelWithInvalidation)
+  const inst = douraStore.getModel(modelWithInvalidation)
 
   inst.$invalidateQueries()
   inst.fetchY.setData(1, 0)
@@ -174,6 +177,7 @@ export function ExternalInvalidation() {
 // A model with no queries still exposes model-wide batch methods.
 export function NoQueryModelHasBatchMethods() {
   const noQ = defineModel({
+    name: 'noQ',
     state: { n: 0 },
     actions: {
       bump() {
@@ -181,7 +185,7 @@ export function NoQueryModelHasBatchMethods() {
       },
     },
   })
-  const inst = douraStore.getModel('noQ', noQ)
+  const inst = douraStore.getModel(noQ)
   inst.$invalidateQueries()
   // @ts-expect-error — public batch methods are model-wide only
   inst.$invalidateQueries('anything')
@@ -199,6 +203,7 @@ export function NoQueryModelHasBatchMethods() {
 import { use } from 'doura'
 
 const child = defineModel({
+  name: 'child',
   state: {},
   queries: {
     fetchChild: (_ctx: QueryCtx) => Promise.resolve('child'),
@@ -206,9 +211,10 @@ const child = defineModel({
 })
 
 export const functionModelWithOwnQueries = defineModel(() => {
-  const c = use('child', child)
+  const c = use(child)
 
   return {
+    name: 'functionModelWithOwnQueries',
     state: { count: 0 },
     actions: {
       async refresh() {

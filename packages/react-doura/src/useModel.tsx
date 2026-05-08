@@ -4,8 +4,6 @@ import { createUseModel } from './createUseModel'
 import { UseAnonymousModel, UseModel, UseStaticModel } from './types'
 import { DouraRoot, useRootModel, useRootStaticModel } from './global'
 
-const ANONYMOUS_MODEL_NAME = 'anonymous model'
-
 const useAnonymousModel: UseAnonymousModel = <
   IModel extends AnyModel,
   S extends Selector<IModel>,
@@ -37,25 +35,15 @@ const useAnonymousModel: UseAnonymousModel = <
       return createUseModel(context.current!.douraStore)
     },
     [context.current.douraStore]
-  )(ANONYMOUS_MODEL_NAME, model, selector, depends)
+  )(model, selector, depends)
 }
 
-const useModel = ((name: any, model: any, selector?: any, depends?: any) => {
-  if (typeof name === 'string') {
-    return useRootModel(name, model, selector, depends)
-  }
-
-  if (typeof name !== 'object' || !name.name) {
-    throw new Error(
-      `[react-doura]: model name is required. Use defineModel({ name, ... }) or call useAnonymousModel(model).`
-    )
-  }
-
-  return useRootModel(name.name, name, model, selector)
+const useModel = ((model: any, selector?: any, depends?: any) => {
+  return useRootModel(model, selector, depends)
 }) as UseModel
 
-const useStaticModel: UseStaticModel = (name, model) => {
-  return useRootStaticModel(name, model)
+const useStaticModel: UseStaticModel = (model) => {
+  return useRootStaticModel(model)
 }
 
 export { DouraRoot, useModel, useAnonymousModel, useStaticModel }
