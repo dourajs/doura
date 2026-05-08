@@ -10,12 +10,12 @@ import {
   nextTick,
   use,
 } from 'doura'
-import { UseNamedModel, UseStaticModel } from '../src/types'
+import { UseSharedModel, UseStaticModel } from '../src/types'
 import { createUseModel, createUseStaticModel } from '../src/createUseModel'
 import { countModel } from './models/index'
 
 let douraStore: ReturnType<typeof doura>
-let useTestModel: UseNamedModel
+let useTestModel: UseSharedModel
 let useTestStaticModel: UseStaticModel
 
 beforeEach(() => {
@@ -23,26 +23,18 @@ beforeEach(() => {
   jest.useFakeTimers()
   douraStore = doura()
   useTestModel = <IModel extends AnyModel, S extends Selector<IModel>>(
-    name: string,
     model: IModel,
     selector?: S,
     depends?: any[]
   ) => {
     return useMemo(() => createUseModel(douraStore), [douraStore])(
-      name,
       model,
       selector,
       depends
     )
   }
-  useTestStaticModel = <IModel extends AnyModel>(
-    name: string,
-    model: IModel
-  ) => {
-    return useMemo(() => createUseStaticModel(douraStore), [douraStore])(
-      name,
-      model
-    )
+  useTestStaticModel = <IModel extends AnyModel>(model: IModel) => {
+    return useMemo(() => createUseStaticModel(douraStore), [douraStore])(model)
   }
 })
 
@@ -51,6 +43,7 @@ afterEach(() => {})
 describe('createUseModel', () => {
   test('could access state and view', () => {
     const model = defineModel({
+      name: 'model',
       state: { value: 1 },
       views: {
         test() {
@@ -63,7 +56,7 @@ describe('createUseModel', () => {
     })
 
     const App = () => {
-      const store = useTestModel('model', model)
+      const store = useTestModel(model)
 
       return (
         <>
@@ -86,7 +79,7 @@ describe('createUseModel', () => {
   describe('should rerender when state changed', () => {
     test('change state by doura reducer', async () => {
       const App = () => {
-        const store = useTestModel('count', countModel)
+        const store = useTestModel(countModel)
 
         return (
           <>
@@ -111,7 +104,7 @@ describe('createUseModel', () => {
 
     test('change state by doura action', async () => {
       const App = () => {
-        const counter = useTestModel('count', countModel)
+        const counter = useTestModel(countModel)
 
         return (
           <>
@@ -145,6 +138,7 @@ describe('createUseModel', () => {
         const count = use(countModel)
 
         return {
+          name: 'newModel',
           state: { value: 0 },
           actions: {
             add(payload: number = 1) {
@@ -165,7 +159,6 @@ describe('createUseModel', () => {
 
       const App = () => {
         const store = useTestModel(
-          'newModel',
           newModel,
           function (s, actions) {
             return {
@@ -210,8 +203,8 @@ describe('createUseModel', () => {
     const App = () => {
       const [state, setState] = React.useState(1)
       const counter = useTestModel(
-        'count',
         defineModel({
+          name: 'counter',
           state: {
             count: state,
           },
@@ -259,8 +252,8 @@ describe('createUseModel', () => {
     const App = () => {
       const [state, setState] = React.useState(1)
       const counter = useTestModel(
-        'count',
         defineModel({
+          name: 'counter',
           state: {
             count: state,
           },
@@ -299,8 +292,47 @@ describe('createUseModel', () => {
     expect(container.querySelector('#count')!.textContent).toEqual('1')
   })
 
+  test('should recompute shared model when model name changes', async () => {
+    const firstModel = defineModel({
+      name: 'firstSharedModel',
+      state: { value: 'first' },
+      actions: {},
+    })
+    const secondModel = defineModel({
+      name: 'secondSharedModel',
+      state: { value: 'second' },
+      actions: {},
+    })
+
+    const App = () => {
+      const [useSecond, setUseSecond] = React.useState(false)
+      const store = useTestModel(useSecond ? secondModel : firstModel)
+
+      return (
+        <>
+          <button id="switch" onClick={() => setUseSecond(true)}>
+            switch
+          </button>
+          <div id="value">{store.value}</div>
+        </>
+      )
+    }
+
+    const { container } = render(<App />)
+
+    expect(container.querySelector('#value')!.textContent).toEqual('first')
+    await act(async () => {
+      container
+        .querySelector('#switch')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await nextTick()
+    })
+    expect(container.querySelector('#value')!.textContent).toEqual('second')
+  })
+
   describe('selector', () => {
     const countModel = defineModel({
+      name: 'count',
       state: {
         count: 1,
       },
@@ -323,7 +355,7 @@ describe('createUseModel', () => {
         }
         const App = () => {
           const [state, setState] = React.useState(0)
-          const counter = useTestModel('count', countModel, countSelector)
+          const counter = useTestModel(countModel, countSelector)
 
           return (
             <>
@@ -361,7 +393,7 @@ describe('createUseModel', () => {
         const fn = jest.fn()
         const App = () => {
           const [state, setState] = React.useState(0)
-          const counter = useTestModel('count', countModel, (s, actions) => {
+          const counter = useTestModel(countModel, (s, actions) => {
             fn()
             return { count: s.count, add: actions.add }
           })
@@ -403,7 +435,6 @@ describe('createUseModel', () => {
       const App = () => {
         const [state, setState] = React.useState(0)
         const counter = useTestModel(
-          'count',
           countModel,
           (s, actions) => {
             fn()
@@ -445,7 +476,6 @@ describe('createUseModel', () => {
       const fn = jest.fn()
       const SybApp = (props: { prop1: number; prop2: number }) => {
         const count = useTestModel(
-          'count',
           countModel,
           function (stateAndViews) {
             fn()
@@ -513,7 +543,6 @@ describe('createUseModel', () => {
       const App = () => {
         let [selectorSwitch, setSwitch] = React.useState(true)
         const counter = useTestModel(
-          'count',
           countModel,
           selectorSwitch ? countSelector1 : countSelector2
         )
@@ -588,14 +617,10 @@ describe('createUseModel', () => {
 
     test('should warn if changed state in a selector', () => {
       const App = () => {
-        const [_state] = useTestModel(
-          'count',
-          countModel,
-          (stateAndViews: any) => {
-            stateAndViews.count = 1
-            return stateAndViews.count
-          }
-        )
+        const [_state] = useTestModel(countModel, (stateAndViews: any) => {
+          stateAndViews.count = 1
+          return stateAndViews.count
+        })
         return null
       }
       expect(() => {
@@ -612,7 +637,7 @@ describe('createUseModel', () => {
 
     function App() {
       AppRenderCount += 1
-      const { value } = useTestModel('count', countModel)
+      const { value } = useTestModel(countModel)
 
       return (
         <>
@@ -625,7 +650,7 @@ describe('createUseModel', () => {
     expect(AppRenderCount).toBe(1)
 
     await act(async () => {
-      const countStore = douraStore.getModel('count', countModel)
+      const countStore = douraStore.getModel(countModel)
       countStore.add()
       await nextTick()
     })
@@ -640,7 +665,7 @@ describe('createUseModel', () => {
       renderCount++
       const [index, setIndex] = React.useState(0)
       const [index1, setIndex1] = React.useState(0)
-      const modelInstance = douraStore.getModel('count', countModel)
+      const modelInstance = douraStore.getModel(countModel)
 
       React.useEffect(() => {
         const unsub1 = modelInstance.$subscribe(() => {
@@ -669,7 +694,7 @@ describe('createUseModel', () => {
     expect(container.querySelector('#value')?.innerHTML).toEqual('0')
     expect(container.querySelector('#value1')?.innerHTML).toEqual('0')
     await act(async () => {
-      douraStore.getModel('count', countModel).add()
+      douraStore.getModel(countModel).add()
       await nextTick()
     })
     // Both setState calls should be batched into a single re-render by React 18
@@ -681,7 +706,7 @@ describe('createUseModel', () => {
   test('should render with newest state even update state during render', async () => {
     let firstRender = true
     const App = () => {
-      const { value, add } = useTestModel('count', countModel)
+      const { value, add } = useTestModel(countModel)
 
       if (firstRender) {
         firstRender = false
@@ -704,6 +729,7 @@ describe('createUseModel', () => {
 describe('createUseStaticModel', () => {
   test('could access state and view', () => {
     const model = defineModel({
+      name: 'model',
       state: { value: 1 },
       views: {
         test() {
@@ -713,7 +739,7 @@ describe('createUseStaticModel', () => {
     })
 
     const App = () => {
-      const state = useTestStaticModel('test', model)
+      const state = useTestStaticModel(model)
 
       return (
         <>
@@ -735,7 +761,7 @@ describe('createUseStaticModel', () => {
     const App = () => {
       renderTime += 1
 
-      const store = useTestStaticModel('test', countModel)
+      const store = useTestStaticModel(countModel)
 
       currentCount = store.value
 
@@ -784,7 +810,7 @@ describe('createUseStaticModel', () => {
   test('should render with newest state even update state during render', () => {
     let firstRender = true
     const App = () => {
-      const store = useTestStaticModel('test', countModel)
+      const store = useTestStaticModel(countModel)
 
       if (firstRender) {
         firstRender = false
@@ -797,17 +823,55 @@ describe('createUseStaticModel', () => {
     const { container } = render(<App />)
     expect(container.querySelector('#value')!.textContent).toEqual('2')
   })
+
+  test('should recompute static model when model name changes', () => {
+    const firstModel = defineModel({
+      name: 'firstStaticModel',
+      state: { value: 'first' },
+      actions: {},
+    })
+    const secondModel = defineModel({
+      name: 'secondStaticModel',
+      state: { value: 'second' },
+      actions: {},
+    })
+
+    const App = () => {
+      const [useSecond, setUseSecond] = React.useState(false)
+      const store = useTestStaticModel(useSecond ? secondModel : firstModel)
+
+      return (
+        <>
+          <button id="switch" onClick={() => setUseSecond(true)}>
+            switch
+          </button>
+          <div id="value">{store.value}</div>
+        </>
+      )
+    }
+
+    const { container } = render(<App />)
+
+    expect(container.querySelector('#value')!.textContent).toEqual('first')
+    act(() => {
+      container
+        .querySelector('#switch')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(container.querySelector('#value')!.textContent).toEqual('second')
+  })
 })
 
 describe('dynamic selector presence', () => {
   test('should warn in dev when selector presence changes between renders', () => {
     const model = defineModel({
+      name: 'model',
       state: { value: 1 },
       actions: {},
     })
 
     const App = ({ sel }: { sel?: (s: any) => any }) => {
-      ;(useTestModel as any)('test', model, sel, sel ? [] : undefined)
+      ;(useTestModel as any)(model, sel, sel ? [] : undefined)
       return <div />
     }
 
@@ -825,6 +889,7 @@ describe('dynamic selector presence', () => {
 describe('selector depends stability', () => {
   test('should recreate ModelView when depends values change', async () => {
     const model = defineModel({
+      name: 'model',
       state: {
         items: { a: 1, b: 2, c: 3 },
       },
@@ -837,7 +902,6 @@ describe('selector depends stability', () => {
 
     const App = ({ filterKey }: { filterKey: string }) => {
       const data = useTestModel(
-        'test',
         model,
         (s) => {
           return (s.items as any)[filterKey]
@@ -862,13 +926,13 @@ describe('selector depends stability', () => {
 
   test('should handle depends array length change without crashing', async () => {
     const model = defineModel({
+      name: 'model',
       state: { x: 1, y: 2 },
       actions: {},
     })
 
     const App = ({ keys }: { keys: string[] }) => {
       const data = useTestModel(
-        'test',
         model,
         (s) => {
           return keys.map((k) => (s as any)[k]).join(',')

@@ -51,6 +51,10 @@ function readonlyModel(model: ModelPublicInstance<AnyModel>) {
   })
 }
 
+function getModelCacheKey(model: AnyModel) {
+  return typeof model === 'object' ? model.name : model
+}
+
 function useModel<IModel extends AnyModel>(
   model: ModelPublicInstance<IModel>,
   subscribe: SubscribeFn
@@ -128,22 +132,18 @@ function useModelWithSelector<
 }
 
 function useModelInstance<IModel extends AnyModel>(
-  name: string,
   model: IModel,
   doura: Doura
 ) {
-  const { modelInstance, subscribe } = useMemo(
-    () => {
-      const modelInstance = doura.getModel(name, model)
-      return {
-        modelInstance,
-        subscribe: (onModelChange: () => void) =>
-          modelInstance.$subscribe(() => onModelChange()),
-      }
-    },
-    // ignore model's change
-    [name, doura]
-  )
+  const modelKey = getModelCacheKey(model)
+  const { modelInstance, subscribe } = useMemo(() => {
+    const modelInstance = doura.getModel(model)
+    return {
+      modelInstance,
+      subscribe: (onModelChange: () => void) =>
+        modelInstance.$subscribe(() => onModelChange()),
+    }
+  }, [doura, modelKey])
 
   return {
     modelInstance,
@@ -154,13 +154,12 @@ function useModelInstance<IModel extends AnyModel>(
 export const createUseModel =
   (doura: Doura) =>
   <IModel extends AnyModel, S extends Selector<IModel>>(
-    name: string,
     model: IModel,
     selector?: S,
     depends?: any[]
   ) => {
     const hasSelector = useRef(selector)
-    const { modelInstance, subscribe } = useModelInstance(name, model, doura)
+    const { modelInstance, subscribe } = useModelInstance(model, doura)
 
     if (__DEV__) {
       if (!!selector !== !!hasSelector.current) {
@@ -181,11 +180,11 @@ export const createUseModel =
 
 export const createUseStaticModel =
   (doura: Doura) =>
-  <IModel extends AnyModel>(name: string, model: IModel) => {
+  <IModel extends AnyModel>(model: IModel) => {
+    const modelKey = getModelCacheKey(model)
     const modelInstance = useMemo(
-      () => doura.getModel(name, model),
-      // ignore model's change
-      [name, doura]
+      () => doura.getModel(model),
+      [doura, modelKey]
     )
 
     // only run this once against a model
