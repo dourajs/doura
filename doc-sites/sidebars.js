@@ -83,9 +83,9 @@ const sidebars = {
       label: 'Guides',
       items: [
         'guides/compose-model',
+        'guides/queries',
         'guides/optimize-views',
         'guides/typescript',
-        'guides/hmr',
       ],
       collapsed: true,
       collapsible: true,

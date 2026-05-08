@@ -3,7 +3,7 @@ id: index
 title: 'Plugins'
 ---
 
-Doura provider below hooks to access model and store.
+Doura provides the following hooks for plugins to access models and the store.
 
 ## Types
 
