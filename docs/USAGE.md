@@ -166,7 +166,7 @@ Full details: [Composing Models](../doc-sites/docs/guides/compose-model.md)
 
 ### Queries
 
-Built-in async data fetching with caching. Each query entry maintains a cache keyed by its arguments.
+Built-in async data fetching with caching. Each query entry maintains a cache keyed by its arguments. Prefer a direct function entry when the query only needs `fn`; use `query(...)` only for full specs with options. Direct `{ fn }` objects are not supported.
 
 ```ts
 import { defineModel, query } from 'doura'
@@ -175,12 +175,13 @@ const userModel = defineModel({
   name: 'user',
   state: { currentUser: null as User | null },
   queries: {
-    // Shorthand form
+    // Preferred when only fn is needed
     fetchAll: async function (ctx) {
       const res = await fetch('/api/users', { signal: ctx.signal })
       return res.json()
     },
-    // Full form with options
+
+    // Use query(...) when options are needed
     fetchById: query({
       fn: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })

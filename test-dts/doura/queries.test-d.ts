@@ -46,8 +46,8 @@ const userModel = defineModel({
       return Promise.resolve({ id, name: 'User' })
     },
 
-    // full spec — only fn/staleTime are supported.
-    fetchUserToState: {
+    // full spec via query() — only fn/staleTime are supported.
+    fetchUserToState: query({
       fn(ctx, id: string) {
         expectType<QueryCtx>(ctx)
         expectType<Record<string, User>>(this.users)
@@ -56,6 +56,17 @@ const userModel = defineModel({
         return Promise.resolve(user)
       },
       staleTime: 5000,
+    }),
+  },
+})
+
+defineModel({
+  name: 'directQuerySpecRejected',
+  state: {},
+  queries: {
+    // @ts-expect-error — full specs must be created by query(...)
+    fetchUser: {
+      fn: (_ctx: QueryCtx, id: string) => Promise.resolve({ id }),
     },
   },
 })
@@ -229,17 +240,11 @@ expectType<QueryHandle<[string], { id: string; value: number }>>(
 )
 
 // =============================================================
-// query() helper — fn-driven inner inference
+// Preferred shorthand and query() options
 // =============================================================
 //
-// Inside `query(...)` TS establishes a fresh inference context: `fn`
-// is the sole authoritative position for TArgs / TData.
-//
-// Why the helper is needed (even on TS 5.4): inside defineModel the
-// queries field is typed against QueriesOption<S>, and its
-// QuerySpec<any,any,S> member collapses NoInfer to `any` for bare
-// literal entries. query() creates a per-entry context where TArgs /
-// TData actually flow from fn first.
+// Prefer the shorthand function form when a query only needs `fn`.
+// Use query(...) only when the entry needs per-query options such as staleTime.
 
 interface InferredState {
   users: Record<string, User>
@@ -249,7 +254,7 @@ defineModel({
   name: 'queryHelper',
   state: { users: {} as Record<string, User> } as InferredState,
   queries: {
-    // No-args form.
+    // query(...) form with per-entry options.
     fetchListHelper: query({
       fn: (ctx): Promise<User[]> => {
         expectType<QueryCtx>(ctx)
@@ -258,22 +263,18 @@ defineModel({
       staleTime: 5000,
     }),
 
-    // Args form — tuple args are declared directly inside fn.
-    fetchUserHelper: query({
-      fn: (ctx, id: string) => {
-        expectType<QueryCtx>(ctx)
-        expectType<string>(id)
-        return Promise.resolve({ id, name: 'User ' + id })
-      },
-    }),
+    // Args form — prefer shorthand when only fn is needed.
+    fetchUserHelper: (ctx, id: string) => {
+      expectType<QueryCtx>(ctx)
+      expectType<string>(id)
+      return Promise.resolve({ id, name: 'User ' + id })
+    },
 
-    objectArgHelper: query({
-      fn: (ctx, args: { id: string }) => {
-        expectType<QueryCtx>(ctx)
-        expectType<{ id: string }>(args)
-        return Promise.resolve({ id: args.id, name: 'User ' + args.id })
-      },
-    }),
+    objectArgHelper: (ctx, args: { id: string }) => {
+      expectType<QueryCtx>(ctx)
+      expectType<{ id: string }>(args)
+      return Promise.resolve({ id: args.id, name: 'User ' + args.id })
+    },
     removedKey: query({
       fn: (_ctx) => Promise.resolve(1),
       // @ts-expect-error — removed from query specs; cache identity comes from args

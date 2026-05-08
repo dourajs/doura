@@ -1,7 +1,13 @@
 import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn, isArray } from '../utils'
-import { QueriesOption, QueryCtx, QueryHandle } from './queryTypes'
+import {
+  QueriesOption,
+  QueryCtx,
+  QueryHandle,
+  QuerySpec,
+  isQuerySpec,
+} from './queryTypes'
 import type { ModelInstance } from './modelPublicInstance'
 
 export type State = {
@@ -124,10 +130,9 @@ type StripIndexSignatureUnlessAny<T> = 0 extends 1 & T
   ? T
   : StripIndexSignature<T>
 
-export type ModelState<Model> =
-  Model extends ModelOptions<infer S, any, any, any>
-    ? { [K in keyof S]: S[K] }
-    : never
+export type ModelState<Model> = Model extends { state: infer S }
+  ? { [K in keyof S]: S[K] }
+  : never
 
 export type ModelActions<Model> =
   Model extends ModelOptions<any, infer A, any, any> ? Actions<A> : never
@@ -140,16 +145,14 @@ export type ModelModels<Model> = Model extends { models: infer Models }
   : {}
 
 /** Infer (TArgs, TData) from a user-provided query entry (shorthand fn or
- *  full spec object), then surface them as a QueryHandle. */
+ *  query() spec), then surface them as a QueryHandle. */
 type HandleFromEntry<T> = T extends (
   this: any,
   ctx: QueryCtx,
   ...args: infer A
 ) => Promise<infer D>
   ? QueryHandle<A, D>
-  : T extends {
-        fn: (this: any, ctx: QueryCtx, ...args: infer A) => Promise<infer D>
-      }
+  : T extends QuerySpec<infer A, infer D, any, any>
     ? QueryHandle<A, D>
     : QueryHandle<any, any>
 
@@ -177,13 +180,8 @@ function validateQueries(model: AnyObjectModel) {
   invariant(isPlainObject(queries), `model.queries should be object!`)
   for (const key of Object.keys(queries)) {
     const spec = queries[key]
-    if (
-      typeof spec !== 'function' &&
-      !(isPlainObject(spec) && typeof spec.fn === 'function')
-    ) {
-      warn(
-        `query "${key}" must be a function or an object with an "fn" property`
-      )
+    if (typeof spec !== 'function' && !isQuerySpec(spec)) {
+      warn(`query "${key}" must be a function or a spec created by query(...)`)
       continue
     }
   }

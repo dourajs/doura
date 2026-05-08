@@ -94,10 +94,10 @@ type NoModelKeyConflicts<
 //     self-referential constraint: TS captures Q from the literal,
 //     then validates each entry against a freshly-resolved
 //     `InferQueryEntry<Q[K], S, TThis>`. That fresh resolution is what lets
-//     the NoInfer-wrapped fields inside QuerySpec pick up fn's
-//     inferred TArgs / TData for that specific entry.
-// Together they give per-entry fn-driven inference on BARE object
-// literals — no helper function needed at the call site.
+//     the branded QuerySpec returned by query() preserves fn's inferred
+//     TArgs / TData for that specific entry.
+// Together they preserve per-entry fn-driven inference for query(...) specs
+// while rejecting unbranded `{ fn }` object literals at the call site.
 //
 // `& QueriesOption<S>` is kept so shorthand fn entries (bare
 // `(ctx) => Promise<T>`) still get `ctx: QueryCtx` contextually typed.
@@ -121,7 +121,7 @@ export function defineModel<
     queries?: Q & QueriesOption<S, ModelThis<S, A, V, Q, Models>>
   } & NoModelKeyConflicts<S, A, V, Q, Models> &
     ThisType<ModelThis<S, A, V, Q, Models>>
-): M & { name: N } & DefineModel<S, A, V, Models>
+): M & { name: N }
 
 // Implementation
 export function defineModel(modelOptions: any): any {

@@ -185,7 +185,7 @@ const parentModel = defineModel({
 
 ## `query`
 
-Helper function to define a query entry with full options. Establishes a fresh inference context per entry so TypeScript correctly infers `TArgs` from `fn`'s rest parameters and `TData` from its return type.
+Helper function to define a query entry with full options. Prefer a shorthand function when the entry only needs `fn`; use `query(...)` when options such as `staleTime` are needed. Full query specs must be created with `query(...)`; direct `{ fn }` objects are rejected.
 
 ### Types
 
@@ -205,12 +205,13 @@ const userModel = defineModel({
   name: 'user',
   state: { users: {} as Record<string, User> },
   queries: {
-    // Shorthand form — just a function
+    // Preferred when only fn is needed
     fetchAll: async function (ctx) {
       const res = await fetch('/api/users', { signal: ctx.signal })
       return res.json()
     },
-    // Full form with query() helper
+
+    // Use query(...) when options are needed
     fetchById: query({
       fn: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })

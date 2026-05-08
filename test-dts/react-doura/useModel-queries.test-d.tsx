@@ -31,12 +31,10 @@ const userModel = defineModel({
       expectType<QueryCtx>(ctx)
       return Promise.resolve<User>({ id, name: 'User ' + id })
     },
-    // args query (full spec)
-    fetchUserSpec: {
-      fn: (ctx, id: string) => {
-        expectType<QueryCtx>(ctx)
-        return Promise.resolve<User>({ id, name: 'Spec ' + id })
-      },
+    // args query with shorthand function
+    fetchUserSpec: (ctx, id: string) => {
+      expectType<QueryCtx>(ctx)
+      return Promise.resolve<User>({ id, name: 'Spec ' + id })
     },
   },
 })

@@ -52,10 +52,8 @@ describe('useQuery', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchUser: {
-          fn: (_ctx: any, id: string) =>
-            Promise.resolve({ id, name: 'User ' + id }),
-        },
+        fetchUser: (_ctx: any, id: string) =>
+          Promise.resolve({ id, name: 'User ' + id }),
       },
     })
 
@@ -80,10 +78,8 @@ describe('useQuery', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchUser: {
-          fn: (_ctx: any, id: string) =>
-            Promise.resolve({ id, name: 'User ' + id }),
-        },
+        fetchUser: (_ctx: any, id: string) =>
+          Promise.resolve({ id, name: 'User ' + id }),
       },
     })
 
@@ -335,9 +331,7 @@ describe('useQuery', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchUser: {
-          fn,
-        },
+        fetchUser: fn,
       },
     })
 
@@ -373,10 +367,8 @@ describe('useQuery', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchUser: {
-          fn: (_ctx: any, id: string) =>
-            Promise.resolve({ id, name: 'User ' + id }),
-        },
+        fetchUser: (_ctx: any, id: string) =>
+          Promise.resolve({ id, name: 'User ' + id }),
       },
     })
 

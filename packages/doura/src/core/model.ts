@@ -47,6 +47,7 @@ import {
   NormalizedQuerySpec,
   QueryCacheEntry,
   QueryHash,
+  isQuerySpec,
 } from './queryTypes'
 import type { InternalQueryHandle } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
@@ -709,9 +710,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const queries = (this.options as any).queries
     if (queries) {
       for (const queryName of Object.keys(queries)) {
+        const spec = queries[queryName]
+        if (typeof spec !== 'function' && !isQuerySpec(spec)) {
+          if (__DEV__) {
+            warn(
+              `query "${queryName}" must be a function or a spec created by query(...)`
+            )
+          }
+          continue
+        }
         this._cacheAccess(queryName, AccessTypes.QUERY)
         this._queryKeys.push(queryName)
-        const spec = queries[queryName]
         const normalized: NormalizedQuerySpec =
           typeof spec === 'function'
             ? { fn: spec }

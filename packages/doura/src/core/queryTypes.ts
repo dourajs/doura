@@ -8,9 +8,11 @@ type QueryArgsTuple = readonly unknown[]
 
 type QueryStaleTime<S> = S extends never ? never : number
 
-/** Full query spec — used when the user writes an object literal under
- *  `queries`. `fn` is the sole authoritative position: TS infers TArgs
- *  from its rest parameters and TData from its return type.
+const QuerySpecBrand: unique symbol = Symbol('doura.querySpec')
+
+/** Full query spec — created by the `query()` helper. `fn` is the sole
+ *  authoritative position: TS infers TArgs from its rest parameters and TData
+ *  from its return type.
  *
  *  `fn` always has the shape `(ctx, ...args) => Promise<TData>`.
  *  No-args queries infer `TArgs = []`; parameterized queries infer the
@@ -25,6 +27,7 @@ export interface QuerySpec<
   S = any,
   TThis = any,
 > {
+  readonly [QuerySpecBrand]: true
   fn: (this: TThis, ctx: QueryCtx, ...args: TArgs) => Promise<TData>
   staleTime?: QueryStaleTime<S>
 }
@@ -55,22 +58,28 @@ export type InferQueryEntry<E, S = any, TThis = any> = E extends (
   ...args: any[]
 ) => Promise<any>
   ? E // shorthand — accept as-is
-  : E extends {
-        fn: (this: any, ctx: QueryCtx, ...args: infer A) => Promise<infer D>
-      }
+  : E extends QuerySpec<infer A, infer D, any, any>
     ? QuerySpec<A, D, S, TThis>
     : never
 
 export type QueriesOption<S = any, TThis = any> = Record<
   string,
-  QuerySpec<any[], any, S, TThis> | QueryShorthand<any[], any, TThis>
+  QuerySpec<any, any, S, TThis> | QueryShorthand<any, any, TThis>
 >
 
 // -----------------------------------------------------------------------------
-// query — fn-driven spec helper
+// query — options spec helper
 // -----------------------------------------------------------------------------
 //
-// Users write query arguments directly in `fn`:
+// Prefer a shorthand function when a query only needs fn:
+//
+//   fetchUser: async function (ctx, id: string) {
+//     const user = await api.getUser(id)
+//     this.users[id] = user
+//     return user
+//   }
+//
+// Use query(...) when per-entry options are needed:
 //
 //   fetchUser: query({
 //     fn: async function (ctx, id: string) {
@@ -78,11 +87,11 @@ export type QueriesOption<S = any, TThis = any> = Record<
 //       this.users[id] = user
 //       return user
 //     },
+//     staleTime: 30_000,
 //   })
 //
-// Why a helper is useful: `query(...)` establishes a FRESH inference
-// context scoped to one entry. TS infers TArgs from `fn`'s rest
-// parameters and TData from its return type.
+// `query(...)` is also the only accepted full-spec constructor; direct
+// `{ fn }` objects in `queries` are rejected.
 //
 // TS 5.4+ native `NoInfer` is used throughout.
 // The helper's spec shape intentionally has a NON-CONDITIONAL `fn`
@@ -106,8 +115,22 @@ export function query<
   TThis = any,
 >(
   spec: QueryHelperSpec<TArgs, TData, S, TThis>
-): QueryHelperSpec<TArgs, TData, S, TThis> {
-  return spec
+): QuerySpec<TArgs, TData, S, TThis> {
+  Object.defineProperty(spec, QuerySpecBrand, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+  })
+  return spec as QuerySpec<TArgs, TData, S, TThis>
+}
+
+export function isQuerySpec(value: unknown): value is QuerySpec {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    (value as any)[QuerySpecBrand] === true &&
+    typeof (value as any).fn === 'function'
+  )
 }
 
 /** Coordinator interface — breaks the circular import between model.ts

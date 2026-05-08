@@ -1,4 +1,4 @@
-import { defineModel, modelManager, QueryCoordinator } from '../index'
+import { defineModel, modelManager, query, QueryCoordinator } from '../index'
 import { DEFAULT_QUERY_CONFIG } from '../queryTypes'
 import { doura } from '../../doura'
 
@@ -118,9 +118,7 @@ describe('QueryCoordinator', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchData: {
-            fn,
-          },
+          fetchData: fn,
         },
       })
 
@@ -150,9 +148,7 @@ describe('QueryCoordinator', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchData: {
-            fn,
-          },
+          fetchData: fn,
         },
       })
 
@@ -518,10 +514,10 @@ describe('QueryCoordinator', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchData: {
+          fetchData: query({
             fn: async () => 'result',
             staleTime: 5000,
-          },
+          }),
         },
       })
 
@@ -541,10 +537,10 @@ describe('QueryCoordinator', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchData: {
+          fetchData: query({
             fn: async () => 'result',
             staleTime: 5000,
-          },
+          }),
         },
       })
 
@@ -745,13 +741,9 @@ describe('QueryCoordinator', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchData: {
-            fn: (ctx: any) => {
-              signal = ctx.signal
-              return new Promise((resolve) =>
-                setTimeout(() => resolve(1), 5000)
-              )
-            },
+          fetchData: (ctx: any) => {
+            signal = ctx.signal
+            return new Promise((resolve) => setTimeout(() => resolve(1), 5000))
           },
         },
       })

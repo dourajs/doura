@@ -24,14 +24,12 @@ const makeModel = (fetchFn?: (cursor: number) => Promise<Page>) =>
     name: 'makeModel',
     state: {},
     queries: {
-      fetchPage: {
-        fn: (_ctx: any, cursor: number) =>
-          fetchFn
-            ? fetchFn(cursor)
-            : Promise.resolve(
-                pageData[cursor] || { items: [], nextCursor: null }
-              ),
-      },
+      fetchPage: (_ctx: any, cursor: number) =>
+        fetchFn
+          ? fetchFn(cursor)
+          : Promise.resolve(
+              pageData[cursor] || { items: [], nextCursor: null }
+            ),
     },
   })
 
@@ -303,10 +301,8 @@ describe('useInfiniteQuery — fetchPreviousPage', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchSymPage: {
-          fn: (_ctx: any, cursor: number): Promise<BiPage> =>
-            Promise.resolve(bidir[cursor]),
-        },
+        fetchSymPage: (_ctx: any, cursor: number): Promise<BiPage> =>
+          Promise.resolve(bidir[cursor]),
       },
     })
 
@@ -486,12 +482,10 @@ describe('useInfiniteQuery — race guard', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchPage: {
-          fn: (_ctx: any, cursor: number) =>
-            new Promise<Page>((resolve) => {
-              resolvers[cursor] = resolve
-            }),
-        },
+        fetchPage: (_ctx: any, cursor: number) =>
+          new Promise<Page>((resolve) => {
+            resolvers[cursor] = resolve
+          }),
       },
     })
 

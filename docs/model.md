@@ -266,14 +266,14 @@ const userModel = defineModel({
   name: 'user',
   state: { users: {} as Record<string, User> },
   queries: {
-    // Shorthand: 直接写函数
+    // 只有 fn 时优先直接写函数
     fetchUser: async function (ctx, id: string) {
       const user = await api.getUser(id)
       this.users[id] = user
       return user
     },
 
-    // Full spec: 使用 query() helper
+    // 需要 staleTime 等选项时使用 query() helper
     fetchList: query({
       fn: async function (ctx, page: number) {
         return await api.getUserList(page)
@@ -285,10 +285,10 @@ const userModel = defineModel({
 ```
 
 **两种声明方式**：
-- **Shorthand**（直接函数）：`(ctx: QueryCtx, ...args) => Promise<TData>`
-- **QuerySpec**（对象）：`{ fn, staleTime? }`
+- **Shorthand**（推荐用于只有 `fn` 的场景）：`(ctx: QueryCtx, ...args) => Promise<TData>`
+- **QuerySpec**（用于额外选项）：`query({ fn, staleTime? })`
 
-`query()` helper 是一个 identity function，唯一作用是为每个 query entry 建立独立的 TypeScript 推断上下文，使 `TArgs` 和 `TData` 从 `fn` 的签名精确推断。
+只有 `fn` 时不要包一层 `query(...)`。`query()` helper 是 full spec 的唯一入口，用于 `staleTime` 等选项；不要在 `queries` 中直接写 `{ fn }` 对象。
 
 **fn 签名**：`fn(this: ModelThis, ctx: QueryCtx, ...args: TArgs): Promise<TData>`
 - `this` 绑定到 model 的 internal proxy，可以在 query fn 内部访问/修改 state
@@ -317,7 +317,7 @@ const userModel = defineModel({
 
 `_initQueries()` 遍历 `model.queries`，对每个 entry：
 1. 调用 `_cacheAccess(queryName, QUERY)` 注册到 accessCache
-2. Normalize spec（shorthand → `{ fn }`）
+2. Normalize spec（shorthand 函数或 `query(...)` spec → internal `{ fn, staleTime? }`）
 3. `_buildQueryHandle(queryName, spec)` 构造 handle 对象
 4. 注册到 `this.queries`（proxy 可访问）和 `this._queryHandles`（getApi 遍历用）
 5. 两份 record 都 `Object.freeze`，不可运行时追加

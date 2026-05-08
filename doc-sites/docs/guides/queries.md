@@ -7,7 +7,7 @@ Queries provide built-in async data fetching with caching, directly in your mode
 
 ## Defining Queries
 
-Add a `queries` field to your model. Each entry is either a shorthand function or a full spec object via the `query()` helper.
+Add a `queries` field to your model. Prefer a shorthand function when the query only needs `fn`; use the `query()` helper only for full specs with options. Direct `{ fn }` objects are not supported.
 
 ```ts
 import { defineModel, query } from 'doura'
@@ -18,13 +18,13 @@ const userModel = defineModel({
     currentUser: null as User | null,
   },
   queries: {
-    // Shorthand — just a function
+    // Preferred when only fn is needed
     fetchAll: async function (ctx) {
       const res = await fetch('/api/users', { signal: ctx.signal })
       return await res.json() as User[]
     },
 
-    // Full spec with query() helper — adds per-entry options
+    // Use query(...) when per-entry options are needed
     fetchById: query({
       fn: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
@@ -109,7 +109,7 @@ Methods that accept optional args operate on a specific cache slot when args are
 
 ### Per-entry staleTime
 
-Set `staleTime` in the `query()` spec to control how long data is considered fresh for a specific query:
+Set `staleTime` in the `query()` spec to control how long data is considered fresh for a specific query. If the query only has `fn`, use the shorthand function form instead.
 
 ```ts
 fetchUser: query({

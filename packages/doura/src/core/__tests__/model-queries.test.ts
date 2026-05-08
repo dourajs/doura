@@ -3,6 +3,7 @@ import {
   modelManager,
   computeQueryHash,
   computeArgsKey,
+  query,
 } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -43,10 +44,10 @@ describe('model queries', () => {
         name: 'model',
         state: { user: null as { id: number } | null },
         queries: {
-          fetchUser: {
+          fetchUser: query({
             fn,
             staleTime: 5000,
-          },
+          }),
         },
       })
 
@@ -54,6 +55,23 @@ describe('model queries', () => {
       const handle = inst.$queries.fetchUser as any
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
+    })
+
+    it('should reject direct object specs that were not created by query()', () => {
+      const fn = async (_ctx: any) => ({ id: 1 })
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: { fn },
+        } as any,
+      })
+
+      const inst = modelMgr.getModel(model)
+      expect(Object.keys(inst.$queries)).toHaveLength(0)
+      expect(
+        'query "fetchUser" must be a function or a spec created by query(...)'
+      ).toHaveBeenWarned()
     })
 
     it('should have no queries when no queries option', () => {
@@ -167,12 +185,10 @@ describe('model queries', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchUser: {
-            fn: async (_ctx: any, id: number) => ({
-              id,
-              name: '',
-            }),
-          },
+          fetchUser: async (_ctx: any, id: number) => ({
+            id,
+            name: '',
+          }),
         },
       })
 
@@ -233,12 +249,10 @@ describe('model queries', () => {
         name: 'model',
         state: { user: null as any },
         queries: {
-          fetchUser: {
-            async fn() {
-              const user = { id: 1, name: 'Alice' }
-              this.user = user
-              return user
-            },
+          async fetchUser() {
+            const user = { id: 1, name: 'Alice' }
+            this.user = user
+            return user
           },
         },
       })
@@ -260,12 +274,10 @@ describe('model queries', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchUser: {
-            fn: async (_ctx: any, id: number) => ({
-              id,
-              name: '',
-            }),
-          },
+          fetchUser: async (_ctx: any, id: number) => ({
+            id,
+            name: '',
+          }),
         },
       })
 
@@ -312,11 +324,9 @@ describe('model queries', () => {
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchUser: {
-            fn: async (_ctx: any, id: number) => ({
-              id,
-            }),
-          },
+          fetchUser: async (_ctx: any, id: number) => ({
+            id,
+          }),
         },
       })
 
@@ -427,9 +437,7 @@ describe('model queries', () => {
       name: 'model',
       state: { value: 0 },
       queries: {
-        fetchData: {
-          fn: async (_ctx: any, id: string) => ({ id }),
-        },
+        fetchData: async (_ctx: any, id: string) => ({ id }),
       },
     })
 
@@ -515,10 +523,8 @@ describe('model queries', () => {
       name: 'argsModel',
       state: { sentinel: 0 },
       queries: {
-        fetchUser: {
-          fn: (_ctx: any, id: string) =>
-            Promise.resolve({ id, name: 'User ' + id }),
-        },
+        fetchUser: (_ctx: any, id: string) =>
+          Promise.resolve({ id, name: 'User ' + id }),
       },
     })
 
@@ -612,10 +618,10 @@ describe('model queries', () => {
         name: 'stale',
         state: {},
         queries: {
-          fetchFresh: {
+          fetchFresh: query({
             fn: (_ctx: any) => Promise.resolve(1),
             staleTime: 60_000,
-          },
+          }),
         },
       })
       const inst = modelMgr.getModel(freshModel)
@@ -706,11 +712,9 @@ describe('model queries', () => {
         name: 'model',
         state: {},
         queries: {
-          fetchUser: {
-            fn: (ctx: any, id: string) => {
-              signals[id] = ctx.signal
-              return new Promise((resolve) => setTimeout(resolve, 5000))
-            },
+          fetchUser: (ctx: any, id: string) => {
+            signals[id] = ctx.signal
+            return new Promise((resolve) => setTimeout(resolve, 5000))
           },
         },
       })
@@ -777,9 +781,7 @@ describe('model queries', () => {
         name: 'userModel',
         state: {},
         queries: {
-          fetchUser: {
-            fn: (_ctx: any, id: string) => Promise.resolve({ id }),
-          },
+          fetchUser: (_ctx: any, id: string) => Promise.resolve({ id }),
         },
       })
 
@@ -853,9 +855,7 @@ describe('model queries', () => {
         name: 'userModel',
         state: {},
         queries: {
-          fetchUser: {
-            fn: (_ctx: any, id: string) => Promise.resolve({ id }),
-          },
+          fetchUser: (_ctx: any, id: string) => Promise.resolve({ id }),
         },
       })
 

@@ -13,9 +13,7 @@ const model = defineModel({
   },
   queries: {
     fetchData: (_ctx: any) => Promise.resolve(42),
-    fetchUser: {
-      fn: (_ctx: any, id: string) => Promise.resolve({ id, name: 'User' }),
-    },
+    fetchUser: (_ctx: any, id: string) => Promise.resolve({ id, name: 'User' }),
   },
 })
 
