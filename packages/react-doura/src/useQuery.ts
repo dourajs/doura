@@ -6,15 +6,58 @@ import {
   useSyncExternalStore,
 } from 'react'
 import type { QueryHandle, QueryCacheEntry } from 'doura'
+import type { InternalQueryHandle } from '../../doura/src/core/internalQueryTypes'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
 
-type QueryHandleInternal = QueryHandle<any, any> & {
-  readonly _spec: { staleTime?: number }
-  readonly _hasArgs: boolean
-  computeHash(...args: any[]): string
-  subscribe(args: readonly unknown[], listener: () => void): () => void
-  observe(...args: any[]): void
-  unobserve(args: readonly unknown[], cleanup: () => void): void
+function shallowArrayEqual(
+  a: readonly unknown[] | undefined,
+  b: readonly unknown[]
+): boolean {
+  if (a === b) return true
+  if (!a || a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (!Object.is(a[i], b[i])) return false
+  }
+  return true
+}
+
+function isCacheEntryStale(
+  entry: QueryCacheEntry | undefined,
+  staleTime: number
+): boolean {
+  return (
+    !entry ||
+    entry.data === undefined ||
+    Date.now() - entry.dataUpdatedAt >= staleTime
+  )
+}
+
+function useQueryHash(
+  queryHandle: InternalQueryHandle<any, any>,
+  args: readonly unknown[]
+): string {
+  const cacheRef = useRef<{
+    queryHandle: InternalQueryHandle<any, any>
+    args: readonly unknown[]
+    hash: string
+  }>()
+
+  const cached = cacheRef.current
+  if (
+    !cached ||
+    cached.queryHandle !== queryHandle ||
+    !shallowArrayEqual(cached.args, args)
+  ) {
+    const next = {
+      queryHandle,
+      args: [...args],
+      hash: queryHandle.computeHash(...(args as any[])),
+    }
+    cacheRef.current = next
+    return next.hash
+  }
+
+  return cached.hash
 }
 
 // Overload: query with no args
@@ -39,7 +82,7 @@ export function useQuery(
   argsOrOptions?: any,
   maybeOptions?: any
 ): UseQueryResult<any, any> {
-  const queryHandleInternal = queryHandle as QueryHandleInternal
+  const queryHandleInternal = queryHandle as InternalQueryHandle<any, any>
 
   // Resolve overloaded args using the runtime tag rather than key-scanning.
   let args: readonly unknown[]
@@ -52,9 +95,9 @@ export function useQuery(
     options = argsOrOptions
   }
 
-  // Stable hash — computed from tuple contents so inline `[id]` arrays do
-  // not re-subscribe when the hash is unchanged.
-  const hash = queryHandleInternal.computeHash(...(args as any[]))
+  // Stable hash — cached by tuple contents so inline `[id]` arrays do not
+  // recompute or re-subscribe when the args are unchanged.
+  const hash = useQueryHash(queryHandleInternal, args)
 
   // Latest args via ref so refetch() always uses the current value without
   // forcing the callback identity to change on every render.
@@ -99,11 +142,7 @@ export function useQuery(
 
     if (enabled) {
       const entry = queryHandleInternal.getState(...(effectArgs as any[]))
-      const stale =
-        !entry ||
-        entry.data === undefined ||
-        Date.now() - entry.dataUpdatedAt >= resolvedStaleTime
-      if (stale) {
+      if (isCacheEntryStale(entry, resolvedStaleTime)) {
         queryHandleInternal.fetch(...(effectArgs as any[])).catch(() => {
           // Error surfaces via cacheEntry.error; swallow the rejection
           // to avoid unhandled promise warnings.
@@ -148,10 +187,7 @@ export function useQuery(
     return queryHandleInternal.fetch(...(argsRef.current as any[]))
   }, [queryHandleInternal, hash])
 
-  const isStale =
-    !cacheEntry ||
-    cacheEntry.data === undefined ||
-    Date.now() - cacheEntry.dataUpdatedAt >= resolvedStaleTime
+  const isStale = isCacheEntryStale(cacheEntry, resolvedStaleTime)
 
   return {
     data: displayData,

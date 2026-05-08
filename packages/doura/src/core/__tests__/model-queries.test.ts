@@ -36,12 +36,8 @@ describe('model queries', () => {
       expect((inst.$queries.fetchUser as any)._spec.fn).toBe(fetchUser)
     })
 
-    it('should preserve only supported spec options (fn, staleTime)', () => {
+    it('should preserve supported spec options', () => {
       const fn = async (_ctx: any, id: number) => ({ id })
-      const key = (args: { id: number }) => ['user', args.id]
-      const onData = (ctx: any, data: any) => {
-        ctx.state.user = data
-      }
 
       const model = defineModel({
         name: 'model',
@@ -49,10 +45,8 @@ describe('model queries', () => {
         queries: {
           fetchUser: {
             fn,
-            key,
             staleTime: 5000,
-            onData,
-          } as any,
+          },
         },
       })
 
@@ -60,14 +54,6 @@ describe('model queries', () => {
       const handle = inst.$queries.fetchUser as any
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
-      expect((handle._spec as any).key).toBeUndefined()
-      expect((handle._spec as any).onData).toBeUndefined()
-      expect(
-        `query "fetchUser" uses removed option "key"; cache identity now comes from query args`
-      ).toHaveBeenWarned()
-      expect(
-        `query "fetchUser" uses removed option "onData"; write state inside "fn"`
-      ).toHaveBeenWarned()
     })
 
     it('should have no queries when no queries option', () => {
@@ -513,39 +499,6 @@ describe('model queries', () => {
 
       inst.$resetQueries()
       expect(listener).toHaveBeenCalled()
-    })
-  })
-
-  describe('removed onData option', () => {
-    it('should ignore onData at runtime without wedging the model', () => {
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        queries: {
-          broken: {
-            fn: async (_ctx: any) => 42,
-            onData: () => {
-              throw new Error('onData exploded')
-            },
-          } as any,
-        },
-      })
-
-      const inst = modelMgr.getModel(model)
-      const internal = (inst as any)._
-
-      inst.$queries.broken.setData(42)
-
-      expect(
-        `query "broken" uses removed option "onData"; write state inside "fn"`
-      ).toHaveBeenWarned()
-      expect(internal._watchStateChange).toBe(true)
-      expect(inst.$queries.broken.getData()).toBe(42)
-
-      // Model should still be functional — state changes should work
-      internal.stateRef.value.value = 99
-      internal._update()
-      expect(inst.$state.value).toBe(99)
     })
   })
 

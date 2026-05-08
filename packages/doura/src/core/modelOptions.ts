@@ -188,29 +188,6 @@ function validateQueries(model: AnyObjectModel) {
       )
       continue
     }
-
-    if (isPlainObject(spec)) {
-      if ('setData' in spec) {
-        warn(
-          `query "${key}" uses removed option "setData"; write state inside "fn"`
-        )
-      }
-      if ('getData' in spec) {
-        warn(
-          `query "${key}" uses removed option "getData"; query reads now come from cache`
-        )
-      }
-      if ('key' in spec) {
-        warn(
-          `query "${key}" uses removed option "key"; cache identity now comes from query args`
-        )
-      }
-      if ('onData' in spec) {
-        warn(
-          `query "${key}" uses removed option "onData"; write state inside "fn"`
-        )
-      }
-    }
   }
 }
 

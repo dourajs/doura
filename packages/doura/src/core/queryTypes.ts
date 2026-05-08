@@ -8,13 +8,6 @@ type QueryArgsTuple = readonly unknown[]
 
 type QueryStaleTime<S> = S extends never ? never : number
 
-type RemovedQueryOptions = {
-  key?: never
-  onData?: never
-  setData?: never
-  getData?: never
-}
-
 /** Full query spec — used when the user writes an object literal under
  *  `queries`. `fn` is the sole authoritative position: TS infers TArgs
  *  from its rest parameters and TData from its return type.
@@ -31,7 +24,7 @@ export interface QuerySpec<
   TData = any,
   S = any,
   TThis = any,
-> extends RemovedQueryOptions {
+> {
   fn: (this: TThis, ctx: QueryCtx, ...args: TArgs) => Promise<TData>
   staleTime?: QueryStaleTime<S>
 }
@@ -89,8 +82,7 @@ export type QueriesOption<S = any, TThis = any> = Record<
 //
 // Why a helper is useful: `query(...)` establishes a FRESH inference
 // context scoped to one entry. TS infers TArgs from `fn`'s rest
-// parameters and TData from its return type while still checking that
-// removed options such as `key` and `onData` are not present.
+// parameters and TData from its return type.
 //
 // TS 5.4+ native `NoInfer` is used throughout.
 // The helper's spec shape intentionally has a NON-CONDITIONAL `fn`
@@ -102,7 +94,7 @@ interface QueryHelperSpec<
   TData = unknown,
   S = any,
   TThis = any,
-> extends RemovedQueryOptions {
+> {
   fn: (this: TThis, ctx: QueryCtx, ...args: TArgs) => Promise<TData>
   staleTime?: QueryStaleTime<S>
 }

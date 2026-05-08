@@ -75,6 +75,58 @@ describe('useQuery', () => {
     })
   })
 
+  test('should reuse the query hash when args tuple contents are unchanged', () => {
+    const model = defineModel({
+      name: 'model',
+      state: {},
+      queries: {
+        fetchUser: {
+          fn: (_ctx: any, id: string) =>
+            Promise.resolve({ id, name: 'User ' + id }),
+        },
+      },
+    })
+
+    let patchHandle: ((handle: any) => void) | undefined
+    const computeHash = jest.fn()
+    patchHandle = (handle: any) => {
+      const original = handle.computeHash.bind(handle)
+      handle.computeHash = (...args: any[]) => {
+        computeHash(...args)
+        return original(...args)
+      }
+      patchHandle = undefined
+    }
+
+    const App = ({ id }: { id: string }) => {
+      const api = useModel(model)
+      patchHandle?.(api.fetchUser)
+      useQuery(api.fetchUser, [id], { enabled: false })
+      return <div id="id">{id}</div>
+    }
+
+    const { rerender } = render(
+      <DouraRoot>
+        <App id="1" />
+      </DouraRoot>
+    )
+    expect(computeHash).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <DouraRoot>
+        <App id="1" />
+      </DouraRoot>
+    )
+    expect(computeHash).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <DouraRoot>
+        <App id="2" />
+      </DouraRoot>
+    )
+    expect(computeHash).toHaveBeenCalledTimes(2)
+  })
+
   test('should not fetch when enabled is false', async () => {
     const fn = jest.fn(() => Promise.resolve(42))
     const model = defineModel({
