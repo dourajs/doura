@@ -2,8 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 import App from './App'
 import { doura } from 'doura'
-import douraLog from 'doura-log'
-import persist, { createWebStorage } from 'doura-persist'
+import douraLog from 'doura-plugin-log'
+import persist, { createWebStorage } from 'doura-plugin-persist'
 import { DouraRoot } from 'react-doura'
 
 const douraStore = doura({
@@ -17,7 +17,7 @@ const douraStore = doura({
         storage: createWebStorage('local'),
         // whitelist: ['b'],
         blacklist: ['b'],
-        migrate: function (storageState: any, version: number) {
+        migrate: function (storageState: any, _version: number) {
           const count = storageState.count
           if (count && count.value >= 3) {
             count.value = 2

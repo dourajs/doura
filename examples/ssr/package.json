@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "start": "react-scripts-with-ssr start",
-    "build": "react-scripts-with-ssr build",
+    "start": "NODE_OPTIONS=--require=./scripts/webpack5Compat.cjs react-scripts-with-ssr start",
+    "build": "NODE_OPTIONS=--require=./scripts/webpack5Compat.cjs react-scripts-with-ssr build",
     "serve": "react-scripts-with-ssr serve"
   },
   "dependencies": {

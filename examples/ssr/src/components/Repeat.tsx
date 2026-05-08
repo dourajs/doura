@@ -11,7 +11,7 @@ for (let i = 0; i < 10; i++) {
 }
 
 function Count() {
-  const [{ value }] = useModel(local)
+  const { value } = useModel(local)
   return (
     <div>
       {arr.map((index) => {

@@ -1,4 +1,4 @@
-import { createContainer } from '../../../../../packages/react-doura/esm'
+import { createContainer } from 'react-doura'
 
 export const { Provider: LocalProviderB, useSharedModel: useSharedModelB } =
   createContainer()

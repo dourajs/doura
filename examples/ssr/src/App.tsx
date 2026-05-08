@@ -4,10 +4,10 @@ import Basic from './components/Basic'
 import Views from './components/Views'
 import List from './components/List'
 import Repeat from './components/Repeat'
-import type { DouraStore } from 'doura'
+import type { Doura } from 'doura'
 import { DouraRoot } from 'react-doura'
 
-function App(props: { store?: DouraStore }) {
+function App(props: { store?: Doura }) {
   return (
     <>
       <DouraRoot {...props}>

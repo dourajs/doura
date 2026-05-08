@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { ModelData } from 'doura'
-import { useRootModel } from '../../../../packages/react-doura/esm'
+import { useModel } from 'react-doura'
 
 import { login, currentUser } from '../models/login'
 
@@ -15,14 +15,15 @@ const currentUserSelector = function (
 }
 
 function Login() {
-  const [{ isLogin }, { toggleLogin }] = useRootModel(login)
-  const [{ userInfo }, _] = useRootModel(currentUser, currentUserSelector)
+  const loginState = useModel(login)
+  const { userInfo } = useModel(currentUser, currentUserSelector)
   return (
     <div>
       <h3>
-        useRootModel isLogin: {isLogin.toString()}, currentUser: {userInfo}
+        useModel isLogin: {loginState.isLogin.toString()}, currentUser:{' '}
+        {userInfo}
       </h3>
-      <button onClick={() => toggleLogin()}>toggleLogin</button>
+      <button onClick={() => loginState.toggleLogin()}>toggleLogin</button>
       <hr />
     </div>
   )

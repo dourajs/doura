@@ -6,7 +6,7 @@ const douraStore0 = doura()
 const douraStore1 = doura()
 
 function Shared() {
-  let [data, setState] = React.useState(false)
+  const [data, setState] = React.useState(false)
   return (
     <>
       <button
