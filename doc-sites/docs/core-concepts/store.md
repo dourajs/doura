@@ -3,10 +3,13 @@ id: store
 title: Store
 ---
 
-A model is only a definination of your data & loic. It's need to be init and accessed by a store.
+A model is a definition of your data and logic. It needs to be initialized and accessed by a store.
 
 ```js
+import { defineModel, doura } from 'doura'
+
 export const counterModel = defineModel({
+  name: 'counter',
   state: {
     count: 0,
   },
@@ -23,26 +26,21 @@ export const counterModel = defineModel({
 
 const store = doura()
 
-const modelInstance = store.getModel('counter', counterModel)
+const modelInstance = store.getModel(counterModel)
 
 // call the action as a method of the model instance
 modelInstance.increment()
 
-// read the state as a props of the model instance
+// read the state as a property of the model instance
 console.log(modelInstance.count) // 1
-
-// we can init a new instance with the same model by passing a different name
-const anotherModelInstance = store.getModel('counterAlt', counterModel)
-
-console.log(anotherModelInstance) // 0
 ```
 
 ## Setting initial state
 
-Initial state can be setted by passing `initialState` options to `doura()`
+Initial state can be set by passing `initialState` options to `doura()`. The key in `initialState` corresponds to the model's `name`.
 
 ```js
-const store = doure({
+const store = doura({
   initialState: {
     counter: {
       count: 100,
@@ -50,21 +48,21 @@ const store = doure({
   },
 })
 
-const modelInstance = store.getModel('counter', counterModel)
+const modelInstance = store.getModel(counterModel)
 
 console.log(modelInstance.count) // 100
 ```
 
-## Multil Store
+## Multiple Stores
 
-A model can be used in multi store, they will have independent state.
+A model can be used in multiple stores, they will have independent state.
 
 ```js
 const storeA = doura()
 const storeB = doura()
 
-const counterA = storeA.getModel('counter', counterModel)
-const counterB = storeB.getModel('counter', counterModel)
+const counterA = storeA.getModel(counterModel)
+const counterB = storeB.getModel(counterModel)
 
 console.log(counterA.count) // 0
 console.log(counterB.count) // 0

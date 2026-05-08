@@ -9,6 +9,7 @@ title: Using at Component Level
 import { defineModel } from 'doura'
 
 const countModel = defineModel({
+  name: 'count',
   state: {
     count: 0,
   },
@@ -39,14 +40,15 @@ function Counter() {
 
 ## Selector
 
-If we only care a part of states, we should use selecotr to pick exact what we want:
+If we only care about a part of state, we should use a selector to pick exactly what we want:
 
 ```tsx
 import { useModel } from 'react-doura'
 
 const userModel = defineModel({
+  name: 'user',
   state: {
-    name: 'aclie',
+    name: 'alice',
     isLogin: false,
   },
   actions: {
@@ -63,14 +65,20 @@ function Login() {
       isLogin: s.isLogin,
       login: s.login,
     }),
-    [] // deps of selector, empty means the seletor function won't change
+    [] // deps of selector, empty means the selector function won't change
   )
 
   return isLogin ? <div>Welcome</div> : <button onClick={login}>Login</button>
 }
 ```
 
-We could also pass a pre-defined selector function insteand of an inline function to eliminate the need of passing a dependencies array.
+We could also pass a pre-defined selector function instead of an inline function to eliminate the need of passing a dependencies array.
+
+:::tip
+
+For fully isolated per-component state (similar to `useReducer`), use `useDetachedModel` — each component instance gets its own independent model.
+
+:::
 
 ```tsx
 import { Selector } from 'react-doura'

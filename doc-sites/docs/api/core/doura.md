@@ -48,6 +48,7 @@ Actions can modify state in three ways, each producing a different action type:
 
 ```tsx
 const count = defineModel({
+  name: 'count',
   state: { value: 0 },
   actions: {
     add(p: number) {
@@ -68,6 +69,7 @@ const count = defineModel({
       return { value: 2 }
     },
   },
+})
 ```
 
 ## View
@@ -85,6 +87,7 @@ type ViewOptions<State = any> = Record<
 
 ```tsx
 const count = defineModel({
+  name: 'count',
   state: {
     count: 1,
   },
@@ -96,7 +99,7 @@ const count = defineModel({
       return this.count * 2
     },
     nested() {
-      this.double
+      return this.double
     },
   },
 })
@@ -104,25 +107,28 @@ const count = defineModel({
 
 ## `defineModel`
 
-There is two ways define a model, object or function.
+Defines a model — the unit of state, logic, and derived data in Doura.
 
 ### Types
 
 ```ts
-export type DefineModel<
-  S extends State,
-  A extends ActionOptions,
-  V extends ViewOptions,
-  P extends Params
-> = ModelOptions<S, A, V, P> & {}
+function defineModel<N, S, A, V, Models, Q>(options: {
+  name: N                    // required: unique string identifier
+  state: S                   // required: initial state object
+  actions?: A                // optional: methods that mutate state
+  views?: V                  // optional: computed/derived values
+  models?: Models            // optional: array of child models for composition
+  queries?: Q                // optional: async data fetching with caching
+}): DefineModel<S, A, V, Models>
 ```
 
-### `defineModel` By Object
+Keys across `state`, `actions`, `views`, `queries`, and `models` must not conflict — TypeScript will report a compile-time error if they do.
 
-The basic way to define model.
+### Example
 
 ```tsx
 const countModel = defineModel({
+  name: 'count',
   state: { count: 1 },
   actions: {
     add(p: number) {
@@ -137,9 +143,9 @@ const countModel = defineModel({
 })
 ```
 
-### `defineModel` By Function
+### Model Composition
 
-Composing other models by using function.
+Use the `models` option to compose child models. Child models are accessed via `this.childName` (the child model's `name` field) inside actions and views.
 
 ```ts
 const countModel = defineModel({
@@ -157,8 +163,8 @@ const countModel = defineModel({
   },
 })
 
-const model = defineModel({
-  name: 'model',
+const parentModel = defineModel({
+  name: 'parent',
   state: { value: 0 },
   models: [countModel],
   actions: {
@@ -177,6 +183,85 @@ const model = defineModel({
 })
 ```
 
+## `query`
+
+Helper function to define a query entry with full options. Establishes a fresh inference context per entry so TypeScript correctly infers `TArgs` from `fn`'s rest parameters and `TData` from its return type.
+
+### Types
+
+```ts
+function query<TArgs, TData>(spec: {
+  fn: (this: ModelThis, ctx: QueryCtx, ...args: TArgs) => Promise<TData>
+  staleTime?: number
+}): QuerySpec<TArgs, TData>
+```
+
+### Example
+
+```ts
+import { defineModel, query } from 'doura'
+
+const userModel = defineModel({
+  name: 'user',
+  state: { users: {} as Record<string, User> },
+  queries: {
+    // Shorthand form — just a function
+    fetchAll: async function (ctx) {
+      const res = await fetch('/api/users', { signal: ctx.signal })
+      return res.json()
+    },
+    // Full form with query() helper
+    fetchById: query({
+      fn: async function (ctx, id: string) {
+        const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
+        const user = await res.json()
+        this.users[id] = user
+        return user
+      },
+      staleTime: 30_000,
+    }),
+  },
+})
+```
+
+## `QueryHandle`
+
+The runtime query object available on model instances for each query entry. Accessed as `instance.queryName` or `instance.$queries.queryName`.
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `getData(...args)` | Read cached data without triggering a fetch. Returns `undefined` if absent. |
+| `getState(...args)` | Read the raw cache entry (`{ data, error, dataUpdatedAt, fetchStatus }`). |
+| `isFetching(...args)` | `true` if the query is currently fetching. |
+| `isStale(...args)` | `true` if the cached data is missing or older than `staleTime`. |
+| `fetch(...args)` | Kick off a fetch. Returns a Promise resolving with the data. |
+| `prefetch(...args)` | Fetch and warm the cache. Returns `Promise<void>`. |
+| `cancel(...args?)` | Cancel inflight request for specific args, or all inflight requests (no args). |
+| `invalidate(...args?)` | Mark cached entry stale without clearing data. No args = invalidate all. |
+| `reset(...args?)` | Clear the cached entry entirely. No args = reset all. |
+| `setData(...args, data)` | Write data directly into the cache. |
+
+### `QueryCtx`
+
+```ts
+interface QueryCtx {
+  signal: AbortSignal  // fires when cancel() is called
+}
+```
+
+### `QueryCacheEntry`
+
+```ts
+interface QueryCacheEntry {
+  data: unknown
+  error: unknown
+  dataUpdatedAt: number
+  fetchStatus: 'idle' | 'fetching'
+}
+```
+
 ## `doura`
 
 Creates a store (`Doura` instance) that manages model instances.
@@ -189,6 +274,10 @@ function doura(options?: DouraOptions): Doura
 interface DouraOptions {
   initialState?: Record<string, any>
   plugins?: [Plugin, any?][]
+  query?: {
+    gcTime?: number    // garbage collection time (default: 5 min)
+    staleTime?: number // how long data is fresh (default: 0)
+  }
 }
 ```
 
@@ -203,36 +292,62 @@ const store = doura({
   },
 })
 
-const modelInstance = store.getModel('counter', counterModel)
+const modelInstance = store.getModel(counterModel)
 
 console.log(modelInstance.count) // 100
 ```
 
 ## `ModelInstance`
 
-Get model state, call actions and views.
+The runtime model instance returned by `store.getModel(model)`. Provides direct access to state, actions, views, queries, and child models.
 
-### Example
+### Flat Access
+
+All state keys, action methods, view properties, query handles, and child model instances are accessible directly:
 
 ```ts
 const store = doura()
 const model = defineModel({
+  name: 'test',
   state: { value: 0 },
   actions: {
     actionOne() {
-      // ...change state
+      this.value = 1
     },
   },
   views: {
-    viewOne() {},
+    double() {
+      return this.value * 2
+    },
   },
 })
 
-const modelInstance = store.getModel('test', model)
-modelInstance.$state // { value: 0 }
-modelInstance.actionOne() // undefined
-modelInstance.viewOne // undefined
+const instance = store.getModel(model)
+instance.value       // 0 (state)
+instance.actionOne() // call action
+instance.double      // 0 (view)
 ```
+
+### `$`-prefixed API
+
+| Property / Method | Description |
+|-------------------|-------------|
+| `$name` | The model's name |
+| `$state` | Current state (assignable to replace) |
+| `$rawState` | Raw state snapshot |
+| `$actions` | Actions map |
+| `$views` | Views map |
+| `$queries` | Query handles map |
+| `$models` | Child model instances map |
+| `$patch(obj)` | Deep merge partial state |
+| `$onAction(listener)` | Subscribe to action calls. Returns unsubscribe. |
+| `$subscribe(listener)` | Subscribe to state changes. Returns unsubscribe. |
+| `$isolate(fn)` | Read state without tracking (for view optimization) |
+| `$getApi()` | Get a snapshot of the full API (state + views + actions + queries + models) |
+| `$createView(selector)` | Create a reactive derived view. Returns `{ (): T, destroy(): void }`. |
+| `$invalidateQueries()` | Mark all query cache entries stale |
+| `$cancelQueries()` | Cancel all inflight query requests |
+| `$resetQueries()` | Clear all query cache entries |
 
 ## `Doura`
 
@@ -243,7 +358,7 @@ The store object returned by `doura()`. Manages named and detached model instanc
 ```ts
 interface Doura {
   getState(): Record<string, State>
-  getModel<IModel extends AnyModel>(name: string, model: IModel): ModelInstance<IModel>
+  getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
   getDetachedModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
   subscribe(fn: () => any): () => void
   destroy(): void
@@ -253,7 +368,7 @@ interface Doura {
 ### Methods
 
 - **`getState()`** — Returns a snapshot of all named models' state, keyed by model name.
-- **`getModel(name, model)`** — Retrieves or creates a named model instance. Repeated calls with the same name return the same instance.
+- **`getModel(model)`** — Retrieves or creates a named model instance. Repeated calls with the same model return the same instance.
 - **`getDetachedModel(model)`** — Creates a detached model instance that is not registered in the store and not included in `getState()`.
 - **`subscribe(fn)`** — Registers a listener that fires whenever any named model's state changes (batched via microtask). Returns an unsubscribe function.
 - **`destroy()`** — Destroys the store: calls `onDestroy` on all plugin hooks, destroys all model instances, and clears subscribers.
@@ -262,7 +377,7 @@ interface Doura {
 
 ```ts
 const store = doura()
-const counter = store.getModel('counter', counterModel)
+const counter = store.getModel(counterModel)
 
 // subscribe to any model change
 const unsubscribe = store.subscribe(() => {
@@ -278,7 +393,7 @@ store.destroy()
 
 ## `$isolate`
 
-Executes the given function in a scope where reactive values can be read, but they cannot cause the caller's reactive scope to re-evaluated when they change. Useful for optimizing views that read nested objects.
+Executes the given function in a scope where reactive values can be read, but they cannot cause the caller's reactive scope to re-evaluate when they change. Useful for optimizing views that read nested objects.
 
 ### Types
 
@@ -290,6 +405,7 @@ $isolate: <T>(fn: (state: ModelState<IModel>) => T) => T
 
 ```ts
 const userModel = defineModel({
+  name: 'user',
   state: {
     user: { name: 'alice', age: 18 },
   },
@@ -325,6 +441,7 @@ class SomeExternalLib {
 }
 
 const model = defineModel({
+  name: 'app',
   state: {
     lib: markRaw(new SomeExternalLib()),  // will not be made reactive
     count: 0,
@@ -355,6 +472,7 @@ const obj = markStrict(
 )
 
 const model = defineModel({
+  name: 'app',
   state: {
     data: obj,  // non-enumerable 'hidden' property will be preserved during copy-on-write
   },

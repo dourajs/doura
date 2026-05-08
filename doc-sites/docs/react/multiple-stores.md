@@ -45,12 +45,13 @@ function App() {
 
 ## Using Models
 
-Inside each provider, use the corresponding `useSharedModel` hook. The first argument is always a **name** (string).
+Inside each provider, use the corresponding `useSharedModel` hook with the model definition.
 
 ```tsx
 import { defineModel } from 'doura'
 
 const counterModel = defineModel({
+  name: 'counter',
   state: { count: 0 },
   actions: {
     increment() {
@@ -60,13 +61,13 @@ const counterModel = defineModel({
 })
 
 function SettingsPanel() {
-  const { count, increment } = useSettingsModel('counter', counterModel)
+  const { count, increment } = useSettingsModel(counterModel)
   // this 'counter' is isolated to SettingsProvider
   return <button onClick={increment}>Settings count: {count}</button>
 }
 
 function Dashboard() {
-  const { count, increment } = useDashboardModel('counter', counterModel)
+  const { count, increment } = useDashboardModel(counterModel)
   // this 'counter' is isolated to DashboardProvider — independent from SettingsPanel
   return <button onClick={increment}>Dashboard count: {count}</button>
 }

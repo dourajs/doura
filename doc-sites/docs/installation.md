@@ -13,6 +13,16 @@ yarn add doura
 npm install doura
 ```
 
+For React integration, also install `react-doura`:
+
+```bash
+pnpm add react-doura
+# or with yarn
+yarn add react-doura
+# or with npm
+npm install react-doura
+```
+
 ## Usage
 
 ### Define models
@@ -20,7 +30,10 @@ npm install doura
 A **Model** is an entity holding state and business logic that isn't bound to your Components. It's a bit like a component that is always there and that everybody can read off and write to. It has three concepts, the [state](./core-concepts/state.md), [views](./core-concepts/views.md) and [actions](./core-concepts/actions.md).
 
 ```ts title="src/models/count.ts"
+import { defineModel } from 'doura'
+
 export const count = defineModel({
+  name: 'count',
   // initial state
   state: {
     count: 0,
@@ -56,12 +69,12 @@ import { count } from './models/count';
 const storeA = doura();
 const storeB = doura();
 
-const modelInstanceA = storeA.getModel('count', count)
+const modelInstanceA = storeA.getModel(count)
 
-// model will only be inited once within a store
-console.log(storeA.getModel('count', count) === modelInstanceA) // true
+// model will only be initialized once within a store
+console.log(storeA.getModel(count) === modelInstanceA) // true
 
-const modelInstanceB = storeB.getModel('count', count)
+const modelInstanceB = storeB.getModel(count)
 
 console.log(modelInstanceA.count) // 0
 console.log(modelInstanceA.isZero) // true
