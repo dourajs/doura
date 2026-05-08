@@ -46,8 +46,8 @@ import {
   NormalizedQuerySpec,
   QueryCacheEntry,
   QueryHash,
-  QueryHandle,
 } from './queryTypes'
+import type { InternalQueryHandle } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
 import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
 
@@ -217,7 +217,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   // props
   actions: ModelActions<IModel>
   views: Views<ModelViews<IModel>>
-  queries: Record<string, QueryHandle>
+  queries: Record<string, InternalQueryHandle>
   viewInstances: ViewExt[] = []
   private _modelViews: ViewExt[] = []
   accessContext: AccessContext
@@ -232,7 +232,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _api: ModelAPI<IModel> | null = null
   private _actionKeys: string[] = []
   private _queryKeys: string[] = []
-  private _queryHandles: Record<string, QueryHandle> = Object.create(null)
+  private _queryHandles: Record<string, InternalQueryHandle> =
+    Object.create(null)
   private _initState: ModelState<IModel>
   private _currentState: any
   private _actionListeners: ActionListener[] = []
@@ -745,7 +746,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _buildQueryHandle(
     queryName: string,
     spec: NormalizedQuerySpec
-  ): QueryHandle {
+  ): InternalQueryHandle {
     const self = this
     // fn.length > 1 means fn(ctx, args) — i.e. the query requires args.
     const hasArgs = spec.fn.length > 1
@@ -801,7 +802,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       }
     }
 
-    return handle as QueryHandle
+    return handle as InternalQueryHandle
   }
 
   private _queryHash(queryName: string, args?: readonly unknown[]): QueryHash {

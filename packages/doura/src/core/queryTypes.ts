@@ -172,27 +172,15 @@ type MutableTuple<T extends QueryArgsTuple> = [...T]
  *  empty to target every slot, or the query args tuple to target one slot. */
 type QueryArgsOptional<TArgs extends QueryArgsTuple> = [] | MutableTuple<TArgs>
 
-/** Bound query handle — combines model+query identity (for hooks) with
- *  runtime methods (for model-level code in actions/views/composed models).
+/** Public bound query handle — runtime methods available to users in
+ *  model instances, actions/views, and React integration types.
  *
- *  One object per (model instance, query name). The same reference is:
- *   - consumed by React hooks via _model / _queryName / _spec
- *   - called by actions/views via getData/getState/isFetching/fetch/etc. */
+ *  Internal identity/protocol fields live on the runtime object, but are
+ *  intentionally omitted from this public type. */
 export interface QueryHandle<
   TArgs extends QueryArgsTuple = any[],
   TData = any,
 > {
-  // --- descriptor (used by hooks) ---
-  readonly _model: any // ModelPublicInstance — typed as any to avoid circular import
-  readonly _queryName: string
-  readonly _spec: NormalizedQuerySpec<any, any>
-  /** Runtime discriminator: true when the query's fn takes args. */
-  readonly _hasArgs: boolean
-  // Phantom types for inference
-  readonly _args?: TArgs
-  readonly _data?: TData
-
-  // --- runtime accessors (used by model-level code) ---
   /** Read cached data without triggering a fetch. Returns undefined if absent. */
   getData(...args: MutableTuple<TArgs>): TData | undefined
   /** Read the raw cache entry (data, error, fetchStatus, dataUpdatedAt). */
@@ -221,14 +209,4 @@ export interface QueryHandle<
   setData: TArgs extends []
     ? (data: TData) => void
     : (...args: [...MutableTuple<TArgs>, data: TData]) => void
-
-  // --- hook integration (used by useQuery / useInfiniteQuery) ---
-  /** Compute the stable cache hash for a given args value. */
-  computeHash(...args: MutableTuple<TArgs>): QueryHash
-  /** Subscribe to cache changes for a specific args slot. Returns unsubscribe. */
-  subscribe(args: readonly unknown[], listener: () => void): () => void
-  /** Register a GC observer for the given args slot. */
-  observe(...args: MutableTuple<TArgs>): void
-  /** Unregister a GC observer. cleanup is called when gcTime elapses. */
-  unobserve(args: readonly unknown[], cleanup: () => void): void
 }

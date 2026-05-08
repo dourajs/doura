@@ -32,7 +32,7 @@ describe('model queries', () => {
 
       const inst = modelMgr.getModel('norm1', model)
       expect(inst.$queries.fetchUser).toBeDefined()
-      expect(inst.$queries.fetchUser._spec.fn).toBe(fetchUser)
+      expect((inst.$queries.fetchUser as any)._spec.fn).toBe(fetchUser)
     })
 
     it('should preserve only supported spec options (fn, staleTime)', () => {
@@ -55,7 +55,7 @@ describe('model queries', () => {
       })
 
       const inst = modelMgr.getModel('norm2', model)
-      const handle = inst.$queries.fetchUser
+      const handle = inst.$queries.fetchUser as any
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
       expect((handle._spec as any).key).toBeUndefined()
@@ -117,7 +117,7 @@ describe('model queries', () => {
 
       const store = modelMgr.getModel('test', model)
       expect(store.$queries.fetchUser).toBeDefined()
-      expect(store.$queries.fetchUser._spec.fn).toBe(fn)
+      expect((store.$queries.fetchUser as any)._spec.fn).toBe(fn)
     })
 
     it('should resolve query names from proxy', () => {
@@ -552,9 +552,10 @@ describe('model queries', () => {
 
       expect(viaQueries).toBe(viaProxy)
       expect(viaQueries).toBe(viaApi)
-      expect(viaQueries._queryName).toBe('fetchData')
-      expect(viaQueries._model).toBe(inst)
-      expect(viaQueries._spec.fn).toBeInstanceOf(Function)
+      const internalHandle = viaQueries as any
+      expect(internalHandle._queryName).toBe('fetchData')
+      expect(internalHandle._model).toBe(inst)
+      expect(internalHandle._spec.fn).toBeInstanceOf(Function)
     })
 
     it('getData / getState — void query returns undefined before any cache write', () => {

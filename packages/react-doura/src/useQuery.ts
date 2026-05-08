@@ -8,6 +8,15 @@ import {
 import type { QueryHandle, QueryCacheEntry } from 'doura'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
 
+type QueryHandleInternal = QueryHandle<any, any> & {
+  readonly _spec: { staleTime?: number }
+  readonly _hasArgs: boolean
+  computeHash(...args: any[]): string
+  subscribe(args: readonly unknown[], listener: () => void): () => void
+  observe(...args: any[]): void
+  unobserve(args: readonly unknown[], cleanup: () => void): void
+}
+
 // Overload: query with no args
 export function useQuery<TData, TSelected = TData>(
   queryHandle: QueryHandle<[], TData>,
@@ -30,10 +39,12 @@ export function useQuery(
   argsOrOptions?: any,
   maybeOptions?: any
 ): UseQueryResult<any, any> {
+  const queryHandleInternal = queryHandle as QueryHandleInternal
+
   // Resolve overloaded args using the runtime tag rather than key-scanning.
   let args: readonly unknown[]
   let options: QueryOverrides<any, any> | undefined
-  if (queryHandle._hasArgs) {
+  if (queryHandleInternal._hasArgs) {
     args = argsOrOptions ?? []
     options = maybeOptions
   } else {
@@ -43,7 +54,7 @@ export function useQuery(
 
   // Stable hash — computed from tuple contents so inline `[id]` arrays do
   // not re-subscribe when the hash is unchanged.
-  const hash = queryHandle.computeHash(...(args as any[]))
+  const hash = queryHandleInternal.computeHash(...(args as any[]))
 
   // Latest args via ref so refetch() always uses the current value without
   // forcing the callback identity to change on every render.
@@ -51,16 +62,16 @@ export function useQuery(
   argsRef.current = args
 
   const subscribe = useCallback(
-    (cb: () => void) => queryHandle.subscribe(argsRef.current, cb),
-    [queryHandle, hash]
+    (cb: () => void) => queryHandleInternal.subscribe(argsRef.current, cb),
+    [queryHandleInternal, hash]
   )
 
   const getSnapshot = useCallback(
     () =>
-      queryHandle.getState(...(argsRef.current as any[])) as
+      queryHandleInternal.getState(...(argsRef.current as any[])) as
         | QueryCacheEntry
         | undefined,
-    [queryHandle, hash]
+    [queryHandleInternal, hash]
   )
 
   const cacheEntry = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
@@ -79,21 +90,21 @@ export function useQuery(
 
   // Resolved staleTime (hook override > spec > 0)
   const resolvedStaleTime =
-    options?.staleTime ?? queryHandle._spec.staleTime ?? 0
+    options?.staleTime ?? queryHandleInternal._spec.staleTime ?? 0
 
   // Fetch + GC lifecycle
   useEffect(() => {
     const effectArgs = args
-    queryHandle.observe(effectArgs)
+    queryHandleInternal.observe(effectArgs)
 
     if (enabled) {
-      const entry = queryHandle.getState(...(effectArgs as any[]))
+      const entry = queryHandleInternal.getState(...(effectArgs as any[]))
       const stale =
         !entry ||
         entry.data === undefined ||
         Date.now() - entry.dataUpdatedAt >= resolvedStaleTime
       if (stale) {
-        queryHandle.fetch(...(effectArgs as any[])).catch(() => {
+        queryHandleInternal.fetch(...(effectArgs as any[])).catch(() => {
           // Error surfaces via cacheEntry.error; swallow the rejection
           // to avoid unhandled promise warnings.
         })
@@ -101,11 +112,11 @@ export function useQuery(
     }
 
     return () => {
-      queryHandle.unobserve(effectArgs, () => {
-        queryHandle.reset(...(effectArgs as any[]))
+      queryHandleInternal.unobserve(effectArgs, () => {
+        queryHandleInternal.reset(...(effectArgs as any[]))
       })
     }
-  }, [hash, enabled, queryHandle, resolvedStaleTime])
+  }, [hash, enabled, queryHandleInternal, resolvedStaleTime])
 
   // Apply select transform to real data (not placeholder)
   const selectedData = useMemo(() => {
@@ -134,8 +145,8 @@ export function useQuery(
   const isPending = !hasData
 
   const refetch = useCallback((): Promise<any> => {
-    return queryHandle.fetch(...(argsRef.current as any[]))
-  }, [queryHandle, hash])
+    return queryHandleInternal.fetch(...(argsRef.current as any[]))
+  }, [queryHandleInternal, hash])
 
   const isStale =
     !cacheEntry ||

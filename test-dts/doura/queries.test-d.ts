@@ -99,6 +99,22 @@ inst.$queries.fetchList.invalidate()
 inst.$queries.fetchList.cancel()
 inst.$queries.fetchList.reset()
 inst.$queries.fetchList.setData([{ id: '1', name: 'Alice' }])
+// @ts-expect-error — internal descriptor is not part of the public QueryHandle
+inst.$queries.fetchList._spec
+// @ts-expect-error — internal descriptor is not part of the public QueryHandle
+inst.$queries.fetchList._queryName
+// @ts-expect-error — internal descriptor is not part of the public QueryHandle
+inst.$queries.fetchList._model
+// @ts-expect-error — internal discriminator is not part of the public QueryHandle
+inst.$queries.fetchList._hasArgs
+// @ts-expect-error — hook integration protocol is internal
+inst.$queries.fetchList.computeHash()
+// @ts-expect-error — hook integration protocol is internal
+inst.$queries.fetchList.subscribe([], () => {})
+// @ts-expect-error — hook integration protocol is internal
+inst.$queries.fetchList.observe()
+// @ts-expect-error — hook integration protocol is internal
+inst.$queries.fetchList.unobserve([], () => {})
 // @ts-expect-error — no-args query handle does not accept args
 inst.$queries.fetchList.cancel('1')
 

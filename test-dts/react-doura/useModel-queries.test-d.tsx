@@ -51,8 +51,19 @@ export function TestUseModelQueryTypes() {
   expectType<QueryHandle<[string], User>>(api.fetchUser)
   expectType<QueryHandle<[string], User>>(api.fetchUserSpec)
 
-  // Handle descriptor fields are typed.
-  expectType<string>(api.fetchList._queryName)
+  // Internal descriptor and hook protocol fields are hidden from public API.
+  // @ts-expect-error — internal descriptor is not public
+  api.fetchList._queryName
+  // @ts-expect-error — internal descriptor is not public
+  api.fetchList._spec
+  // @ts-expect-error — internal descriptor is not public
+  api.fetchList._model
+  // @ts-expect-error — internal discriminator is not public
+  api.fetchList._hasArgs
+  // @ts-expect-error — hook integration protocol is internal
+  api.fetchList.computeHash()
+  // @ts-expect-error — hook integration protocol is internal
+  api.fetchList.unobserve([], () => {})
 
   // --- Runtime methods carry the inferred TArgs / TData ---
 
