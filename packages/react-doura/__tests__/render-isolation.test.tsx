@@ -5,8 +5,8 @@
  * subscribers. Components that read a DIFFERENT query on the same model do
  * not re-render because of unrelated cache updates.
  *
- * The pure cache-write paths ($setQueryData, plus
- * $invalidateQueries/$resetQueries targeting a specific query name) don't
+ * The pure cache-write paths (handle.setData, plus
+ * handle.invalidate/handle.reset targeting a specific query) don't
  * dispatch a model action, so useModel's model-level subscription stays
  * quiet and only the useQuery hook's per-query listener fires.
  */

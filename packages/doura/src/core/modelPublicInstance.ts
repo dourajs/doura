@@ -39,15 +39,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $createView: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
-} & ModelQueryMethods<
-  IModel extends { queries: infer Q }
-    ? Q
-    : IModel extends () => infer R
-      ? R extends { queries: infer Q2 }
-        ? Q2
-        : {}
-      : {}
-> &
+} & ModelQueryMethods &
   StripIndexSignature<ModelState<IModel>> &
   StripIndexSignature<ModelViews<IModel>> &
   StripIndexSignature<ModelActions<IModel>> &
@@ -71,12 +63,9 @@ const publicPropertiesMap: PublicPropertiesMap =
       $isolate: (i) => i.isolate,
       $getApi: (i) => i.getApi,
       $createView: (i) => createView.bind(null, i),
-      $invalidateQueries: (i) => i.invalidateQueries.bind(i),
-      $setQueryData: (i) => i.setQueryData.bind(i),
-      $getQueryData: (i) => i.getQueryData.bind(i),
-      $prefetchQuery: (i) => i.prefetchQuery.bind(i),
-      $cancelQueries: (i) => i.cancelQueries.bind(i),
-      $resetQueries: (i) => i.resetQueries.bind(i),
+      $invalidateQueries: (i) => () => i.invalidateQueries(),
+      $cancelQueries: (i) => () => i.cancelQueries(),
+      $resetQueries: (i) => () => i.resetQueries(),
     } as PublicPropertiesMap
   )
 

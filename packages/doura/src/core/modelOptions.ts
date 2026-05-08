@@ -30,91 +30,10 @@ export type Views<ViewOptions> = {
     : never
 }
 
-/** Names of declared queries (string keys only). Falls back to `string`
- *  when Q is `any` so legacy / loose call sites still accept any name. */
-type QueryNames<Q> = 0 extends 1 & Q
-  ? string
-  : keyof Q extends never
-    ? string
-    : Extract<keyof Q, string>
-
-type QueryArgsTuple = readonly unknown[]
-
-type MutableTuple<T extends QueryArgsTuple> = [...T]
-
-type QueryArgsFromEntry<T> = T extends (
-  this: any,
-  ctx: QueryCtx,
-  ...args: infer A
-) => Promise<any>
-  ? A
-  : T extends {
-        fn: (this: any, ctx: QueryCtx, ...args: infer A) => Promise<any>
-      }
-    ? A
-    : any[]
-
-type QueryDataFromEntry<T> = T extends (
-  this: any,
-  ctx: QueryCtx,
-  ...args: any[]
-) => Promise<infer D>
-  ? D
-  : T extends {
-        fn: (this: any, ctx: QueryCtx, ...args: any[]) => Promise<infer D>
-      }
-    ? D
-    : unknown
-
-type QueryArgsFor<Q, N> = 0 extends 1 & Q
-  ? any[]
-  : N extends keyof Q
-    ? QueryArgsFromEntry<Q[N]>
-    : any[]
-
-type QueryDataFor<Q, N> = 0 extends 1 & Q
-  ? unknown
-  : N extends keyof Q
-    ? QueryDataFromEntry<Q[N]>
-    : unknown
-
-type NameArgsParam<TArgs extends QueryArgsTuple> = TArgs extends []
-  ? [args?: []]
-  : [args: MutableTuple<TArgs>]
-
-type NameArgsOptional<TArgs extends QueryArgsTuple> =
-  | []
-  | [args: MutableTuple<TArgs>]
-
-type NameSetDataParam<TArgs extends QueryArgsTuple, TData> = TArgs extends []
-  ? [args: [], data: TData]
-  : [args: MutableTuple<TArgs>, data: TData]
-
-export interface ModelQueryMethods<Q = {}> {
-  $invalidateQueries<N extends QueryNames<Q>>(
-    queryName?: N,
-    ...args: NameArgsOptional<QueryArgsFor<Q, N>>
-  ): void
-  $cancelQueries<N extends QueryNames<Q>>(
-    queryName?: N,
-    ...args: NameArgsOptional<QueryArgsFor<Q, N>>
-  ): void
-  $resetQueries<N extends QueryNames<Q>>(
-    queryName?: N,
-    ...args: NameArgsOptional<QueryArgsFor<Q, N>>
-  ): void
-  $setQueryData<N extends QueryNames<Q>>(
-    queryName: N,
-    ...args: NameSetDataParam<QueryArgsFor<Q, N>, QueryDataFor<Q, N>>
-  ): void
-  $getQueryData<N extends QueryNames<Q>>(
-    queryName: N,
-    ...args: NameArgsParam<QueryArgsFor<Q, N>>
-  ): QueryDataFor<Q, N> | undefined
-  $prefetchQuery<N extends QueryNames<Q>>(
-    queryName: N,
-    ...args: NameArgsParam<QueryArgsFor<Q, N>>
-  ): Promise<void>
+export interface ModelQueryMethods {
+  $invalidateQueries(): void
+  $cancelQueries(): void
+  $resetQueries(): void
 }
 
 /** Map a raw queries options object (what the user writes under `queries`)
@@ -132,11 +51,11 @@ export type ModelThis<
 > = {
   $state: S
   $patch: (s: AnyObject) => void
-} & S &
-  Views<V> &
-  Actions<A> &
-  QueriesOnThis<Q> &
-  ModelQueryMethods<Q>
+} & StripIndexSignatureUnlessAny<S> &
+  StripIndexSignatureUnlessAny<Views<V>> &
+  StripIndexSignatureUnlessAny<Actions<A>> &
+  StripIndexSignatureUnlessAny<QueriesOnThis<Q>> &
+  ModelQueryMethods
 
 export type ViewThis<S extends State = {}, V extends ViewOptions = {}> = S & {
   $state: S
@@ -184,6 +103,10 @@ export type StripIndexSignature<T> = {
         ? never
         : K]: T[K]
 }
+
+type StripIndexSignatureUnlessAny<T> = 0 extends 1 & T
+  ? T
+  : StripIndexSignature<T>
 
 export type ModelState<Model> =
   Model extends ModelOptions<infer S, any, any>

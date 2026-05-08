@@ -69,15 +69,14 @@ store.$replace(BigInt(1))
 store.$replace(Symbol(1))
 
 // =============================================================
-// Typed `this.someQuery` inside actions + name-narrowed $*Queries
+// Typed `this.someQuery` inside actions + model-wide $*Queries
 // =============================================================
 //
 // Two type-level guarantees exercised below:
 //  - `this.someQuery` resolves to a typed QueryHandle (not `any`), so
 //    handle methods like .fetch() / .getData() carry TArgs / TData.
-//  - `this.$invalidateQueries / $cancelQueries / $resetQueries /
-//    $setQueryData / $getQueryData / $prefetchQuery` reject names that
-//    aren't declared queries on this model.
+//  - single-query cache operations live on QueryHandle, while
+//    $invalidateQueries / $cancelQueries / $resetQueries are model-wide only.
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
@@ -119,33 +118,33 @@ export const modelWithInvalidation = defineModel({
   state: {},
   actions: {
     async mutate() {
-      // Declared names type-check.
-      this.$invalidateQueries('fetchX')
-      this.$invalidateQueries('fetchY')
-      this.$cancelQueries('fetchX')
-      this.$resetQueries('fetchY')
-      this.$setQueryData('fetchX', [], 'value')
-      this.$getQueryData('fetchX')
-      this.$prefetchQuery('fetchY', [1])
+      // Single-query operations use QueryHandle.
+      this.fetchX.invalidate()
+      this.fetchY.invalidate(1)
+      this.fetchX.cancel()
+      this.fetchY.reset(1)
+      this.fetchX.setData('value')
+      this.fetchX.getData()
+      this.fetchY.prefetch(1)
 
-      // Undeclared names are rejected.
-      // @ts-expect-error — 'nonExistent' is not a declared query
-      this.$invalidateQueries('nonExistent')
-      // @ts-expect-error
-      this.$cancelQueries('nonExistent')
-      // @ts-expect-error
-      this.$resetQueries('nonExistent')
-      // @ts-expect-error
-      this.$setQueryData('nonExistent', [], 0)
-      // @ts-expect-error
-      this.$getQueryData('nonExistent')
-      // @ts-expect-error
-      this.$prefetchQuery('nonExistent')
-
-      // No-arg forms still work for the optional-name methods.
+      // No-arg model-wide forms still work.
       this.$invalidateQueries()
       this.$cancelQueries()
       this.$resetQueries()
+
+      // Public instance batch methods no longer accept query names.
+      // @ts-expect-error — use this.fetchX.invalidate()
+      this.$invalidateQueries('fetchX')
+      // @ts-expect-error — use this.fetchX.cancel()
+      this.$cancelQueries('fetchX')
+      // @ts-expect-error — use this.fetchY.reset()
+      this.$resetQueries('fetchY')
+      // @ts-expect-error — removed; use this.fetchX.setData(...)
+      this.$setQueryData('fetchX', [], 'value')
+      // @ts-expect-error — removed; use this.fetchX.getData()
+      this.$getQueryData('fetchX')
+      // @ts-expect-error — removed; use this.fetchY.prefetch(...)
+      this.$prefetchQuery('fetchY', [1])
     },
   },
   queries: {
@@ -154,17 +153,17 @@ export const modelWithInvalidation = defineModel({
   },
 })
 
-// Name-narrowing applies identically on ModelPublicInstance (external
+// Query API shape applies identically on ModelPublicInstance (external
 // callers via store.getModel).
 export function ExternalInvalidation() {
   const inst = douraStore.getModel('modelD', modelWithInvalidation)
 
-  inst.$invalidateQueries('fetchX')
-  inst.$setQueryData('fetchY', [1], 0)
+  inst.$invalidateQueries()
+  inst.fetchY.setData(1, 0)
 
-  // @ts-expect-error — external access enforces declared names too
+  // @ts-expect-error — public batch methods are model-wide only
   inst.$invalidateQueries('nope')
-  // @ts-expect-error
+  // @ts-expect-error — removed from public instance API
   inst.$setQueryData('nope', [], 0)
 
   // Handle typing on the instance (regression guard).
@@ -172,9 +171,8 @@ export function ExternalInvalidation() {
   expectType<QueryHandle<[number], number>>(inst.fetchY)
 }
 
-// A model with no queries falls back to `string` for $*Queries names so
-// loose AnyModel consumers stay ergonomic.
-export function LooseModelAcceptsAnyName() {
+// A model with no queries still exposes model-wide batch methods.
+export function NoQueryModelHasBatchMethods() {
   const noQ = defineModel({
     state: { n: 0 },
     actions: {
@@ -184,8 +182,9 @@ export function LooseModelAcceptsAnyName() {
     },
   })
   const inst = douraStore.getModel('noQ', noQ)
-  inst.$invalidateQueries('anything')
   inst.$invalidateQueries()
+  // @ts-expect-error — public batch methods are model-wide only
+  inst.$invalidateQueries('anything')
 }
 
 // =============================================================
@@ -231,11 +230,11 @@ export const functionModelWithOwnQueries = defineModel(() => {
         const ch = await c.fetchChild.fetch()
         expectType<string>(ch)
 
-        // $*Queries narrows to own declared names
+        // Query handles own single-query operations.
+        this.fetchData.invalidate()
+        this.fetchUser.invalidate('1')
+        // @ts-expect-error — public batch methods are model-wide only
         this.$invalidateQueries('fetchData')
-        this.$invalidateQueries('fetchUser')
-        // @ts-expect-error — 'nope' not declared
-        this.$invalidateQueries('nope')
       },
     },
     queries: {

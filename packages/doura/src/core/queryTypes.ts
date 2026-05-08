@@ -168,7 +168,7 @@ export const DEFAULT_QUERY_CONFIG: QueryConfig = {
 
 type MutableTuple<T extends QueryArgsTuple> = [...T]
 
-/** Tuple of the args parameter for bulk handle methods (invalidate/reset) —
+/** Tuple of the args parameter for bulk handle methods (invalidate/reset/cancel) —
  *  empty to target every slot, or the query args tuple to target one slot. */
 type QueryArgsOptional<TArgs extends QueryArgsTuple> = [] | MutableTuple<TArgs>
 
@@ -205,6 +205,11 @@ export interface QueryHandle<
   // --- runtime operations ---
   /** Kick off a fetch and resolve with the result (or reject on error). */
   fetch(...args: MutableTuple<TArgs>): Promise<TData>
+  /** Kick off a fetch and resolve when the cache has been warmed. */
+  prefetch(...args: MutableTuple<TArgs>): Promise<void>
+  /** Cancel the inflight request for a specific args slot, or every inflight
+   *  request of this query (no args). */
+  cancel(...args: QueryArgsOptional<TArgs>): void
   /** Mark the cached entry (specific args) or every entry of this query
    *  (no args) stale without clearing data. */
   invalidate(...args: QueryArgsOptional<TArgs>): void

@@ -768,6 +768,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       if (!self.coordinator) return Promise.resolve(undefined)
       return self.coordinator.fetch(self, queryName, args) as Promise<any>
     }
+    handle.prefetch = (...args: any[]): Promise<void> =>
+      self.prefetchQuery(queryName, args)
+    handle.cancel = (...args: any[]) => self.cancelQueries(queryName, args)
     handle.invalidate = (...args: any[]) =>
       self.invalidateQueries(queryName, args)
     handle.reset = (...args: any[]) => self.resetQueries(queryName, args)

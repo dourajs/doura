@@ -75,7 +75,7 @@ describe('QueryCoordinator', () => {
       )
 
       // Check query cache via public API
-      const data = inst.$getQueryData('fetchData')
+      const data = inst.$queries.fetchData.getData()
       expect(data).toBe('result')
 
       mgr.destroy()
@@ -555,7 +555,7 @@ describe('QueryCoordinator', () => {
     })
   })
 
-  describe('$prefetchQuery through model instance', () => {
+  describe('QueryHandle.prefetch through model instance', () => {
     it('should return a promise that resolves after the cache is warmed', async () => {
       let resolveFetch!: (value: string) => void
       const model = defineModel({
@@ -571,7 +571,7 @@ describe('QueryCoordinator', () => {
       const mgr = modelManager({ query: {} })
       const inst = mgr.getModel('test', model)
 
-      const promise = inst.$prefetchQuery('fetchData')
+      const promise = inst.$queries.fetchData.prefetch()
       let settled = false
       promise.then(() => {
         settled = true
@@ -583,7 +583,7 @@ describe('QueryCoordinator', () => {
       resolveFetch('prefetched')
       await promise
 
-      expect(inst.$getQueryData('fetchData')).toBe('prefetched')
+      expect(inst.$queries.fetchData.getData()).toBe('prefetched')
 
       mgr.destroy()
     })
@@ -600,11 +600,11 @@ describe('QueryCoordinator', () => {
       const mgr = modelManager({ query: {} })
       const inst = mgr.getModel('test', model)
 
-      inst.$prefetchQuery('fetchData')
+      inst.$queries.fetchData.prefetch()
       // Wait for the fetch to complete
       await new Promise((r) => setTimeout(r, 10))
 
-      const data = inst.$getQueryData('fetchData')
+      const data = inst.$queries.fetchData.getData()
       expect(data).toBe('prefetched')
       expect(fn).toHaveBeenCalledTimes(1)
 
@@ -624,19 +624,19 @@ describe('QueryCoordinator', () => {
       const mgr = modelManager()
       const inst = mgr.getModel('test', model)
 
-      // $prefetchQuery should still work since coordinator is always created
-      inst.$prefetchQuery('fetchData')
+      // QueryHandle.prefetch should still work since coordinator is always created
+      inst.$queries.fetchData.prefetch()
       await new Promise((r) => setTimeout(r, 10))
 
-      const data = inst.$getQueryData('fetchData')
+      const data = inst.$queries.fetchData.getData()
       expect(data).toBe('prefetched')
 
       mgr.destroy()
     })
   })
 
-  describe('$cancelQueries through model instance', () => {
-    it('should cancel inflight queries through model public API', async () => {
+  describe('QueryHandle.cancel and $cancelQueries through model instance', () => {
+    it('should cancel inflight queries through a query handle', async () => {
       let signal!: AbortSignal
       const model = defineModel({
         state: { value: 0 },
@@ -651,12 +651,42 @@ describe('QueryCoordinator', () => {
       const mgr = modelManager({ query: {} })
       const inst = mgr.getModel('test', model)
 
-      inst.$prefetchQuery('fetchData')
+      inst.$queries.fetchData.prefetch()
       // Let the fetch start
       await new Promise((r) => setTimeout(r, 5))
 
-      inst.$cancelQueries('fetchData')
+      inst.$queries.fetchData.cancel()
       expect(signal.aborted).toBe(true)
+
+      mgr.destroy()
+    })
+
+    it('$cancelQueries should cancel all inflight queries on the model', async () => {
+      const signals: Record<string, AbortSignal> = {}
+      const model = defineModel({
+        state: { value: 0 },
+        queries: {
+          fetchUser: (ctx: any, id: string) => {
+            signals[id] = ctx.signal
+            return new Promise((resolve) => setTimeout(resolve, 5000))
+          },
+          fetchPosts: (ctx: any) => {
+            signals.posts = ctx.signal
+            return new Promise((resolve) => setTimeout(resolve, 5000))
+          },
+        },
+      })
+
+      const mgr = modelManager({ query: {} })
+      const inst = mgr.getModel('test-batch-cancel', model)
+
+      inst.$queries.fetchUser.prefetch('1')
+      inst.$queries.fetchPosts.prefetch()
+      await new Promise((r) => setTimeout(r, 5))
+
+      inst.$cancelQueries()
+      expect(signals['1'].aborted).toBe(true)
+      expect(signals.posts.aborted).toBe(true)
 
       mgr.destroy()
     })
@@ -675,10 +705,10 @@ describe('QueryCoordinator', () => {
       const store = doura({ query: { staleTime: 5000, gcTime: 30000 } })
       const inst = store.getModel('test', model)
 
-      inst.$prefetchQuery('fetchData')
+      inst.$queries.fetchData.prefetch()
       await new Promise((r) => setTimeout(r, 10))
 
-      expect(inst.$getQueryData('fetchData')).toBe('from-doura')
+      expect(inst.$queries.fetchData.getData()).toBe('from-doura')
 
       store.destroy()
     })

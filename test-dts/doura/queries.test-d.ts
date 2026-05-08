@@ -24,12 +24,12 @@ const userModel = defineModel({
     async updateUser(payload: { id: string; name: string }) {
       this.users[payload.id] = payload
       // query methods accessible from actions via this
-      this.$invalidateQueries('fetchUser')
-      this.$invalidateQueries('fetchUser', [payload.id])
+      this.fetchUser.invalidate()
+      this.fetchUser.invalidate(payload.id)
+      this.fetchUser.cancel(payload.id)
+      this.fetchUser.reset(payload.id)
       this.$invalidateQueries()
-      this.$cancelQueries('fetchUser')
       this.$cancelQueries()
-      this.$resetQueries('fetchUser', ['1'])
       this.$resetQueries()
     },
   },
@@ -94,43 +94,48 @@ expectType<boolean>(inst.$queries.fetchList.isStale())
 expectType<Promise<{ id: string; name: string }[]>>(
   inst.$queries.fetchList.fetch()
 )
+expectType<Promise<void>>(inst.$queries.fetchList.prefetch())
 inst.$queries.fetchList.invalidate()
+inst.$queries.fetchList.cancel()
 inst.$queries.fetchList.reset()
 inst.$queries.fetchList.setData([{ id: '1', name: 'Alice' }])
+// @ts-expect-error — no-args query handle does not accept args
+inst.$queries.fetchList.cancel('1')
 
 // args query
 expectType<{ id: string; name: string } | undefined>(
   inst.$queries.fetchUser.getData('1')
 )
 expectType<boolean>(inst.$queries.fetchUser.isFetching('1'))
+expectType<Promise<void>>(inst.$queries.fetchUser.prefetch('1'))
+inst.$queries.fetchUser.cancel('1')
+inst.$queries.fetchUser.cancel()
 inst.$queries.fetchUser.setData('1', { id: '1', name: 'Alice' })
 
 // @ts-expect-error — missing args
 inst.$queries.fetchUser.getData()
+// @ts-expect-error — prefetch requires query args
+inst.$queries.fetchUser.prefetch()
 
 // --- Public query methods on model instance ---
 
-// $invalidateQueries
+// model-wide batch methods
 inst.$invalidateQueries()
-inst.$invalidateQueries('fetchUser')
-inst.$invalidateQueries('fetchUser', ['1'])
-
-// $setQueryData / $getQueryData
-inst.$setQueryData('fetchUser', ['1'], { id: '1', name: 'Alice' })
-expectType<User | undefined>(inst.$getQueryData('fetchUser', ['1']))
-
-// $prefetchQuery
-expectType<Promise<void>>(inst.$prefetchQuery('fetchUser', ['1']))
-
-// $cancelQueries
 inst.$cancelQueries()
-inst.$cancelQueries('fetchUser')
-inst.$cancelQueries('fetchUser', ['1'])
-
-// $resetQueries
 inst.$resetQueries()
+
+// @ts-expect-error — single-query invalidation moved to QueryHandle.invalidate()
+inst.$invalidateQueries('fetchUser')
+// @ts-expect-error — single-query cancellation moved to QueryHandle.cancel()
+inst.$cancelQueries('fetchUser')
+// @ts-expect-error — single-query reset moved to QueryHandle.reset()
 inst.$resetQueries('fetchUser')
-inst.$resetQueries('fetchUser', ['1'])
+// @ts-expect-error — removed; use inst.$queries.fetchUser.setData(...)
+inst.$setQueryData('fetchUser', ['1'], { id: '1', name: 'Alice' })
+// @ts-expect-error — removed; use inst.$queries.fetchUser.getData(...)
+inst.$getQueryData('fetchUser', ['1'])
+// @ts-expect-error — removed; use inst.$queries.fetchUser.prefetch(...)
+inst.$prefetchQuery('fetchUser', ['1'])
 
 // --- Cross-model invalidation via use() ---
 
@@ -141,10 +146,10 @@ const composedModel = defineModel(() => {
     state: {},
     actions: {
       invalidateUsers() {
-        users.$invalidateQueries('fetchUser')
-        users.$setQueryData('fetchUser', ['1'], { id: '1', name: 'Bob' })
+        users.fetchUser.invalidate()
+        users.fetchUser.setData('1', { id: '1', name: 'Bob' })
         users.$cancelQueries()
-        users.$resetQueries('fetchUser')
+        users.fetchUser.reset()
       },
     },
   }
