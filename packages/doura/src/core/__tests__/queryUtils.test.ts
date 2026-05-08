@@ -37,23 +37,22 @@ describe('stableStringify', () => {
 
 describe('computeArgsKey', () => {
   it('should return empty array for void args', () => {
-    expect(computeArgsKey(undefined)).toEqual([])
+    expect(computeArgsKey([])).toEqual([])
   })
 
-  it('should wrap stringified args in array when no keyFn', () => {
-    const a = computeArgsKey({ id: '1' })
-    const b = computeArgsKey({ id: '1' })
+  it('should return the args tuple directly', () => {
+    const a = computeArgsKey(['1', 2])
+    const b = computeArgsKey(['1', 2])
     expect(a).toEqual(b)
-    expect(Array.isArray(a)).toBe(true)
+    expect(a).toEqual(['1', 2])
   })
 
-  it('should use keyFn result directly when provided', () => {
-    const keyFn = (args: { id: string }) => [args.id]
-    expect(computeArgsKey({ id: '1' }, keyFn)).toEqual(['1'])
+  it('should support object args as a single tuple element', () => {
+    expect(computeArgsKey([{ id: '1' }])).toEqual([{ id: '1' }])
   })
 
   it('should differentiate distinct args', () => {
-    expect(computeArgsKey({ id: '1' })).not.toEqual(computeArgsKey({ id: '2' }))
+    expect(computeArgsKey(['1'])).not.toEqual(computeArgsKey(['2']))
   })
 })
 
@@ -65,20 +64,20 @@ describe('computeQueryHash', () => {
   })
 
   it('should produce same hash for same inputs', () => {
-    const key = computeArgsKey({ id: '1' })
+    const key = computeArgsKey([{ id: '1' }])
     expect(computeQueryHash('m', 'q', key)).toBe(
       computeQueryHash('m', 'q', key)
     )
   })
 
   it('should produce different hashes for different args', () => {
-    expect(computeQueryHash('m', 'q', computeArgsKey({ id: '1' }))).not.toBe(
-      computeQueryHash('m', 'q', computeArgsKey({ id: '2' }))
+    expect(computeQueryHash('m', 'q', computeArgsKey(['1']))).not.toBe(
+      computeQueryHash('m', 'q', computeArgsKey(['2']))
     )
   })
 
   it('should produce different hashes for different modelName or queryName', () => {
-    const key = computeArgsKey(undefined)
+    const key = computeArgsKey([])
     expect(computeQueryHash('m1', 'q', key)).not.toBe(
       computeQueryHash('m2', 'q', key)
     )

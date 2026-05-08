@@ -19,11 +19,8 @@ export function stableStringify(value: unknown): string {
   return '{' + parts.join(',') + '}'
 }
 
-export function computeArgsKey(
-  args: object | void,
-  keyFn?: (args: any) => unknown[]
-): unknown[] {
-  return keyFn ? keyFn(args) : args ? [stableStringify(args)] : []
+export function computeArgsKey(args: readonly unknown[] | void): unknown[] {
+  return args ? [...args] : []
 }
 
 export function computeQueryHash(

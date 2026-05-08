@@ -88,7 +88,7 @@ export const modelWithQueries = defineModel({
       // `this.fetchData` should carry the full handle type — NOT any.
       // If it were any, the bogus method call would silently pass and
       // the ts-expect-error directive would be flagged as unused.
-      // @ts-expect-error — fetchData is QueryHandle<void, number>, no .bogus()
+      // @ts-expect-error — fetchData is QueryHandle<[], number>, no .bogus()
       this.fetchData.bogus()
 
       const data = await this.fetchData.fetch()
@@ -98,20 +98,20 @@ export const modelWithQueries = defineModel({
       expectType<number | undefined>(this.fetchData.getData())
 
       // Args query — args are required and typed.
-      const user = await this.fetchUser.fetch({ id: '1' })
+      const user = await this.fetchUser.fetch('1')
       expectType<{ id: string; name: string }>(user)
 
       // @ts-expect-error — fetchUser requires args
       this.fetchUser.fetch()
 
       // @ts-expect-error — data for fetchUser must be {id,name}, not a number
-      this.fetchUser.setData({ id: '1' }, 42)
+      this.fetchUser.setData('1', 42)
     },
   },
   queries: {
     fetchData: (_ctx: QueryCtx) => Promise.resolve(42),
-    fetchUser: (_ctx: QueryCtx, args: { id: string }) =>
-      Promise.resolve({ id: args.id, name: 'User ' + args.id }),
+    fetchUser: (_ctx: QueryCtx, id: string) =>
+      Promise.resolve({ id, name: 'User ' + id }),
   },
 })
 
@@ -124,9 +124,9 @@ export const modelWithInvalidation = defineModel({
       this.$invalidateQueries('fetchY')
       this.$cancelQueries('fetchX')
       this.$resetQueries('fetchY')
-      this.$setQueryData('fetchX', undefined, 'value')
+      this.$setQueryData('fetchX', [], 'value')
       this.$getQueryData('fetchX')
-      this.$prefetchQuery('fetchY')
+      this.$prefetchQuery('fetchY', [1])
 
       // Undeclared names are rejected.
       // @ts-expect-error — 'nonExistent' is not a declared query
@@ -136,7 +136,7 @@ export const modelWithInvalidation = defineModel({
       // @ts-expect-error
       this.$resetQueries('nonExistent')
       // @ts-expect-error
-      this.$setQueryData('nonExistent', undefined, 0)
+      this.$setQueryData('nonExistent', [], 0)
       // @ts-expect-error
       this.$getQueryData('nonExistent')
       // @ts-expect-error
@@ -150,7 +150,7 @@ export const modelWithInvalidation = defineModel({
   },
   queries: {
     fetchX: (_ctx: QueryCtx) => Promise.resolve('X'),
-    fetchY: (_ctx: QueryCtx, args: { id: number }) => Promise.resolve(args.id),
+    fetchY: (_ctx: QueryCtx, id: number) => Promise.resolve(id),
   },
 })
 
@@ -160,16 +160,16 @@ export function ExternalInvalidation() {
   const inst = douraStore.getModel('modelD', modelWithInvalidation)
 
   inst.$invalidateQueries('fetchX')
-  inst.$setQueryData('fetchY', { id: 1 }, 0)
+  inst.$setQueryData('fetchY', [1], 0)
 
   // @ts-expect-error — external access enforces declared names too
   inst.$invalidateQueries('nope')
   // @ts-expect-error
-  inst.$setQueryData('nope', undefined, 0)
+  inst.$setQueryData('nope', [], 0)
 
   // Handle typing on the instance (regression guard).
-  expectType<QueryHandle<void, string>>(inst.fetchX)
-  expectType<QueryHandle<{ id: number }, number>>(inst.fetchY)
+  expectType<QueryHandle<[], string>>(inst.fetchX)
+  expectType<QueryHandle<[number], number>>(inst.fetchY)
 }
 
 // A model with no queries falls back to `string` for $*Queries names so
@@ -213,7 +213,7 @@ export const functionModelWithOwnQueries = defineModel(() => {
     state: { count: 0 },
     actions: {
       async refresh() {
-        // Own query via this — typed as QueryHandle<void, number>
+        // Own query via this — typed as QueryHandle<[], number>
         // @ts-expect-error — fetchData is QueryHandle, no .bogus()
         this.fetchData.bogus()
 
@@ -224,7 +224,7 @@ export const functionModelWithOwnQueries = defineModel(() => {
         // Own query with args
         // @ts-expect-error — fetchUser requires args
         this.fetchUser.fetch()
-        const user = await this.fetchUser.fetch({ id: '1' })
+        const user = await this.fetchUser.fetch('1')
         expectType<{ id: string; name: string }>(user)
 
         // Composed child via closure — ModelPublicInstance<typeof child>
@@ -240,8 +240,8 @@ export const functionModelWithOwnQueries = defineModel(() => {
     },
     queries: {
       fetchData: (_ctx: QueryCtx) => Promise.resolve(42),
-      fetchUser: (_ctx: QueryCtx, args: { id: string }) =>
-        Promise.resolve({ id: args.id, name: 'User ' + args.id }),
+      fetchUser: (_ctx: QueryCtx, id: string) =>
+        Promise.resolve({ id, name: 'User ' + id }),
     },
   }
 })

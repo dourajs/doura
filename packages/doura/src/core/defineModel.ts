@@ -32,10 +32,10 @@ export type DefineModel<
 //   - `const Q` (TS 5.0+) keeps Q's literal shape narrow at the call
 //     site (no widening to `QueryInputSpec<any, any>`), so downstream
 //     ModelQueries<typeof model> can see each entry's fn signature.
-//   - `Q extends { [K in keyof Q]: InferQueryEntry<Q[K], S> }` is a
+//   - `Q extends { [K in keyof Q]: InferQueryEntry<Q[K], S, TThis> }` is a
 //     self-referential constraint: TS captures Q from the literal,
 //     then validates each entry against a freshly-resolved
-//     `InferQueryEntry<Q[K], S>`. That fresh resolution is what lets
+//     `InferQueryEntry<Q[K], S, TThis>`. That fresh resolution is what lets
 //     the NoInfer-wrapped fields inside QuerySpec pick up fn's
 //     inferred TArgs / TData for that specific entry.
 // Together they give per-entry fn-driven inference on BARE object
@@ -48,7 +48,7 @@ export function defineModel<
   A extends ActionOptions,
   V extends ViewOptions<S>,
   const Q extends QueriesOption<S> & {
-    [K in keyof Q]: InferQueryEntry<Q[K], S>
+    [K in keyof Q]: InferQueryEntry<Q[K], S, ModelThis<S, A, V, Q>>
   },
   M extends ObjectModel<S, A, V>,
 >(
@@ -56,7 +56,7 @@ export function defineModel<
     state: S
     actions?: A
     views?: V & ThisType<ViewThis<S, V>>
-    queries?: Q & QueriesOption<S>
+    queries?: Q & QueriesOption<S, ModelThis<S, A, V, Q>>
   } & ThisType<ModelThis<S, A, V, Q>>
 ): M & DefineModel<S, A, V>
 
@@ -73,7 +73,7 @@ export function defineModel<
   A extends ActionOptions,
   V extends ViewOptions<S>,
   const Q extends QueriesOption<S> & {
-    [K in keyof Q]: InferQueryEntry<Q[K], S>
+    [K in keyof Q]: InferQueryEntry<Q[K], S, ModelThis<S, A, V, Q>>
   },
   M extends ObjectModel<S, A, V>,
 >(
@@ -81,7 +81,7 @@ export function defineModel<
     state: S
     actions?: A
     views?: V & ThisType<ViewThis<S, V>>
-    queries?: Q & QueriesOption<S>
+    queries?: Q & QueriesOption<S, ModelThis<S, A, V, Q>>
   } & ThisType<ModelThis<S, A, V, Q>>
 ): () => M & DefineModel<S, A, V>
 

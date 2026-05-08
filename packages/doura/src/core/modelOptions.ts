@@ -38,25 +38,82 @@ type QueryNames<Q> = 0 extends 1 & Q
     ? string
     : Extract<keyof Q, string>
 
+type QueryArgsTuple = readonly unknown[]
+
+type MutableTuple<T extends QueryArgsTuple> = [...T]
+
+type QueryArgsFromEntry<T> = T extends (
+  this: any,
+  ctx: QueryCtx,
+  ...args: infer A
+) => Promise<any>
+  ? A
+  : T extends {
+        fn: (this: any, ctx: QueryCtx, ...args: infer A) => Promise<any>
+      }
+    ? A
+    : any[]
+
+type QueryDataFromEntry<T> = T extends (
+  this: any,
+  ctx: QueryCtx,
+  ...args: any[]
+) => Promise<infer D>
+  ? D
+  : T extends {
+        fn: (this: any, ctx: QueryCtx, ...args: any[]) => Promise<infer D>
+      }
+    ? D
+    : unknown
+
+type QueryArgsFor<Q, N> = 0 extends 1 & Q
+  ? any[]
+  : N extends keyof Q
+    ? QueryArgsFromEntry<Q[N]>
+    : any[]
+
+type QueryDataFor<Q, N> = 0 extends 1 & Q
+  ? unknown
+  : N extends keyof Q
+    ? QueryDataFromEntry<Q[N]>
+    : unknown
+
+type NameArgsParam<TArgs extends QueryArgsTuple> = TArgs extends []
+  ? [args?: []]
+  : [args: MutableTuple<TArgs>]
+
+type NameArgsOptional<TArgs extends QueryArgsTuple> =
+  | []
+  | [args: MutableTuple<TArgs>]
+
+type NameSetDataParam<TArgs extends QueryArgsTuple, TData> = TArgs extends []
+  ? [args: [], data: TData]
+  : [args: MutableTuple<TArgs>, data: TData]
+
 export interface ModelQueryMethods<Q = {}> {
   $invalidateQueries<N extends QueryNames<Q>>(
     queryName?: N,
-    args?: object
+    ...args: NameArgsOptional<QueryArgsFor<Q, N>>
   ): void
-  $cancelQueries<N extends QueryNames<Q>>(queryName?: N, args?: object): void
-  $resetQueries<N extends QueryNames<Q>>(queryName?: N, args?: object): void
+  $cancelQueries<N extends QueryNames<Q>>(
+    queryName?: N,
+    ...args: NameArgsOptional<QueryArgsFor<Q, N>>
+  ): void
+  $resetQueries<N extends QueryNames<Q>>(
+    queryName?: N,
+    ...args: NameArgsOptional<QueryArgsFor<Q, N>>
+  ): void
   $setQueryData<N extends QueryNames<Q>>(
     queryName: N,
-    args: object | void,
-    data: unknown
+    ...args: NameSetDataParam<QueryArgsFor<Q, N>, QueryDataFor<Q, N>>
   ): void
   $getQueryData<N extends QueryNames<Q>>(
     queryName: N,
-    args?: object | void
-  ): unknown | undefined
+    ...args: NameArgsParam<QueryArgsFor<Q, N>>
+  ): QueryDataFor<Q, N> | undefined
   $prefetchQuery<N extends QueryNames<Q>>(
     queryName: N,
-    args?: object | void
+    ...args: NameArgsParam<QueryArgsFor<Q, N>>
   ): Promise<void>
 }
 
@@ -142,19 +199,16 @@ export type ModelViews<Model> =
 /** Infer (TArgs, TData) from a user-provided query entry (shorthand fn or
  *  full spec object), then surface them as a QueryHandle. */
 type HandleFromEntry<T> = T extends (
+  this: any,
   ctx: QueryCtx,
-  args: infer A
+  ...args: infer A
 ) => Promise<infer D>
-  ? QueryHandle<A extends object ? A : void, D>
-  : T extends (ctx: QueryCtx) => Promise<infer D>
-    ? QueryHandle<void, D>
-    : T extends {
-          fn: (ctx: QueryCtx, args: infer A) => Promise<infer D>
-        }
-      ? QueryHandle<A extends object ? A : void, D>
-      : T extends { fn: (ctx: QueryCtx) => Promise<infer D> }
-        ? QueryHandle<void, D>
-        : QueryHandle<any, any>
+  ? QueryHandle<A, D>
+  : T extends {
+        fn: (this: any, ctx: QueryCtx, ...args: infer A) => Promise<infer D>
+      }
+    ? QueryHandle<A, D>
+    : QueryHandle<any, any>
 
 /** Extract the queries type from a model definition as QueryHandle refs. */
 export type ModelQueries<Model> = Model extends { queries: infer Q }
@@ -194,11 +248,23 @@ function validateQueries(model: AnyObjectModel) {
 
     if (isPlainObject(spec)) {
       if ('setData' in spec) {
-        warn(`query "${key}" uses removed option "setData"; use "onData"`)
+        warn(
+          `query "${key}" uses removed option "setData"; write state inside "fn"`
+        )
       }
       if ('getData' in spec) {
         warn(
           `query "${key}" uses removed option "getData"; query reads now come from cache`
+        )
+      }
+      if ('key' in spec) {
+        warn(
+          `query "${key}" uses removed option "key"; cache identity now comes from query args`
+        )
+      }
+      if ('onData' in spec) {
+        warn(
+          `query "${key}" uses removed option "onData"; write state inside "fn"`
         )
       }
     }

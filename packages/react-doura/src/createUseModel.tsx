@@ -66,7 +66,7 @@ function useModel<IModel extends AnyModel>(
 
 function useModelWithSelector<
   IModel extends AnyModel,
-  S extends Selector<IModel>
+  S extends Selector<IModel>,
 >(
   model: ModelPublicInstance<IModel>,
   subscribe: SubscribeFn,
@@ -191,7 +191,7 @@ export const createUseStaticModel =
     // only run this once against a model
     const store = useMemo(() => {
       if (__DEV__) {
-        return readonlyModel(modelInstance)
+        return readonlyModel(modelInstance as any)
       } else {
         return modelInstance
       }

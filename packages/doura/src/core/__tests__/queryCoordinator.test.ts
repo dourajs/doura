@@ -71,7 +71,7 @@ describe('QueryCoordinator', () => {
       await coordinator.fetch(
         (inst as any)._ || getInternal(mgr, 'test', model),
         'fetchData',
-        undefined
+        []
       )
 
       // Check query cache via public API
@@ -95,8 +95,8 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      const p1 = coordinator.fetch(internal, 'fetchData', undefined)
-      const p2 = coordinator.fetch(internal, 'fetchData', undefined)
+      const p1 = coordinator.fetch(internal, 'fetchData', [])
+      const p2 = coordinator.fetch(internal, 'fetchData', [])
 
       const [r1, r2] = await Promise.all([p1, p2])
       expect(r1).toBe('result')
@@ -106,17 +106,17 @@ describe('QueryCoordinator', () => {
       mgr.destroy()
     })
 
-    it('should apply onData only once for a deduplicated response', async () => {
+    it('should apply inline state writes only once for a deduplicated response', async () => {
       const coordinator = new QueryCoordinator()
-      const onData = jest.fn(({ state }, data: number) => {
-        state.value += data
+      const fn = jest.fn(async function (this: any) {
+        this.value += 1
+        return 1
       })
       const model = defineModel({
         state: { value: 0 },
         queries: {
           fetchData: {
-            fn: async () => 1,
-            onData,
+            fn,
           },
         },
       })
@@ -126,29 +126,28 @@ describe('QueryCoordinator', () => {
       const internal = getInternal(mgr, 'test', model)
 
       const [r1, r2] = await Promise.all([
-        coordinator.fetch(internal, 'fetchData', undefined),
-        coordinator.fetch(internal, 'fetchData', undefined),
+        coordinator.fetch(internal, 'fetchData', []),
+        coordinator.fetch(internal, 'fetchData', []),
       ])
 
       expect(r1).toBe(1)
       expect(r2).toBe(1)
-      expect(onData).toHaveBeenCalledTimes(1)
+      expect(fn).toHaveBeenCalledTimes(1)
       expect(inst.$state.value).toBe(1)
 
       mgr.destroy()
     })
 
-    it('should reject every waiter if shared onData commit throws', async () => {
+    it('should reject every waiter if shared query function throws', async () => {
       const coordinator = new QueryCoordinator()
-      const onData = jest.fn(() => {
+      const fn = jest.fn(() => {
         throw new Error('onData exploded')
       })
       const model = defineModel({
         state: { value: 0 },
         queries: {
           fetchData: {
-            fn: async () => 1,
-            onData,
+            fn,
           },
         },
       })
@@ -157,12 +156,12 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      const p1 = coordinator.fetch(internal, 'fetchData', undefined)
-      const p2 = coordinator.fetch(internal, 'fetchData', undefined)
+      const p1 = coordinator.fetch(internal, 'fetchData', [])
+      const p2 = coordinator.fetch(internal, 'fetchData', [])
 
       await expect(p1).rejects.toThrow('onData exploded')
       await expect(p2).rejects.toThrow('onData exploded')
-      expect(onData).toHaveBeenCalledTimes(1)
+      expect(fn).toHaveBeenCalledTimes(1)
       expect(inst.$queries.fetchData.getState()?.fetchStatus).toBe('idle')
       expect(inst.$queries.fetchData.getState()?.error).toBeInstanceOf(Error)
 
@@ -222,10 +221,10 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      const promise = coordinator.fetch(internal, 'fetchData', undefined)
+      const promise = coordinator.fetch(internal, 'fetchData', [])
 
       // Check fetchStatus is 'fetching'
-      const state = (inst as any)._.getQueryState('fetchData', undefined)
+      const state = (inst as any)._.getQueryState('fetchData', [])
       expect(state?.fetchStatus).toBe('fetching')
 
       resolveFetch('done')
@@ -251,10 +250,10 @@ describe('QueryCoordinator', () => {
       const internal = getInternal(mgr, 'test', model)
 
       await expect(
-        coordinator.fetch(internal, 'fetchData', undefined)
+        coordinator.fetch(internal, 'fetchData', [])
       ).rejects.toThrow('fail')
 
-      const state = (inst as any)._.getQueryState('fetchData', undefined)
+      const state = (inst as any)._.getQueryState('fetchData', [])
       expect(state?.error).toBe(error)
       expect(state?.fetchStatus).toBe('idle')
 
@@ -272,7 +271,7 @@ describe('QueryCoordinator', () => {
       const internal = getInternal(mgr, 'test', model)
 
       await expect(
-        coordinator.fetch(internal, 'nonExistent', undefined)
+        coordinator.fetch(internal, 'nonExistent', [])
       ).rejects.toThrow('Query "nonExistent" not found')
 
       mgr.destroy()
@@ -299,8 +298,8 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      const promise = coordinator.fetch(internal, 'fetchData', undefined)
-      coordinator.cancel(internal, 'fetchData', undefined)
+      const promise = coordinator.fetch(internal, 'fetchData', [])
+      coordinator.cancel(internal, 'fetchData', [])
 
       expect(signal.aborted).toBe(true)
       await expect(promise).rejects.toThrow()
@@ -327,8 +326,8 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      const promise = coordinator.fetch(internal, 'fetchData', undefined)
-      coordinator.cancel(internal, 'fetchData', undefined)
+      const promise = coordinator.fetch(internal, 'fetchData', [])
+      coordinator.cancel(internal, 'fetchData', [])
 
       expect(signal.aborted).toBe(true)
       await expect(promise).rejects.toThrow()
@@ -359,8 +358,8 @@ describe('QueryCoordinator', () => {
       mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      coordinator.fetch(internal, 'fetchA', undefined).catch(() => {})
-      coordinator.fetch(internal, 'fetchB', undefined).catch(() => {})
+      coordinator.fetch(internal, 'fetchA', []).catch(() => {})
+      coordinator.fetch(internal, 'fetchB', []).catch(() => {})
 
       coordinator.cancel(internal)
 
@@ -376,7 +375,7 @@ describe('QueryCoordinator', () => {
       const model = defineModel({
         state: { value: 0 },
         queries: {
-          fetchData: (ctx: any, args: any) => {
+          fetchData: (ctx: any, id: number) => {
             signals.push(ctx.signal)
             return new Promise((resolve) => setTimeout(resolve, 5000))
           },
@@ -387,8 +386,8 @@ describe('QueryCoordinator', () => {
       mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      coordinator.fetch(internal, 'fetchData', { id: 1 } as any).catch(() => {})
-      coordinator.fetch(internal, 'fetchData', { id: 2 } as any).catch(() => {})
+      coordinator.fetch(internal, 'fetchData', [1]).catch(() => {})
+      coordinator.fetch(internal, 'fetchData', [2]).catch(() => {})
 
       coordinator.cancel(internal, 'fetchData')
 
@@ -405,7 +404,7 @@ describe('QueryCoordinator', () => {
       const model = defineModel({
         state: { value: 0 },
         queries: {
-          'fetch"Users': (ctx: any, args: any) => {
+          'fetch"Users': (ctx: any, id: number) => {
             usersSignals.push(ctx.signal)
             return new Promise((resolve) => setTimeout(resolve, 5000))
           },
@@ -420,13 +419,9 @@ describe('QueryCoordinator', () => {
       mgr.getModel('te"st', model)
       const internal = getInternal(mgr, 'te"st', model)
 
-      coordinator
-        .fetch(internal, 'fetch"Users', { id: 1 } as any)
-        .catch(() => {})
-      coordinator
-        .fetch(internal, 'fetch"Users', { id: 2 } as any)
-        .catch(() => {})
-      coordinator.fetch(internal, 'fetchPosts', undefined).catch(() => {})
+      coordinator.fetch(internal, 'fetch"Users', [1]).catch(() => {})
+      coordinator.fetch(internal, 'fetch"Users', [2]).catch(() => {})
+      coordinator.fetch(internal, 'fetchPosts', []).catch(() => {})
 
       coordinator.cancel(internal, 'fetch"Users')
 
@@ -452,7 +447,7 @@ describe('QueryCoordinator', () => {
       mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      expect(coordinator.isStale(internal, 'fetchData', undefined)).toBe(true)
+      expect(coordinator.isStale(internal, 'fetchData', [])).toBe(true)
 
       mgr.destroy()
     })
@@ -470,9 +465,9 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      await coordinator.fetch(internal, 'fetchData', undefined)
+      await coordinator.fetch(internal, 'fetchData', [])
 
-      expect(coordinator.isStale(internal, 'fetchData', undefined)).toBe(false)
+      expect(coordinator.isStale(internal, 'fetchData', [])).toBe(false)
 
       mgr.destroy()
     })
@@ -490,10 +485,10 @@ describe('QueryCoordinator', () => {
       const inst = mgr.getModel('test', model)
       const internal = getInternal(mgr, 'test', model)
 
-      await coordinator.fetch(internal, 'fetchData', undefined)
+      await coordinator.fetch(internal, 'fetchData', [])
 
       // staleTime=0, so it's immediately stale
-      expect(coordinator.isStale(internal, 'fetchData', undefined)).toBe(true)
+      expect(coordinator.isStale(internal, 'fetchData', [])).toBe(true)
 
       mgr.destroy()
     })
@@ -690,7 +685,6 @@ describe('QueryCoordinator', () => {
 
     it('should abort inflight fetches and keep destroyed caches empty', async () => {
       let signal!: AbortSignal
-      const onData = jest.fn()
       const model = defineModel({
         state: { value: 0 },
         queries: {
@@ -701,7 +695,6 @@ describe('QueryCoordinator', () => {
                 setTimeout(() => resolve(1), 5000)
               )
             },
-            onData,
           },
         },
       })
@@ -715,7 +708,6 @@ describe('QueryCoordinator', () => {
 
       expect(signal.aborted).toBe(true)
       await expect(promise).rejects.toThrow()
-      expect(onData).not.toHaveBeenCalled()
       expect(internal.queryCache.size).toBe(0)
     })
   })

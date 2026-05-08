@@ -191,6 +191,10 @@ function markViewShouldRun(view: View) {
   view.dirty = true
 }
 
+function normalizeQueryArgs(args?: readonly unknown[]): readonly unknown[] {
+  return args ? args : emptyArray
+}
+
 let detachedModelQueryScopeId = 0
 
 export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
@@ -430,7 +434,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const unsub = dep.subscribe((event) => {
       this._triggerListener({
         ...event,
-        model: this.proxy,
+        model: this.proxy as any,
       })
     })
     this._depListenersHandlers.push(unsub)
@@ -727,9 +731,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
             ? { fn: spec }
             : {
                 fn: spec.fn,
-                key: spec.key,
                 staleTime: spec.staleTime,
-                onData: spec.onData,
               }
         const handle = this._buildQueryHandle(queryName, normalized)
         ;(this.queries as any)[queryName] = handle
@@ -754,35 +756,40 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       _hasArgs: hasArgs,
     }
 
-    handle.getData = (args?: any) => self.getQueryData(queryName, args)
-    handle.getState = (args?: any) => self.getQueryState(queryName, args)
-    handle.isFetching = (args?: any) =>
+    handle.getData = (...args: any[]) => self.getQueryData(queryName, args)
+    handle.getState = (...args: any[]) => self.getQueryState(queryName, args)
+    handle.isFetching = (...args: any[]) =>
       self.getQueryState(queryName, args)?.fetchStatus === 'fetching'
-    handle.isStale = (args?: any): boolean => {
+    handle.isStale = (...args: any[]): boolean => {
       if (!self.coordinator) return true
       return self.coordinator.isStale(self, queryName, args)
     }
-    handle.fetch = (args?: any): Promise<any> => {
+    handle.fetch = (...args: any[]): Promise<any> => {
       if (!self.coordinator) return Promise.resolve(undefined)
       return self.coordinator.fetch(self, queryName, args) as Promise<any>
     }
-    handle.invalidate = (args?: any) => self.invalidateQueries(queryName, args)
-    handle.reset = (args?: any) => self.resetQueries(queryName, args)
+    handle.invalidate = (...args: any[]) =>
+      self.invalidateQueries(queryName, args)
+    handle.reset = (...args: any[]) => self.resetQueries(queryName, args)
     handle.setData = hasArgs
-      ? (args: any, data: any) => self.setQueryData(queryName, args, data)
-      : (data: any) => self.setQueryData(queryName, undefined, data)
+      ? (...argsAndData: any[]) => {
+          const data = argsAndData[argsAndData.length - 1]
+          const args = argsAndData.slice(0, -1)
+          self.setQueryData(queryName, args, data)
+        }
+      : (data: any) => self.setQueryData(queryName, emptyArray, data)
 
     // Hook integration
-    handle.computeHash = (args?: any): QueryHash =>
+    handle.computeHash = (...args: any[]): QueryHash =>
       self._queryHash(queryName, args)
-    handle.subscribe = (args: any, listener: () => void) =>
+    handle.subscribe = (args: readonly unknown[], listener: () => void) =>
       self.subscribeQuery(queryName, args, listener)
-    handle.observe = (args?: any) => {
+    handle.observe = (...args: any[]) => {
       if (self.coordinator) {
         self.coordinator.observeQuery(self._queryHash(queryName, args))
       }
     }
-    handle.unobserve = (args: any, cleanup: () => void) => {
+    handle.unobserve = (args: readonly unknown[], cleanup: () => void) => {
       if (self.coordinator) {
         self.coordinator.unobserveQuery(
           self._queryHash(queryName, args),
@@ -794,17 +801,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return handle as QueryHandle
   }
 
-  private _queryHash(queryName: string, args: object | void): QueryHash {
+  private _queryHash(queryName: string, args?: readonly unknown[]): QueryHash {
     return computeQueryHash(
       this._queryHashScope,
       queryName,
-      computeArgsKey(args, this.queries[queryName]?._spec.key)
+      computeArgsKey(normalizeQueryArgs(args))
     )
   }
 
   subscribeQuery(
     queryName: string,
-    args: object | void,
+    args: readonly unknown[],
     listener: () => void
   ): () => void {
     const hash = this._queryHash(queryName, args)
@@ -824,14 +831,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   getQueryState(
     queryName: string,
-    args: object | void
+    args: readonly unknown[]
   ): QueryCacheEntry | undefined {
     return this.queryCache.get(this._queryHash(queryName, args))
   }
 
   setQueryState(
     queryName: string,
-    args: object | void,
+    args: readonly unknown[],
     entry: QueryCacheEntry
   ): void {
     const hash = this._queryHash(queryName, args)
@@ -855,8 +862,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
-  invalidateQueries(queryName?: string, args?: object | void): void {
-    if (queryName && args !== undefined) {
+  invalidateQueries(queryName?: string, args?: readonly unknown[]): void {
+    if (queryName && args !== undefined && args.length > 0) {
       const hash = this._queryHash(queryName, args)
       const entry = this.queryCache.get(hash)
       if (entry) {
@@ -875,32 +882,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     })
   }
 
-  setQueryData(queryName: string, args: object | void, data: unknown): void {
-    const handle = this.queries[queryName]
-    const onDataFn = handle?._spec.onData
-
-    // If spec has custom onData, call it on the mutable draft.
-    if (onDataFn) {
-      this._watchStateChange = false
-      try {
-        ;(onDataFn as Function)(
-          {
-            state: this.stateRef.value,
-            args,
-          },
-          data
-        )
-      } finally {
-        this._watchStateChange = true
-      }
-
-      // Trigger update cycle
-      this.dispatch({
-        type: ActionType.MODIFY,
-      })
-      markUnchanged(this.stateRef as any)
-    }
-
+  setQueryData(
+    queryName: string,
+    args: readonly unknown[],
+    data: unknown
+  ): void {
     // Always update the query cache entry
     const hash = this._queryHash(queryName, args)
     const existing = this.queryCache.get(hash)
@@ -913,11 +899,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.setQueryState(queryName, args, entry)
   }
 
-  getQueryData(queryName: string, args: object | void): unknown {
+  getQueryData(queryName: string, args?: readonly unknown[]): unknown {
     return this.queryCache.get(this._queryHash(queryName, args))?.data
   }
 
-  prefetchQuery(queryName: string, args?: object | void): Promise<void> {
+  prefetchQuery(
+    queryName: string,
+    args: readonly unknown[] = emptyArray
+  ): Promise<void> {
     if (this.coordinator) {
       const prefetchPromise = this.coordinator
         .fetch(this, queryName, args)
@@ -928,14 +917,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return Promise.resolve()
   }
 
-  cancelQueries(queryName?: string, args?: object | void): void {
+  cancelQueries(queryName?: string, args?: readonly unknown[]): void {
     if (this.coordinator) {
       this.coordinator.cancel(this, queryName, args)
     }
   }
 
-  resetQueries(queryName?: string, args?: object | void): void {
-    if (queryName && args !== undefined) {
+  resetQueries(queryName?: string, args?: readonly unknown[]): void {
+    if (queryName && args !== undefined && args.length > 0) {
       const hash = this._queryHash(queryName, args)
       this.queryCache.delete(hash)
       this._notifyQueryListeners(hash)

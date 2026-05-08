@@ -51,16 +51,15 @@ describe('useQuery', () => {
       state: {},
       queries: {
         fetchUser: {
-          key: (args: { id: string }) => [args.id],
-          fn: (_ctx: any, args: { id: string }) =>
-            Promise.resolve({ id: args.id, name: 'User ' + args.id }),
+          fn: (_ctx: any, id: string) =>
+            Promise.resolve({ id, name: 'User ' + id }),
         },
       },
     })
 
     const App = () => {
       const api = useModel('t2', model)
-      const { data } = useQuery(api.fetchUser, { id: '1' })
+      const { data } = useQuery(api.fetchUser, ['1'])
       return <div id="data">{data ? JSON.stringify(data) : 'none'}</div>
     }
 
@@ -271,14 +270,11 @@ describe('useQuery', () => {
   })
 
   test('should deduplicate concurrent fetches for same query+args', async () => {
-    const fn = jest.fn((_ctx: any, args: { id: string }) =>
-      Promise.resolve({ id: args.id })
-    )
+    const fn = jest.fn((_ctx: any, id: string) => Promise.resolve({ id }))
     const model = defineModel({
       state: {},
       queries: {
         fetchUser: {
-          key: (args: { id: string }) => [args.id],
           fn,
         },
       },
@@ -287,8 +283,8 @@ describe('useQuery', () => {
     const App = () => {
       const api = useModel('t9', model)
       // Two components consuming same query+args — should share fetch
-      const a = useQuery(api.fetchUser, { id: '1' })
-      const b = useQuery(api.fetchUser, { id: '1' })
+      const a = useQuery(api.fetchUser, ['1'])
+      const b = useQuery(api.fetchUser, ['1'])
       return (
         <div>
           <span id="a">{a.data ? 'yes' : 'no'}</span>
@@ -316,16 +312,15 @@ describe('useQuery', () => {
       state: {},
       queries: {
         fetchUser: {
-          key: (args: { id: string }) => [args.id],
-          fn: (_ctx: any, args: { id: string }) =>
-            Promise.resolve({ id: args.id, name: 'User ' + args.id }),
+          fn: (_ctx: any, id: string) =>
+            Promise.resolve({ id, name: 'User ' + id }),
         },
       },
     })
 
     const App = ({ id }: { id: string }) => {
       const api = useSharedModel('t10', model)
-      const { data } = useQuery(api.fetchUser, { id })
+      const { data } = useQuery(api.fetchUser, [id])
       return <div id="data">{data ? data.id : 'none'}</div>
     }
 
@@ -355,8 +350,8 @@ describe('useQuery', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    expect(inst.$queries.fetchUser.getData({ id: '1' })).toBeUndefined()
-    expect(inst.$queries.fetchUser.getData({ id: '2' })).toEqual({
+    expect(inst.$queries.fetchUser.getData('1')).toBeUndefined()
+    expect(inst.$queries.fetchUser.getData('2')).toEqual({
       id: '2',
       name: 'User 2',
     })

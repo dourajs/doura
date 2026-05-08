@@ -8,16 +8,20 @@ import {
 import type { QueryHandle, QueryCacheEntry } from 'doura'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
 
-// Overload: query with no args (TArgs = void)
+// Overload: query with no args
 export function useQuery<TData, TSelected = TData>(
-  queryHandle: QueryHandle<void, TData>,
+  queryHandle: QueryHandle<[], TData>,
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
 
 // Overload: query with args
-export function useQuery<TArgs extends object, TData, TSelected = TData>(
+export function useQuery<
+  TArgs extends readonly unknown[],
+  TData,
+  TSelected = TData,
+>(
   queryHandle: QueryHandle<TArgs, TData>,
-  args: TArgs,
+  args: NoInfer<TArgs>,
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
 
@@ -27,19 +31,19 @@ export function useQuery(
   maybeOptions?: any
 ): UseQueryResult<any, any> {
   // Resolve overloaded args using the runtime tag rather than key-scanning.
-  let args: any
+  let args: readonly unknown[]
   let options: QueryOverrides<any, any> | undefined
   if (queryHandle._hasArgs) {
-    args = argsOrOptions
+    args = argsOrOptions ?? []
     options = maybeOptions
   } else {
-    args = undefined
+    args = []
     options = argsOrOptions
   }
 
-  // Stable hash — memoized so subscribe/effect don't re-fire on
-  // args object identity changes that produce the same cache key.
-  const hash = useMemo(() => queryHandle.computeHash(args), [queryHandle, args])
+  // Stable hash — computed from tuple contents so inline `[id]` arrays do
+  // not re-subscribe when the hash is unchanged.
+  const hash = queryHandle.computeHash(...(args as any[]))
 
   // Latest args via ref so refetch() always uses the current value without
   // forcing the callback identity to change on every render.
@@ -52,7 +56,10 @@ export function useQuery(
   )
 
   const getSnapshot = useCallback(
-    () => queryHandle.getState(argsRef.current) as QueryCacheEntry | undefined,
+    () =>
+      queryHandle.getState(...(argsRef.current as any[])) as
+        | QueryCacheEntry
+        | undefined,
     [queryHandle, hash]
   )
 
@@ -80,13 +87,13 @@ export function useQuery(
     queryHandle.observe(effectArgs)
 
     if (enabled) {
-      const entry = queryHandle.getState(effectArgs)
+      const entry = queryHandle.getState(...(effectArgs as any[]))
       const stale =
         !entry ||
         entry.data === undefined ||
         Date.now() - entry.dataUpdatedAt >= resolvedStaleTime
       if (stale) {
-        queryHandle.fetch(effectArgs).catch(() => {
+        queryHandle.fetch(...(effectArgs as any[])).catch(() => {
           // Error surfaces via cacheEntry.error; swallow the rejection
           // to avoid unhandled promise warnings.
         })
@@ -95,7 +102,7 @@ export function useQuery(
 
     return () => {
       queryHandle.unobserve(effectArgs, () => {
-        queryHandle.reset(effectArgs)
+        queryHandle.reset(...(effectArgs as any[]))
       })
     }
   }, [hash, enabled, queryHandle, resolvedStaleTime])
@@ -127,7 +134,7 @@ export function useQuery(
   const isPending = !hasData
 
   const refetch = useCallback((): Promise<any> => {
-    return queryHandle.fetch(argsRef.current)
+    return queryHandle.fetch(...(argsRef.current as any[]))
   }, [queryHandle, hash])
 
   const isStale =

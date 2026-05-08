@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 import type { QueryHandle } from 'doura'
 
-export interface InfiniteQueryConfig<TArgs extends object, TData> {
+export interface InfiniteQueryConfig<TArgs extends readonly unknown[], TData> {
   /** Args for the first page. */
   initialArgs: TArgs
   /** Given the last loaded page (and all pages so far), return the args for
@@ -11,7 +11,10 @@ export interface InfiniteQueryConfig<TArgs extends object, TData> {
   getPreviousArgs?: (firstPage: TData, allPages: TData[]) => TArgs | undefined
 }
 
-export interface UseInfiniteQueryResult<TArgs extends object, TData> {
+export interface UseInfiniteQueryResult<
+  TArgs extends readonly unknown[],
+  TData,
+> {
   data: { pages: TData[]; args: TArgs[] } | undefined
   error: unknown
   isLoading: boolean
@@ -87,7 +90,7 @@ const INITIAL_STATE: InfiniteState<any, any> = {
  * - Initial fetch runs once on mount (StrictMode-safe via a ref guard).
  * - `fetchNextPage` / `fetchPreviousPage` compute the next/previous args
  *   from the user-supplied `getNextArgs` / `getPreviousArgs` and call
- *   `queryHandle.fetch(args)`, which dedupes through the store's
+ *   `queryHandle.fetch(...args)`, which dedupes through the store's
  *   FetchManager so concurrent requesters of the same page share work.
  * - Race guard via runIdRef: only the latest page fetch writes state.
  *   Out-of-order resolves from superseded runs (e.g. refetch during a
@@ -99,9 +102,9 @@ const INITIAL_STATE: InfiniteState<any, any> = {
  * are still populated in the model (so another useQuery on the same args
  * will read them back), but this hook does not subscribe to those caches.
  */
-export function useInfiniteQuery<TArgs extends object, TData>(
+export function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
   queryHandle: QueryHandle<TArgs, TData>,
-  config: InfiniteQueryConfig<TArgs, TData>
+  config: InfiniteQueryConfig<NoInfer<TArgs>, TData>
 ): UseInfiniteQueryResult<TArgs, TData> {
   const [state, dispatch] = useReducer(
     infiniteReducer as (
@@ -144,12 +147,9 @@ export function useInfiniteQuery<TArgs extends object, TData>(
         dispatch({ type: 'fetching', kind })
       }
       try {
-        // Bypass TArgs-conditional arity — we always pass args for object args.
-        // TS can't resolve QueryArgsParam<TArgs extends object> at the call
-        // site, so cast the method signature to a uniform one-arg form.
         const data = await (
-          handleRef.current.fetch as (a: TArgs) => Promise<TData>
-        )(args)
+          handleRef.current.fetch as (...a: TArgs) => Promise<TData>
+        )(...args)
         if (runIdRef.current !== runId) return
         if (!isMountedRef.current) return
         dispatch({ type: 'success', data, args, position })

@@ -18,18 +18,11 @@ import {
   ModelViews,
   ModelQueries,
   StripIndexSignature,
+  ModelQueryMethods,
 } from './modelOptions'
 import { createView, Selector, ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
-
-/** Names of declared queries on a model (string keys only). Falls back
- *  to `string` when ModelQueries resolves to an empty object so external
- *  call sites that don't know the model's queries still type-check. */
-type ModelQueryName<IModel extends AnyModel> =
-  keyof ModelQueries<IModel> extends never
-    ? string
-    : Extract<keyof ModelQueries<IModel>, string>
 
 export type ModelPublicInstance<IModel extends AnyModel> = {
   $name: string
@@ -46,32 +39,16 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $createView: <R>(
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
-  $invalidateQueries<N extends ModelQueryName<IModel>>(
-    queryName?: N,
-    args?: object
-  ): void
-  $cancelQueries<N extends ModelQueryName<IModel>>(
-    queryName?: N,
-    args?: object
-  ): void
-  $resetQueries<N extends ModelQueryName<IModel>>(
-    queryName?: N,
-    args?: object
-  ): void
-  $setQueryData<N extends ModelQueryName<IModel>>(
-    queryName: N,
-    args: object | void,
-    data: unknown
-  ): void
-  $getQueryData<N extends ModelQueryName<IModel>>(
-    queryName: N,
-    args?: object | void
-  ): unknown | undefined
-  $prefetchQuery<N extends ModelQueryName<IModel>>(
-    queryName: N,
-    args?: object | void
-  ): Promise<void>
-} & StripIndexSignature<ModelState<IModel>> &
+} & ModelQueryMethods<
+  IModel extends { queries: infer Q }
+    ? Q
+    : IModel extends () => infer R
+      ? R extends { queries: infer Q2 }
+        ? Q2
+        : {}
+      : {}
+> &
+  StripIndexSignature<ModelState<IModel>> &
   StripIndexSignature<ModelViews<IModel>> &
   StripIndexSignature<ModelActions<IModel>> &
   StripIndexSignature<ModelQueries<IModel>>

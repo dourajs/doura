@@ -25,7 +25,6 @@ export type {
   ModelManagerOptions,
   Plugin,
   QueryCtx,
-  OnDataCtx,
   QuerySpec,
   QueryShorthand,
   NormalizedQuerySpec,

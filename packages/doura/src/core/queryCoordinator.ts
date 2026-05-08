@@ -4,6 +4,8 @@ import { QueryConfig, DEFAULT_QUERY_CONFIG, QueryHash } from './queryTypes'
 import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
 import type { ModelInternal } from './model'
 
+const emptyArgs: readonly unknown[] = []
+
 export class QueryCoordinator {
   private _fetchManager: FetchManager
   private _gcManager: GCManager
@@ -23,7 +25,7 @@ export class QueryCoordinator {
   async fetch(
     model: ModelInternal,
     queryName: string,
-    args: object | void
+    args: readonly unknown[] = emptyArgs
   ): Promise<unknown> {
     const handle = model.queries[queryName]
     if (!handle) {
@@ -31,14 +33,15 @@ export class QueryCoordinator {
     }
     const fn = handle._spec.fn
 
-    const hash = handle.computeHash(args as any)
+    const argsTuple = args || emptyArgs
+    const hash = handle.computeHash(...(argsTuple as any[]))
     const shared = this._appliedInflight.get(hash)
     if (shared) {
       return shared.data
     }
 
-    const existing = model.getQueryState(queryName, args)
-    model.setQueryState(queryName, args, {
+    const existing = model.getQueryState(queryName, argsTuple)
+    model.setQueryState(queryName, argsTuple, {
       data: existing?.data,
       error: undefined,
       dataUpdatedAt: existing?.dataUpdatedAt || 0,
@@ -48,21 +51,19 @@ export class QueryCoordinator {
     const appliedPromise = this._fetchManager
       .fetch(hash, (signal) => {
         const ctx = { signal }
-        return args !== undefined
-          ? (fn as Function)(ctx, args)
-          : (fn as Function)(ctx)
+        return (fn as Function).call(model.proxy, ctx, ...argsTuple)
       })
       .then((result) => {
         if (!model.destroyed) {
-          model.setQueryData(queryName, args, result)
+          model.setQueryData(queryName, argsTuple, result)
         }
         return result
       })
       .catch((error) => {
         if (!model.destroyed) {
-          const prev = model.getQueryState(queryName, args)
+          const prev = model.getQueryState(queryName, argsTuple)
           const aborted = (error as any)?.name === 'AbortError'
-          model.setQueryState(queryName, args, {
+          model.setQueryState(queryName, argsTuple, {
             data: prev?.data,
             error: aborted ? undefined : error,
             dataUpdatedAt: prev?.dataUpdatedAt || 0,
@@ -83,7 +84,11 @@ export class QueryCoordinator {
     return appliedPromise
   }
 
-  cancel(model: ModelInternal, queryName?: string, args?: object | void): void {
+  cancel(
+    model: ModelInternal,
+    queryName?: string,
+    args?: readonly unknown[]
+  ): void {
     if (!queryName) {
       this._fetchManager.cancelMany(
         this._appliedInflight.find(this._prefixKey(model.queryHashScope))
@@ -96,8 +101,8 @@ export class QueryCoordinator {
       return
     }
 
-    if (args !== undefined) {
-      this._fetchManager.cancel(handle.computeHash(args as any))
+    if (args !== undefined && args.length > 0) {
+      this._fetchManager.cancel(handle.computeHash(...(args as any[])))
       return
     }
 
@@ -123,7 +128,7 @@ export class QueryCoordinator {
   isStale(
     model: ModelInternal,
     queryName: string,
-    args: object | void,
+    args: readonly unknown[] = emptyArgs,
     overrideStaleTime?: number
   ): boolean {
     const entry = model.getQueryState(queryName, args)
