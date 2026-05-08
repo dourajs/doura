@@ -1,5 +1,5 @@
 import { isDraft } from '../../reactivity'
-import { defineModel, modelManager, use } from '../index'
+import { defineModel, modelManager } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
 beforeEach(() => {
@@ -44,7 +44,7 @@ describe('defineModel', () => {
   })
 
   describe('composing models', () => {
-    it('should consume other models by "use()"', () => {
+    it('should consume other models by "models"', () => {
       const depOne = defineModel({
         name: 'one',
         state: { count: 0 },
@@ -65,28 +65,29 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel(() => {
-        const one = use(depOne)
-        const two = use(depTwo)
-
-        return {
-          name: 'test',
-          state: { value: 0 },
-          actions: {
-            add(p: number) {
-              this.value += p
-            },
-            addDep(_: void) {
-              one.add(1)
-              two.add(1)
-            },
+      const model = defineModel({
+        name: 'test',
+        state: { value: 0 },
+        models: [depOne, depTwo],
+        actions: {
+          add(p: number) {
+            this.value += p
           },
-        }
+          addDep(_: void) {
+            this.one.add(1)
+            this.two.add(1)
+          },
+        },
       })
 
       const depOneStore = modelMgr.getModel(depOne)
       const depTwoStore = modelMgr.getModel(depTwo)
       const store = modelMgr.getModel(model)
+
+      expect(store.one).toBe(depOneStore)
+      expect(store.two).toBe(depTwoStore)
+      expect(store.$models.one).toBe(depOneStore)
+      expect(store.$models.two).toBe(depTwoStore)
 
       store.addDep()
       expect(store.$state).toEqual({ value: 0 })
@@ -113,25 +114,23 @@ describe('defineModel', () => {
         },
       })
 
-      const model = defineModel(() => {
-        const count = use(countModel)
-        return {
-          name: 'test',
-          state: { value: 0 },
-          actions: {
-            add(p: number) {
-              this.value += p
-            },
+      const model = defineModel({
+        name: 'test',
+        state: { value: 0 },
+        models: [countModel],
+        actions: {
+          add(p: number) {
+            this.value += p
           },
-          views: {
-            all() {
-              return {
-                value: this.value,
-                depDouble: count.double,
-              }
-            },
+        },
+        views: {
+          all() {
+            return {
+              value: this.value,
+              depDouble: this.count.double,
+            }
           },
-        }
+        },
       })
 
       const store = modelMgr.getModel(model)
@@ -160,10 +159,32 @@ describe('defineModel', () => {
       })
       expect(store.all).toBe(v)
     })
+
+    it('should warn for duplicate and conflicted model keys', () => {
+      const child = defineModel({
+        name: 'child',
+        state: { value: 0 },
+      })
+
+      modelMgr.getModel(
+        defineModel({
+          name: 'parent',
+          state: { child: 1 },
+          models: [child, child],
+        })
+      )
+
+      expect('model "child" is duplicated in "models"').toHaveBeenWarned()
+      expect(
+        'key "child" in "models" is conflicted with the key in "state"'
+      ).toHaveBeenWarned()
+    })
   })
 
-  it('should throw when calling use() outside of a function model', () => {
-    expect(() => use({ state: {} } as any)).toThrow(/Invalid use\(\) call/)
+  it('should reject function models', () => {
+    expect(() => modelMgr.getModel((() => ({ state: {} })) as any)).toThrow(
+      /invalid model/
+    )
   })
 
   it('should not trigger updates in nested action', async () => {
@@ -182,23 +203,21 @@ describe('defineModel', () => {
         },
       },
     })
-    const mB = defineModel(() => {
-      const a = use(mA)
-      return {
-        name: 'b',
-        state: stateB,
-        views: {
-          double() {
-            return this.anArr.map((n) => n * 2)
-          },
+    const mB = defineModel({
+      name: 'b',
+      state: stateB,
+      models: [mA],
+      views: {
+        double() {
+          return this.anArr.map((n) => n * 2)
         },
-        actions: {
-          change(n: number) {
-            this.anArr.push(n)
-            a.update(n)
-          },
+      },
+      actions: {
+        change(n: number) {
+          this.anArr.push(n)
+          this.a.update(n)
         },
-      }
+      },
     })
 
     const a = modelMgr.getModel(mA)

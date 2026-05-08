@@ -142,9 +142,8 @@ const countModel = defineModel({
 Composing other models by using function.
 
 ```ts
-import { use } from 'doura';
-
 const countModel = defineModel({
+  name: 'count',
   state: { count: 1 },
   actions: {
     add(p: number) {
@@ -158,24 +157,23 @@ const countModel = defineModel({
   },
 })
 
-const model = defineModel(() => {
-  const count = use('count', countModel)
-  return {
-    state: { value: 0 },
-    actions: {
-      add(p: number) {
-        this.value += p
-      },
+const model = defineModel({
+  name: 'model',
+  state: { value: 0 },
+  models: [countModel],
+  actions: {
+    add(p: number) {
+      this.value += p
     },
-    views: {
-      all() {
-        return {
-          value: this.value,
-          depDouble: count.double,
-        }
-      },
+  },
+  views: {
+    all() {
+      return {
+        value: this.value,
+        depDouble: this.count.double,
+      }
     },
-  }
+  },
 })
 ```
 

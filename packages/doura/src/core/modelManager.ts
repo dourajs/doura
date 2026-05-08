@@ -1,14 +1,9 @@
-import {
-  State,
-  AnyModel,
-  AnyFunctionModel,
-  AnyObjectModel,
-} from './modelOptions'
+import { State, AnyModel, AnyObjectModel } from './modelOptions'
 import { createModelInstance, ModelInternal, UnSubscribe } from './model'
 import { ModelPublicInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
 import { Plugin, PluginHook } from './plugins'
-import { emptyObject, invariant, removeUnordered } from '../utils'
+import { emptyObject, invariant, isArray, removeUnordered } from '../utils'
 import { warn } from '../warning'
 import { QueryConfig } from './queryTypes'
 import { QueryCoordinator } from './queryCoordinator'
@@ -19,7 +14,7 @@ export type ModelManagerOptions = {
   query?: Partial<QueryConfig>
 }
 
-export type Model = AnyModel | AnyFunctionModel
+export type Model = AnyModel
 
 export interface ModelManager {
   getState(): Record<string, State>
@@ -35,28 +30,11 @@ export interface DouraSubscriptionCallback {
   (): any
 }
 
-export interface ModelContext {
-  manager: ModelManagerInternal
-  model: ModelProxy
-}
-
-export interface ModelProxy {
-  addChild(child: ModelInternal): any
-  setModel(model: ModelInternal): void
-}
-
-export let currentModelContext: ModelContext | null = null
-
-export function setCurrentModelContext(ctx: ModelContext | null) {
-  currentModelContext = ctx
-}
-
 class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models = new Map<string, ModelInternal>()
   private _modelOptions = new Map<string, AnyModel>()
-  private _sourceModelNames = new Map<AnyModel, string>()
   private _subscribers: DouraSubscriptionCallback[] = []
   private _onModelChange: DouraSubscriptionCallback
   _queryCoordinator: QueryCoordinator
@@ -101,16 +79,6 @@ class ModelManagerInternal implements ModelManager {
     model: AnyModel
     detached?: boolean
   }) {
-    if (typeof model === 'function' && !detached) {
-      const cachedName = this._sourceModelNames.get(model)
-      if (cachedName) {
-        const cachedInstace = this._models.get(cachedName)
-        if (cachedInstace) {
-          return cachedInstace
-        }
-      }
-    }
-
     if (typeof model === 'object' && !detached) {
       const name = getModelName(model)
       const cachedInstace = this._models.get(name)
@@ -125,43 +93,7 @@ class ModelManagerInternal implements ModelManager {
     }
 
     let instance: ModelInternal
-    if (typeof model === 'function') {
-      const preCtx = currentModelContext
-      const modelProxy = this._createModelProxy()
-      try {
-        setCurrentModelContext({
-          manager: this,
-          model: modelProxy,
-        })
-        const modelOptions = model()
-        const name = getModelName(modelOptions)
-
-        if (!detached) {
-          const cachedInstace = this._models.get(name)
-          if (cachedInstace) {
-            if (this._modelOptions.get(name) !== model) {
-              warn(
-                `model "${name}" has already been initialized with a different model options reference`
-              )
-            }
-            this._sourceModelNames.set(model, name)
-            return cachedInstace
-          }
-        }
-
-        instance = this._initModel({
-          name: detached ? undefined : name,
-          model: modelOptions,
-          sourceModel: model,
-        })
-        if (!detached) {
-          this._sourceModelNames.set(model, name)
-        }
-      } finally {
-        setCurrentModelContext(preCtx)
-      }
-      modelProxy.setModel(instance)
-    } else if (typeof model === 'object') {
+    if (typeof model === 'object') {
       const name = getModelName(model)
       instance = this._initModel({
         name: detached ? undefined : name,
@@ -197,27 +129,9 @@ class ModelManagerInternal implements ModelManager {
     this._models.forEach((m) => m.destroy())
     this._models.clear()
     this._modelOptions.clear()
-    this._sourceModelNames.clear()
     this._subscribers.length = 0
     this._initialState = emptyObject
     this._queryCoordinator.destroy()
-  }
-
-  private _createModelProxy(): ModelProxy {
-    const children: ModelInternal[] = []
-    const modelProxy: ModelProxy = {
-      addChild(m) {
-        children.push(m)
-      },
-      setModel(model) {
-        for (const child of children) {
-          model.depend(child)
-        }
-        children.length = 0
-      },
-    }
-
-    return modelProxy
   }
 
   private _initModel({
@@ -229,9 +143,23 @@ class ModelManagerInternal implements ModelManager {
     model: AnyObjectModel
     sourceModel?: AnyModel
   }): ModelInternal {
+    const childInstances = this._initChildModels(model)
+    const childModels = Object.create(null)
+    const childModelProxies = Object.create(null)
+    for (const child of childInstances) {
+      childModels[child.name] = child.publicInst
+      childModelProxies[child.name] = child.proxy
+    }
+
     if (!name) {
-      const instance = createModelInstance(model)
+      const instance = createModelInstance(model, {
+        models: childModels,
+        modelProxies: childModelProxies,
+      })
       instance.coordinator = this._queryCoordinator
+      for (const child of childInstances) {
+        instance.depend(child)
+      }
       return instance
     }
 
@@ -240,8 +168,13 @@ class ModelManagerInternal implements ModelManager {
     const modelInstance = createModelInstance(model, {
       name,
       initState: this._getInitialState(name),
+      models: childModels,
+      modelProxies: childModelProxies,
     })
     modelInstance.coordinator = this._queryCoordinator
+    for (const child of childInstances) {
+      modelInstance.depend(child)
+    }
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)
@@ -251,6 +184,18 @@ class ModelManagerInternal implements ModelManager {
     })
 
     return modelInstance
+  }
+
+  private _initChildModels(model: AnyObjectModel): ModelInternal[] {
+    const models = (model as any).models
+    if (!models) {
+      return []
+    }
+    invariant(isArray(models), `model.models should be array!`)
+
+    return models.map((child: AnyObjectModel) =>
+      this.getModelInstance({ model: child })
+    )
   }
 
   private _getInitialState(name: string): State | undefined {

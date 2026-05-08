@@ -25,12 +25,13 @@ const namedModel = defineModel({
   },
 })
 
-const functionModel = defineModel(() => ({
-  name: 'functionModel',
+const parentModel = defineModel({
+  name: 'parent',
   state: {
-    value: 0,
+    parentValue: 0,
   },
-}))
+  models: [model],
+})
 
 const tModel = store.getModel(model)
 const implicitNamedModel = store.getModel(namedModel)
@@ -38,11 +39,16 @@ const implicitNamedModel = store.getModel(namedModel)
 // store apis
 expectType<ModelPublicInstance<typeof model>>(tModel)
 expectType<ModelPublicInstance<typeof namedModel>>(implicitNamedModel)
-expectType<ModelPublicInstance<typeof functionModel>>(
-  store.getModel(functionModel)
+expectType<ModelPublicInstance<typeof parentModel>>(store.getModel(parentModel))
+expectType<ModelPublicInstance<typeof model>>(store.getModel(parentModel).test)
+expectType<ModelPublicInstance<typeof model>>(
+  store.getModel(parentModel).$models.test
 )
+expectType<number>(store.getModel(parentModel).test.value)
 // @ts-expect-error — explicit name overloads were removed
 store.getModel('test', model)
+// @ts-expect-error — function models were removed
+store.getModel(() => ({ name: 'functionModel', state: { value: 0 } }))
 expectType<void>(store.destroy())
 expectType<{ [modelName: string]: State }>(store.getState())
 expectType<() => void>(store.subscribe(() => {}))

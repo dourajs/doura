@@ -73,12 +73,15 @@ const namedCount = defineModel({
   },
 })
 
-const functionCount = defineModel(() => ({
-  name: 'functionCount',
+const standaloneCount = defineModel({
+  name: 'standaloneCount',
   state: {
     value: 1,
   },
-}))
+})
+
+// @ts-expect-error — function models were removed
+defineModel(() => ({ name: 'functionCount', state: { value: 1 } }))
 
 const countSelector: Selector<typeof count> = function (
   stateAndViews,
@@ -96,8 +99,8 @@ const countSelector: Selector<typeof count> = function (
 
 function Test() {
   const model = useAnonymousModel(count, countSelector)
-  const anonymousFunctionModel = useAnonymousModel(functionCount)
-  expectType<number>(anonymousFunctionModel.value)
+  const anonymousStandaloneModel = useAnonymousModel(standaloneCount)
+  expectType<number>(anonymousStandaloneModel.value)
   expectType<number>(model.n)
   expectType<number>(model.v)
   expectType<string>(model.s)
@@ -110,7 +113,7 @@ function Test() {
   const implicitNamedModel = useModel(namedCount, countSelector)
   expectType<number>(implicitNamedModel.n)
   expectType<void>(implicitNamedModel.addValue())
-  expectType<number>(useModel(functionCount).value)
+  expectType<number>(useModel(standaloneCount).value)
 
   // @ts-expect-error — explicit name overloads were removed
   useModel('count', count)

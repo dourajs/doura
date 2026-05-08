@@ -8,7 +8,6 @@ import {
   ModelAPI,
   ModelActions,
   nextTick,
-  use,
 } from 'doura'
 import { UseSharedModel, UseStaticModel } from '../src/types'
 import { createUseModel, createUseStaticModel } from '../src/createUseModel'
@@ -134,27 +133,24 @@ describe('createUseModel', () => {
     })
 
     test('should rerender when depends state changed', async () => {
-      const newModel = defineModel(() => {
-        const count = use(countModel)
-
-        return {
-          name: 'newModel',
-          state: { value: 0 },
-          actions: {
-            add(payload: number = 1) {
-              this.value += payload
-            },
-            async asyncAdd() {
-              await count.asyncAdd(1)
-              this.add(count.value)
-            },
+      const newModel = defineModel({
+        name: 'newModel',
+        state: { value: 0 },
+        models: [countModel],
+        actions: {
+          add(payload: number = 1) {
+            this.value += payload
           },
-          views: {
-            test() {
-              return count.value * 2
-            },
+          async asyncAdd() {
+            await this.countModel.asyncAdd(1)
+            this.add(this.countModel.value)
           },
-        }
+        },
+        views: {
+          test() {
+            return this.countModel.value * 2
+          },
+        },
       })
 
       const App = () => {

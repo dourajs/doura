@@ -40,6 +40,10 @@ function readonlyModel(model: ModelPublicInstance<AnyModel>) {
         return target.$views[key]
       } else if (hasOwn(target.$actions, key)) {
         return target.$actions[key]
+      } else if (hasOwn(target.$queries, key)) {
+        return target.$queries[key]
+      } else if (hasOwn(target.$models, key)) {
+        return target.$models[key]
       }
 
       return undefined

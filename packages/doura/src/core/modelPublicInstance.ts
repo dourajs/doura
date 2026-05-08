@@ -17,6 +17,7 @@ import {
   ModelActions,
   ModelViews,
   ModelQueries,
+  ModelModels,
   StripIndexSignature,
   ModelQueryMethods,
 } from './modelOptions'
@@ -31,6 +32,7 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   $actions: ModelActions<IModel>
   $views: ModelViews<IModel>
   $queries: ModelQueries<IModel>
+  $models: ModelModels<IModel>
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
@@ -43,7 +45,8 @@ export type ModelPublicInstance<IModel extends AnyModel> = {
   StripIndexSignature<ModelState<IModel>> &
   StripIndexSignature<ModelViews<IModel>> &
   StripIndexSignature<ModelActions<IModel>> &
-  StripIndexSignature<ModelQueries<IModel>>
+  StripIndexSignature<ModelQueries<IModel>> &
+  StripIndexSignature<ModelModels<IModel>>
 
 const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
@@ -57,6 +60,7 @@ const publicPropertiesMap: PublicPropertiesMap =
       $actions: (i) => i.actions,
       $views: (i) => i.views,
       $queries: (i) => i.queries,
+      $models: (i) => i.models,
       $patch: (i) => i.patch,
       $onAction: (i) => i.onAction,
       $subscribe: (i) => i.subscribe,
@@ -72,7 +76,7 @@ const publicPropertiesMap: PublicPropertiesMap =
 const createGetter =
   (isPublicInstance: boolean) =>
   ({ _: instance }: ProxyContext, key: string) => {
-    const { actions, views, accessCache, ctx } = instance
+    const { actions, views, accessCache, ctx, models } = instance
 
     let state: any
     if (isPublicInstance) {
@@ -95,6 +99,8 @@ const createGetter =
             return ctx[key]
           case AccessTypes.QUERY:
             return instance.queries[key]
+          case AccessTypes.MODEL:
+            return isPublicInstance ? models[key] : instance.modelProxies[key]
           // default: just fallthrough
         }
       } else if (hasOwn(state, key)) {
@@ -103,6 +109,9 @@ const createGetter =
       } else if (hasOwn(instance.queries, key)) {
         accessCache[key] = AccessTypes.QUERY
         return instance.queries[key]
+      } else if (hasOwn(models, key)) {
+        accessCache[key] = AccessTypes.MODEL
+        return isPublicInstance ? models[key] : instance.modelProxies[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -136,6 +145,7 @@ const set = (
     ctx,
     actions,
     views,
+    models,
     accessContext,
     stateRef: { value: state },
   } = instance
@@ -169,6 +179,14 @@ const set = (
     if (__DEV__) {
       warn(
         `Attempting to mutate query "${key}". Queries are readonly.`,
+        instance
+      )
+    }
+    return false
+  } else if (hasOwn(models, key)) {
+    if (__DEV__) {
+      warn(
+        `Attempting to mutate model "${key}". Models are readonly.`,
         instance
       )
     }

@@ -10,12 +10,12 @@ Model 是 doura 的核心抽象单元。一个 model 定义了 state + actions +
 
 > `core/defineModel.ts`
 
-`defineModel({ state, actions?, views? })` 是一个 **identity function**，零运行时开销。它的唯一作用是为 TypeScript 提供类型推断：action 中 `this` 的类型、view 的返回类型、`useModel` 的结果类型。
+`defineModel({ name, state, models?, actions?, views?, queries? })` 是一个 **identity function**，零运行时开销。它的唯一作用是为 TypeScript 提供类型推断：action 中 `this` 的类型、view 的返回类型、组合 model 的实例类型、`useModel` 的结果类型。
 
-两种 model 形式：
+Model 只支持对象形式：
 
-- **ObjectModel**: `defineModel({ state, actions, views })` — 直接声明
-- **FunctionModel**: `defineModel(() => { use(...); return { state, actions, views } })` — 函数形式，支持 `use()` 组合
+- **ObjectModel**: `defineModel({ name, state, models, actions, views })`
+- `models: [childModel]` 使用子 model 的 `name` 作为 key，暴露为 `this.childName`、`instance.childName` 和 `instance.$models.childName`
 
 ---
 
@@ -40,9 +40,11 @@ constructor(model, { name, initState }) {
   this.proxy = new Proxy(ctx, InternalInstanceProxyHandlers)   // action/view 的 this
   this.publicInst = new Proxy(ctx, PublicInstanceProxyHandlers) // 外部 API
 
-  // 4. 初始化 actions 和 views
+  // 4. 初始化 models、actions、views 和 queries
+  this._initModels()
   this._initActions()
   this._initViews()
+  this._initQueries()
 }
 ```
 
@@ -125,14 +127,14 @@ const createGetter = (isPublicInstance: boolean) =>
     // public 读 getState()（snapshot），internal 读 stateValue（draft）
     let state = isPublicInstance ? instance.getState() : instance.stateValue
 
-    // 按优先级查找：accessCache → state → views → actions → ctx → $ 属性
+    // 按优先级查找：accessCache → state → queries → models → ctx → $ 属性
     ...
   }
 ```
 
 ### accessCache
 
-`modelPublicInstance.ts:76-94`: 首次访问某个 key 时确定它是 STATE/VIEW/ACTION/CONTEXT 哪种类型，缓存到 `accessCache`。后续访问直接 switch 跳转，避免重复的 `hasOwn` 检查。
+`modelPublicInstance.ts:76-94`: 首次访问某个 key 时确定它是 STATE/VIEW/ACTION/QUERY/MODEL/CONTEXT 哪种类型，缓存到 `accessCache`。后续访问直接 switch 跳转，避免重复的 `hasOwn` 检查。
 
 ### $ 前缀属性
 
@@ -144,6 +146,8 @@ $rawState → instance.getState()    // snapshot
 $state   → instance.stateValue     // draft（供 action 内部使用）
 $actions → instance.actions
 $views   → instance.views
+$queries → instance.queries
+$models  → instance.models
 $patch   → instance.patch
 $onAction → instance.onAction
 $subscribe → instance.subscribe
@@ -157,54 +161,57 @@ $createView → createView.bind(null, instance)
 `modelPublicInstance.ts:115-180`：
 
 - `state` 属性 → 写入 draft（VIEW context 中禁止写入）
-- `actions/views` → 只读，拒绝修改
+- `actions/views/queries/models` → 只读，拒绝修改
 - `$state` → 触发 `instance.replace(value)` 整体替换
 - 其他 `$` 属性 → 只读
 - 其余 → 写入 `ctx`
 
 ---
 
-## 4. Model 组合 — use()
+## 4. Model 组合 — models
 
-> `core/use.ts`, `core/modelManager.ts:78-82, 128-140, 174-189`
+> `core/modelManager.ts`, `core/model.ts`
 
 ### 原理
 
-FunctionModel 允许通过 `use(name, otherModel)` 组合其他 model：
+ObjectModel 允许通过 `models: [otherModel]` 组合其他 model。子 model 使用自己的 `name` 作为父实例上的 key：
 
 ```ts
-const parentModel = defineModel(() => {
-  const [state, actions] = use('child', childModel)
-  return {
-    state: { ... },
-    actions: {
-      doSomething() {
-        actions.childAction()  // 调用子 model action
-      }
-    }
-  }
+const childModel = defineModel({
+  name: 'child',
+  state: { count: 0 },
+  actions: {
+    inc() {
+      this.count++
+    },
+  },
+})
+
+const parentModel = defineModel({
+  name: 'parent',
+  state: { value: 0 },
+  models: [childModel],
+  actions: {
+    doSomething() {
+      this.child.inc()
+    },
+  },
+  views: {
+    childCount() {
+      return this.child.count
+    },
+  },
 })
 ```
 
 ### 实现机制
 
-1. `ModelManager.getModelInstance()` (`modelManager.ts:121-148`) 在执行 FunctionModel 前，创建 `ModelProxy` 并设置 `currentModelContext`：
-
-```ts
-const modelProxy = this._createModelProxy()
-setCurrentModelContext({ manager: this, model: modelProxy })
-instance = this._initModel({ name, model: model() })  // 执行函数
-modelProxy.setModel(instance)                            // 建立依赖
-```
-
-2. 函数体内调用 `use(name, model)` (`use.ts`)：
-   - 从 `currentModelContext` 获取 manager 和 modelProxy
-   - `manager.getModelInstance({ name, model })` 获取或创建子 model
-   - `modelProxy.addChild(childInstance)` 注册子 model
-
-3. 函数执行完毕后，`modelProxy.setModel(parentInstance)` 对所有 children 调用 `parentInstance.depend(child)` (`modelManager.ts:180-186`)
-
-4. `model.depend(dep)` (`model.ts:345-355`): subscribe 到 child 的变更事件，转发给 parent 的 subscribers
+1. `ModelManager._initModel()` 读取 `model.models`，通过 `getModelInstance({ model: child })` 获取或创建共享子实例。
+2. 父实例创建时拿到两份子模型映射：
+   - `models`：public instance，用于 `instance.child` 和 `$models.child`
+   - `modelProxies`：internal proxy，用于 action/view 内部的 `this.child`，保证跨模型 view 读取仍能参与响应式追踪
+3. 父实例创建后，对每个 child 调用 `parentInstance.depend(child)`。
+4. `model.depend(dep)` subscribe 到 child 的变更事件，转发给 parent 的 subscribers。
 
 ```ts
 depend(dep: ModelInternal) {
@@ -224,7 +231,7 @@ depend(dep: ModelInternal) {
 
 ModelManager 是 model 实例的注册中心：
 
-- `getModel(name, model)` — 按名缓存。相同 name 返回同一个实例
+- `getModel(model)` — 按 model 的 `name` 缓存。相同 name 返回同一个实例
 - `getDetachedModel(model)` — 匿名实例，不缓存
 - `subscribe(fn)` — 任何 model 变更时触发（通过 `queueJob` 合并）
 

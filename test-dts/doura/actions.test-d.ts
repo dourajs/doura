@@ -192,15 +192,13 @@ export function NoQueryModelHasBatchMethods() {
 }
 
 // =============================================================
-// Function model variant — same guarantees as object model.
+// models variant — same guarantees as local query handles.
 // =============================================================
 //
-// A function model commonly composes child models via use() AND declares
-// its own queries. Both paths must be typed correctly:
+// A model can compose child models via `models` AND declare its own queries.
+// Both paths must be typed correctly:
 //  - own queries via `this.xxQuery` (same handle-on-this threading)
-//  - composed children via closure refs returned from use()
-
-import { use } from 'doura'
+//  - composed children via `this.childName`
 
 const child = defineModel({
   name: 'child',
@@ -210,43 +208,40 @@ const child = defineModel({
   },
 })
 
-export const functionModelWithOwnQueries = defineModel(() => {
-  const c = use(child)
+export const modelWithOwnQueriesAndChildren = defineModel({
+  name: 'modelWithOwnQueriesAndChildren',
+  state: { count: 0 },
+  models: [child],
+  actions: {
+    async refresh() {
+      // Own query via this — typed as QueryHandle<[], number>
+      // @ts-expect-error — fetchData is QueryHandle, no .bogus()
+      this.fetchData.bogus()
 
-  return {
-    name: 'functionModelWithOwnQueries',
-    state: { count: 0 },
-    actions: {
-      async refresh() {
-        // Own query via this — typed as QueryHandle<[], number>
-        // @ts-expect-error — fetchData is QueryHandle, no .bogus()
-        this.fetchData.bogus()
+      const own = await this.fetchData.fetch()
+      expectType<number>(own)
+      expectType<number | undefined>(this.fetchData.getData())
 
-        const own = await this.fetchData.fetch()
-        expectType<number>(own)
-        expectType<number | undefined>(this.fetchData.getData())
+      // Own query with args
+      // @ts-expect-error — fetchUser requires args
+      this.fetchUser.fetch()
+      const user = await this.fetchUser.fetch('1')
+      expectType<{ id: string; name: string }>(user)
 
-        // Own query with args
-        // @ts-expect-error — fetchUser requires args
-        this.fetchUser.fetch()
-        const user = await this.fetchUser.fetch('1')
-        expectType<{ id: string; name: string }>(user)
+      // Composed child via this — ModelPublicInstance<typeof child>
+      const ch = await this.child.fetchChild.fetch()
+      expectType<string>(ch)
 
-        // Composed child via closure — ModelPublicInstance<typeof child>
-        const ch = await c.fetchChild.fetch()
-        expectType<string>(ch)
-
-        // Query handles own single-query operations.
-        this.fetchData.invalidate()
-        this.fetchUser.invalidate('1')
-        // @ts-expect-error — public batch methods are model-wide only
-        this.$invalidateQueries('fetchData')
-      },
+      // Query handles own single-query operations.
+      this.fetchData.invalidate()
+      this.fetchUser.invalidate('1')
+      // @ts-expect-error — public batch methods are model-wide only
+      this.$invalidateQueries('fetchData')
     },
-    queries: {
-      fetchData: (_ctx: QueryCtx) => Promise.resolve(42),
-      fetchUser: (_ctx: QueryCtx, id: string) =>
-        Promise.resolve({ id, name: 'User ' + id }),
-    },
-  }
+  },
+  queries: {
+    fetchData: (_ctx: QueryCtx) => Promise.resolve(42),
+    fetchUser: (_ctx: QueryCtx, id: string) =>
+      Promise.resolve({ id, name: 'User ' + id }),
+  },
 })

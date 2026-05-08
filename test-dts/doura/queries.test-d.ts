@@ -2,7 +2,6 @@ import {
   defineModel,
   doura,
   query,
-  use,
   QueryCtx,
   ModelQueries,
   QueryHandle,
@@ -154,23 +153,20 @@ inst.$getQueryData('fetchUser', ['1'])
 // @ts-expect-error — removed; use inst.$queries.fetchUser.prefetch(...)
 inst.$prefetchQuery('fetchUser', ['1'])
 
-// --- Cross-model invalidation via use() ---
+// --- Cross-model invalidation via models ---
 
-const composedModel = defineModel(() => {
-  const users = use(userModel)
-
-  return {
-    name: 'composed',
-    state: {},
-    actions: {
-      invalidateUsers() {
-        users.fetchUser.invalidate()
-        users.fetchUser.setData('1', { id: '1', name: 'Bob' })
-        users.$cancelQueries()
-        users.fetchUser.reset()
-      },
+const composedModel = defineModel({
+  name: 'composed',
+  state: {},
+  models: [userModel],
+  actions: {
+    invalidateUsers() {
+      this.userModel.fetchUser.invalidate()
+      this.userModel.fetchUser.setData('1', { id: '1', name: 'Bob' })
+      this.userModel.$cancelQueries()
+      this.userModel.fetchUser.reset()
     },
-  }
+  },
 })
 
 // --- defineModel with queries alongside actions and views ---

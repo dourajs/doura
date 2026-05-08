@@ -1,4 +1,4 @@
-import { defineModel, modelManager, Plugin, use } from '../index'
+import { defineModel, modelManager, Plugin } from '../index'
 import { nextTick } from '../scheduler'
 
 describe('modelManager', () => {
@@ -151,34 +151,12 @@ describe('modelManager', () => {
     })
   })
 
-  it('should read shared function model names from returned model options once', () => {
+  it('should reject function models', () => {
     const modelMgr = modelManager()
-    const factory = jest.fn(() => ({
-      name: 'functionModel',
-      state: { value: 0 },
-    }))
-    const model = defineModel(factory)
 
-    const first = modelMgr.getModel(model)
-    const second = modelMgr.getModel(model)
-
-    expect(first).toBe(second)
-    expect(first.$name).toBe('functionModel')
-    expect(factory).toHaveBeenCalledTimes(1)
-  })
-
-  it('should reject missing function model names', () => {
-    const modelMgr = modelManager()
-    const model = defineModel(
-      () =>
-        ({
-          state: { value: 0 },
-        }) as any
-    )
-
-    expect(() => modelMgr.getModel(model as any)).toThrow(
-      'model name is required in model options'
-    )
+    expect(() =>
+      modelMgr.getModel((() => ({ name: 'fn', state: { value: 0 } })) as any)
+    ).toThrow('invalid model')
   })
 
   it('should reject missing or empty object model names', () => {
@@ -252,17 +230,15 @@ describe('modelManager', () => {
     fisrt.$subscribe(() => {
       dependCount++
     })
-    const secondModel = defineModel(() => {
-      void use(firstModel)
-      return {
-        name: 'second',
-        state: { value: 0 },
-        actions: {
-          add(n: number) {
-            this.value += n
-          },
+    const secondModel = defineModel({
+      name: 'second',
+      state: { value: 0 },
+      models: [firstModel],
+      actions: {
+        add(n: number) {
+          this.value += n
         },
-      }
+      },
     })
 
     const second = modelMgr.getModel(secondModel)
@@ -300,18 +276,16 @@ describe('modelManager', () => {
           },
         },
       })
-      const modelB = defineModel(() => {
-        const a = use(modelA)
-        return {
-          name: 'b',
-          state: { value: 0 },
-          actions: {
-            increment(n: number) {
-              a.increment(n)
-              this.value += n
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { value: 0 },
+        models: [modelA],
+        actions: {
+          increment(n: number) {
+            this.modelA.increment(n)
+            this.value += n
           },
-        }
+        },
       })
 
       modelMgr.subscribe(fn)

@@ -1,4 +1,4 @@
-import { defineModel, modelManager, use } from '../index'
+import { defineModel, modelManager } from '../index'
 import { nextTick } from '../scheduler'
 import { isDraft } from '../../reactivity'
 
@@ -562,19 +562,16 @@ describe('defineModel/views', () => {
         },
       })
       let calltime = 0
-      const model = defineModel(() => {
-        const a = use(modelA)
-
-        return {
-          name: 'test',
-          state: {},
-          views: {
-            viewA() {
-              calltime++
-              return a.value
-            },
+      const model = defineModel({
+        name: 'test',
+        state: {},
+        models: [modelA],
+        views: {
+          viewA() {
+            calltime++
+            return this.a.value
           },
-        }
+        },
       })
       const store = modelMgr.getModel(model)
 
@@ -603,17 +600,15 @@ describe('defineModel/views', () => {
           },
         },
       })
-      const model = defineModel(() => {
-        const a = use(modelA)
-        return {
-          name: 'test',
-          state: {},
-          views: {
-            viewA() {
-              return a.doubleA
-            },
+      const model = defineModel({
+        name: 'test',
+        state: {},
+        models: [modelA],
+        views: {
+          viewA() {
+            return this.a.doubleA
           },
-        }
+        },
       })
       const store = modelMgr.getModel(model)
       const storeA = modelMgr.getModel(modelA)
@@ -962,17 +957,15 @@ describe('createView', () => {
         },
       })
 
-      const parentModel = defineModel(() => {
-        const child = use(childModel)
-        return {
-          name: 'parent',
-          state: { value: 1 },
-          views: {
-            childCount() {
-              return child.count
-            },
+      const parentModel = defineModel({
+        name: 'parent',
+        state: { value: 1 },
+        models: [childModel],
+        views: {
+          childCount() {
+            return this.child.count
           },
-        }
+        },
       })
 
       const child = modelMgr.getModel(childModel)
@@ -1141,18 +1134,16 @@ describe('createView', () => {
       })
 
       let calls = 0
-      const modelB = defineModel(() => {
-        const a = use(modelA)
-        return {
-          name: 'b',
-          state: { activeId: 'a' },
-          views: {
-            activeUser() {
-              calls++
-              return a.getById(this.activeId) // only reads users[id]
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { activeId: 'a' },
+        models: [modelA],
+        views: {
+          activeUser() {
+            calls++
+            return this.a.getById(this.activeId) // only reads users[id]
           },
-        }
+        },
       })
 
       const a = modelMgr.getModel(modelA)
@@ -1191,23 +1182,21 @@ describe('createView', () => {
       })
 
       let calls = 0
-      const modelB = defineModel(() => {
-        const a = use(modelA)
-        return {
-          name: 'b',
-          state: { activeId: 'a' },
-          actions: {
-            setActive(id: string) {
-              this.activeId = id
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { activeId: 'a' },
+        models: [modelA],
+        actions: {
+          setActive(id: string) {
+            this.activeId = id
           },
-          views: {
-            activeName() {
-              calls++
-              return a.getById(this.activeId).name // reads the leaf
-            },
+        },
+        views: {
+          activeName() {
+            calls++
+            return this.a.getById(this.activeId).name // reads the leaf
           },
-        }
+        },
       })
 
       const a = modelMgr.getModel(modelA)
@@ -1262,18 +1251,16 @@ describe('createView', () => {
       })
 
       let calls = 0
-      const modelB = defineModel(() => {
-        const a = use(modelA)
-        return {
-          name: 'b',
-          state: { activeId: 'a' },
-          views: {
-            activeUser() {
-              calls++
-              return a.getByIdParam(this.activeId) // only reads users[id]
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { activeId: 'a' },
+        models: [modelA],
+        views: {
+          activeUser() {
+            calls++
+            return this.a.getByIdParam(this.activeId) // only reads users[id]
           },
-        }
+        },
       })
 
       const a = modelMgr.getModel(modelA)

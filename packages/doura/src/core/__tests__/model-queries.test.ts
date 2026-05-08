@@ -784,26 +784,22 @@ describe('model queries', () => {
       expect(inst.$queries.fetchUser.getData('1')).toBeUndefined()
     })
 
-    it('composed model reaches child queries via use() with typed handle', async () => {
-      const { use: useChild } = require('../use')
-
-      const parent = defineModel(() => {
-        const child = useChild(argsModel)
-        return {
-          name: 'handleParent',
-          state: { touched: 0 },
-          actions: {
-            async prime() {
-              if (!child.fetchUser.getData('p')) {
-                await child.fetchUser.fetch('p')
-              }
-              this.touched = 1
-            },
-            invalidateChild() {
-              child.fetchUser.invalidate('p')
-            },
+    it('composed model reaches child queries via models with typed handle', async () => {
+      const parent = defineModel({
+        name: 'handleParent',
+        state: { touched: 0 },
+        models: [argsModel],
+        actions: {
+          async prime() {
+            if (!this.argsModel.fetchUser.getData('p')) {
+              await this.argsModel.fetchUser.fetch('p')
+            }
+            this.touched = 1
           },
-        }
+          invalidateChild() {
+            this.argsModel.fetchUser.invalidate('p')
+          },
+        },
       })
 
       const parentInst = modelMgr.getModel(parent)
@@ -821,10 +817,8 @@ describe('model queries', () => {
     })
   })
 
-  describe('cross-model invalidation via use()', () => {
+  describe('cross-model invalidation via models', () => {
     it('invalidates queries on multiple composed models via QueryHandle', () => {
-      const { use: useChild } = require('../use')
-
       const userModel = defineModel({
         name: 'userModel',
         state: {},
@@ -843,20 +837,16 @@ describe('model queries', () => {
         },
       })
 
-      const composedModel = defineModel(() => {
-        const users = useChild(userModel)
-        const posts = useChild(postModel)
-
-        return {
-          name: 'composedModel',
-          state: {},
-          actions: {
-            invalidateAll() {
-              users.fetchUser.invalidate()
-              posts.fetchPosts.invalidate()
-            },
+      const composedModel = defineModel({
+        name: 'composedModel',
+        state: {},
+        models: [userModel, postModel],
+        actions: {
+          invalidateAll() {
+            this.userModel.fetchUser.invalidate()
+            this.crossPosts.fetchPosts.invalidate()
           },
-        }
+        },
       })
 
       // Prime the child caches with data.
@@ -905,8 +895,6 @@ describe('model queries', () => {
     })
 
     it('QueryHandle.reset from composed action clears child entries entirely', () => {
-      const { use: useChild } = require('../use')
-
       const userModel = defineModel({
         name: 'userModel',
         state: {},
@@ -917,17 +905,15 @@ describe('model queries', () => {
         },
       })
 
-      const composedModel = defineModel(() => {
-        const users = useChild(userModel)
-        return {
-          name: 'composedModel',
-          state: {},
-          actions: {
-            resetUsers() {
-              users.fetchUser.reset()
-            },
+      const composedModel = defineModel({
+        name: 'composedModel',
+        state: {},
+        models: [userModel],
+        actions: {
+          resetUsers() {
+            this.userModel.fetchUser.reset()
           },
-        }
+        },
       })
 
       const usersInst = modelMgr.getModel(userModel)

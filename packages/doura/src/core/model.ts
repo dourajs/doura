@@ -31,6 +31,7 @@ import {
   ModelActions,
   ModelViews,
   ModelQueries,
+  ModelModels,
   StripIndexSignature,
   validateModelOptions,
 } from './modelOptions'
@@ -140,6 +141,7 @@ export const enum AccessTypes {
   VIEW,
   CONTEXT,
   QUERY,
+  MODEL,
 }
 
 export type ModelData<Model extends AnyModel> = ModelState<Model> &
@@ -154,7 +156,8 @@ export type ModelAPI<IModel extends AnyModel> = StripIndexSignature<
 > &
   StripIndexSignature<ModelViews<IModel>> &
   StripIndexSignature<ModelActions<IModel>> &
-  StripIndexSignature<ModelQueries<IModel>>
+  StripIndexSignature<ModelQueries<IModel>> &
+  StripIndexSignature<ModelModels<IModel>>
 
 type ViewExt = View & {
   getSnapshot(): any
@@ -185,6 +188,8 @@ function patchObj(base: Record<string, any>, patch: Record<string, any>) {
 export interface ModelInternalOptions {
   name?: string
   initState?: State
+  models?: Record<string, ModelPublicInstance<any>>
+  modelProxies?: Record<string, ModelPublicInstance<any>>
 }
 
 function markViewShouldRun(view: View) {
@@ -218,6 +223,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   actions: ModelActions<IModel>
   views: Views<ModelViews<IModel>>
   queries: Record<string, InternalQueryHandle>
+  models: Record<string, ModelPublicInstance<any>>
+  modelProxies: Record<string, ModelPublicInstance<any>>
   viewInstances: ViewExt[] = []
   private _modelViews: ViewExt[] = []
   accessContext: AccessContext
@@ -232,6 +239,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _api: ModelAPI<IModel> | null = null
   private _actionKeys: string[] = []
   private _queryKeys: string[] = []
+  private _modelKeys: string[] = []
   private _queryHandles: Record<string, InternalQueryHandle> =
     Object.create(null)
   private _initState: ModelState<IModel>
@@ -253,7 +261,10 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   queryNotifiers: Map<QueryHash, (() => void)[]> = new Map()
   private _queryIndex = new QueryHashIndex<null>()
 
-  constructor(model: IModel, { name, initState }: ModelInternalOptions) {
+  constructor(
+    model: IModel,
+    { name, initState, models, modelProxies }: ModelInternalOptions
+  ) {
     this.patch = this.patch.bind(this)
     this.onAction = this.onAction.bind(this)
     this.subscribe = this.subscribe.bind(this)
@@ -280,6 +291,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.actions = Object.create(null)
     this.views = Object.create(null)
     this.queries = Object.create(null)
+    this.models = models || Object.create(null)
+    this.modelProxies = modelProxies || this.models
     this.accessContext = AccessContext.DEFAULT
     this.ctx = {}
     def(this.ctx, '_', this)
@@ -294,6 +307,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     ) as ModelPublicInstance<IModel>
 
     this.effectScope = effectScope()
+    this._initModels()
     this._initActions()
     this._initViews()
     this._initQueries()
@@ -396,6 +410,10 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       for (let i = 0; i < this._queryKeys.length; i++) {
         const key = this._queryKeys[i]
         def(data, key, this._queryHandles[key])
+      }
+      for (let i = 0; i < this._modelKeys.length; i++) {
+        const key = this._modelKeys[i]
+        def(data, key, this.models[key])
       }
     }
 
@@ -669,6 +687,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         })
       }
     }
+  }
+
+  private _initModels() {
+    for (const modelName of Object.keys(this.models)) {
+      this.accessCache[modelName] = AccessTypes.MODEL
+      this._modelKeys.push(modelName)
+    }
+    Object.freeze(this.models)
+    Object.freeze(this.modelProxies)
   }
 
   private _initViews() {

@@ -57,6 +57,6 @@ defineModel({ state, actions, views })
 | 文档 | 内容 |
 |------|------|
 | [reactivity.md](./reactivity.md) | 响应式系统：Draft、Snapshot、Effect、View |
-| [model.md](./model.md) | Model 系统：定义、实例化、两层 Proxy、use() 组合 |
+| [model.md](./model.md) | Model 系统：定义、实例化、两层 Proxy、models 组合 |
 | [scheduler.md](./scheduler.md) | 调度器：微任务队列、同步刷新策略 |
 | [react-bindings.md](./react-bindings.md) | React 集成：Container、useModel、BatchManager |
