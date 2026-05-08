@@ -48,9 +48,6 @@ describe('createUseModel', () => {
         test() {
           return this.value * 2
         },
-        testExtra(s, n: number) {
-          return s.value * n
-        },
       },
     })
 
@@ -61,7 +58,6 @@ describe('createUseModel', () => {
         <>
           <div id="v">{store.value}</div>
           <div id="t">{store.test}</div>
-          <div id="e">{store.testExtra(3)}</div>
         </>
       )
     }
@@ -69,10 +65,6 @@ describe('createUseModel', () => {
 
     expect(container.querySelector('#v')?.innerHTML).toEqual('1')
     expect(container.querySelector('#t')?.innerHTML).toEqual('2')
-    expect(container.querySelector('#e')?.innerHTML).toEqual('3')
-    expect(
-      'The testExtra in the views is using additional parameters.'
-    ).toHaveBeenWarned()
   })
 
   describe('should rerender when state changed', () => {

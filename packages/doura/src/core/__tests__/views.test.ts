@@ -34,52 +34,6 @@ describe('defineModel/views', () => {
     expect(store.double).toBe(2)
   })
 
-  it('should receive external params', () => {
-    const count = defineModel({
-      name: 'test',
-      state: {
-        count: 1,
-      },
-      views: {
-        double(s, a: number) {
-          return s.count * a
-        },
-      },
-    })
-    const store = modelMgr.getModel(count)
-
-    expect(typeof store.double).toBe('function')
-    expect(store.double(2)).toBe(2)
-    expect(
-      'The double in the views is using additional parameters.'
-    ).toHaveBeenWarned()
-  })
-
-  // fixme: this test is not working
-  it('receive external params - return same ref when params does not change', () => {
-    const count = defineModel({
-      name: 'test',
-      state: {
-        count: 1,
-      },
-      views: {
-        double(s, a: number) {
-          return {}
-        },
-      },
-    })
-    const store = modelMgr.getModel(count)
-
-    expect(typeof store.double).toBe('function')
-    const a = store.double(2)
-    expect(store.double(2)).toBe(a)
-    const b = store.double(3)
-    expect(store.double(3)).toBe(b)
-    expect(
-      'The double in the views is using additional parameters.'
-    ).toHaveBeenWarned()
-  })
-
   it('should warn when changing state in a view', () => {
     let initState = {
       a: 0,
@@ -240,33 +194,6 @@ describe('defineModel/views', () => {
     store.changeA()
     store.doubleB
     expect(calltime).toBe(1)
-  })
-
-  it("should not be invoked when extra args don't change", () => {
-    let calltime = 0
-    const model = defineModel({
-      name: 'test',
-      state: {
-        b: 1,
-      },
-      actions: {},
-      views: {
-        doubleB(s, n: number) {
-          calltime++
-          return s.b * n
-        },
-      },
-    })
-    const store = modelMgr.getModel(model)
-
-    expect(calltime).toBe(0)
-    store.doubleB(1)
-    expect(calltime).toBe(1)
-    store.doubleB(1)
-    expect(calltime).toBe(1)
-    expect(
-      'The doubleB in the views is using additional parameters.'
-    ).toHaveBeenWarned()
   })
 
   it("should not be invoked when deps don't change (complex)", () => {
@@ -986,8 +913,8 @@ describe('createView', () => {
   })
 
   /**
-   * Validates the "no-arg view returning a closure" pattern as an alternative
-   * to the soon-to-be-deprecated parameterized view.
+   * Validates the "no-arg view returning a closure" pattern for dynamic
+   * lookups.
    *
    * Shape: `getById: (s) => (id) => s.users[id]`
    *
@@ -1229,55 +1156,6 @@ describe('createView', () => {
       a.rename('a', 'AliceX')
       expect(b.activeName).toBe('Bob2')
       expect(calls).toBe(3)
-    })
-
-    it('same granularity limit applies to parameterized views (not a closure issue)', () => {
-      const modelA = defineModel({
-        name: 'a',
-        state: {
-          users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
-        },
-        actions: {
-          rename(id: string, name: string) {
-            this.users[id].name = name
-          },
-        },
-        views: {
-          // Parameterized view form (emits deprecation warning in dev)
-          getByIdParam(s, id: string) {
-            return s.users[id]
-          },
-        },
-      })
-
-      let calls = 0
-      const modelB = defineModel({
-        name: 'b',
-        state: { activeId: 'a' },
-        models: [modelA],
-        views: {
-          activeUser() {
-            calls++
-            return this.a.getByIdParam(this.activeId) // only reads users[id]
-          },
-        },
-      })
-
-      const a = modelMgr.getModel(modelA)
-      const b = modelMgr.getModel(modelB)
-
-      expect(b.activeUser).toEqual({ name: 'Alice' })
-      expect(calls).toBe(1)
-
-      // Mutating users.a.name only triggers (users.a, 'name').
-      // The view read users[id] one level above, so it does NOT re-run.
-      // This proves the limitation is access depth, not closure vs param.
-      a.rename('a', 'Alice2')
-      expect(calls).toBe(1)
-
-      expect(
-        'The getByIdParam in the views is using additional parameters.'
-      ).toHaveBeenWarned()
     })
   })
 })

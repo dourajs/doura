@@ -163,7 +163,6 @@ type ViewExt = View & {
   getSnapshot(): any
   __pre: any
   __snapshot: any
-  __externalArgs?: any[]
 }
 
 function patchObj(base: Record<string, any>, patch: Record<string, any>) {
@@ -190,10 +189,6 @@ export interface ModelInternalOptions {
   initState?: State
   models?: Record<string, ModelInstance<any>>
   modelProxies?: Record<string, ModelInstance<any>>
-}
-
-function markViewShouldRun(view: View) {
-  view.dirty = true
 }
 
 let detachedModelQueryScopeId = 0
@@ -465,13 +460,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       view = reactiveView(() => {
         const oldCtx = this.accessContext
         this.accessContext = AccessContext.VIEW
-        const externalArgs = (view as ViewExt).__externalArgs
         try {
-          let value = viewFn.call(
-            this.proxy,
-            this.proxy,
-            ...(externalArgs ? (externalArgs as []) : emptyArray)
-          )
+          let value = viewFn.call(this.proxy, this.proxy)
           if (__DEV__) {
             if (isObject(value)) {
               if (value === this.proxy) {
@@ -698,38 +688,12 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       for (const viewName of Object.keys(views)) {
         this._cacheAccess(viewName, AccessTypes.VIEW)
         const viewFn = views[viewName]
-        const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
         this._modelViews.push(view)
-        if (hasExternalArgs && __DEV__) {
-          warn(
-            `The ${viewName} in the views is using additional parameters. This feature will no longer be supported in the future, please make changes as soon as possible.`
-          )
-        }
-        const getResult = hasExternalArgs
-          ? () =>
-              (...args: any[]) => {
-                const oldArgs = view.__externalArgs
-                if (!oldArgs) {
-                  markViewShouldRun(view)
-                } else if (oldArgs.length !== args.length) {
-                  markViewShouldRun(view)
-                } else {
-                  for (let i = 0; i < oldArgs.length; i++) {
-                    if (oldArgs[i] !== args[i]) {
-                      markViewShouldRun(view)
-                      break
-                    }
-                  }
-                }
-                view.__externalArgs = args
-                return view.getSnapshot()
-              }
-          : view.getSnapshot
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
-          get: getResult,
+          get: view.getSnapshot,
           set() {
             if (__DEV__) {
               warn(`cannot change view property '${String(viewName)}'`)

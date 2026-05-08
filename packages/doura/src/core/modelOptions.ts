@@ -12,7 +12,7 @@ export type ActionOptions = Record<string, Function>
 
 export type ViewOptions<State = any> = Record<
   string,
-  ((s: State, ...args: any[]) => any) | (() => any)
+  ((s: State) => any) | (() => any)
 >
 
 export type Actions<A> = A extends ActionOptions
@@ -25,9 +25,7 @@ export type Views<ViewOptions> = {
   [K in keyof ViewOptions]: ViewOptions[K] extends (...args: infer Args) => any
     ? Args extends [] | [s: any]
       ? ReturnType<ViewOptions[K]>
-      : Args extends [s: any, ...extArgs: infer ExtArgs]
-        ? (...args: ExtArgs) => ReturnType<ViewOptions[K]>
-        : never
+      : never
     : never
 }
 

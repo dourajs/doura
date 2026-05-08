@@ -61,3 +61,16 @@ expectType<void>(store.setText)
 expectType<storeState>(store.$state)
 expectType<number>(depStore.double)
 expectType<depState>(depStore.$state)
+
+defineModel({
+  name: 'parameterizedView',
+  state: {
+    count: 1,
+  },
+  views: {
+    // @ts-expect-error — parameterized views are not supported; return a closure instead.
+    byMultiplier(_state, multiplier: number) {
+      return multiplier
+    },
+  },
+})
