@@ -323,11 +323,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   replace(newState: AnyObject) {
     if (!isObject(newState)) {
-      warn(
-        `replace argument should be an object, but receive a ${Object.prototype.toString.call(
-          newState
-        )}`
-      )
+      if (__DEV__) {
+        warn(
+          `replace argument should be an object, but receive a ${Object.prototype.toString.call(
+            newState
+          )}`
+        )
+      }
       return
     }
 

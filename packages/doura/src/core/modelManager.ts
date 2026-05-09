@@ -83,7 +83,7 @@ class ModelManagerInternal implements ModelManager {
       const name = getModelName(model)
       const cachedInstance = this._models.get(name)
       if (cachedInstance) {
-        if (this._modelOptions.get(name) !== model) {
+        if (__DEV__ && this._modelOptions.get(name) !== model) {
           warn(
             `model "${name}" has already been initialized with a different model options reference`
           )

@@ -132,7 +132,7 @@ const createGetter =
       return ctx[key]
     }
 
-    if (isReservedPrefix(key[0]) && hasOwn(state, key)) {
+    if (__DEV__ && isReservedPrefix(key[0]) && hasOwn(state, key)) {
       warn(
         `Property ${JSON.stringify(
           key
