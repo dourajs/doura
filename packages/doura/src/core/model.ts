@@ -30,9 +30,6 @@ import {
   ModelState,
   ModelActions,
   ModelViews,
-  ModelQueries,
-  ModelModels,
-  StripIndexSignature,
   validateModelOptions,
 } from './modelOptions'
 import {
@@ -40,6 +37,7 @@ import {
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
+import type { ModelPublicFields } from './modelApi'
 import { queueJob, queuePostJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
 import {
@@ -148,17 +146,7 @@ export const enum AccessTypes {
 export type ModelData<Model extends AnyModel> = ModelState<Model> &
   ModelViews<Model>
 
-// Wrap each component in StripIndexSignature so absent sections (e.g. a
-// model without `views` or `actions` declared) don't leak ViewOptions'
-// `Record<string, ...>` constraint into the intersection — that would
-// collapse known-key access errors like `api.nonExistentKey`.
-export type ModelAPI<IModel extends AnyModel> = StripIndexSignature<
-  ModelState<IModel>
-> &
-  StripIndexSignature<ModelViews<IModel>> &
-  StripIndexSignature<ModelActions<IModel>> &
-  StripIndexSignature<ModelQueries<IModel>> &
-  StripIndexSignature<ModelModels<IModel>>
+export type ModelAPI<IModel extends AnyModel> = ModelPublicFields<IModel>
 
 type ViewExt = View & {
   getSnapshot(): any

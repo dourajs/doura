@@ -18,9 +18,9 @@ import {
   ModelViews,
   ModelQueries,
   ModelModels,
-  StripIndexSignature,
   ModelQueryMethods,
 } from './modelOptions'
+import type { ModelPublicFields } from './modelApi'
 import { createView, Selector, ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
@@ -42,11 +42,7 @@ export type ModelInstance<IModel extends AnyModel> = {
     selector: Selector<IModel, R>
   ) => ModelView<Selector<IModel, R>>
 } & ModelQueryMethods &
-  StripIndexSignature<ModelState<IModel>> &
-  StripIndexSignature<ModelViews<IModel>> &
-  StripIndexSignature<ModelActions<IModel>> &
-  StripIndexSignature<ModelQueries<IModel>> &
-  StripIndexSignature<ModelModels<IModel>>
+  ModelPublicFields<IModel>
 
 const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
