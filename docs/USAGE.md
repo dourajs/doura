@@ -61,7 +61,7 @@ Full details: [Installation](../doc-sites/docs/installation.md) | [Introduction]
 `defineModel` is the central API for declaring state, logic, and derived data.
 
 ```ts
-import { defineModel, query } from 'doura'
+import { defineModel } from 'doura'
 
 const model = defineModel({
   name: 'uniqueName', // required: unique string identifier
@@ -70,7 +70,7 @@ const model = defineModel({
   }, // required: initial state (plain object)
   actions: {
     /* ... */
-  }, // optional: methods that mutate state
+  }, // optional: methods that update state
   views: {
     /* ... */
   }, // optional: computed/derived values
@@ -100,11 +100,11 @@ Full details: [State](../doc-sites/docs/core-concepts/state.md)
 
 ### Actions
 
-Actions mutate state. Three semantics:
+Actions change state in three public forms:
 
 ```ts
 actions: {
-  // Modify — mutate via this (most common)
+  // Modify — update via this (most common)
   increment() {
     this.count += 1
   },
@@ -112,9 +112,9 @@ actions: {
   reset() {
     this.$state = { count: 0 }
   },
-  // Patch — return partial object (deep merged)
-  patch() {
-    return { count: 2 }
+  // Patch — use this.$patch for partial merge
+  patchSome() {
+    this.$patch({ count: 2 })
   },
   // Async actions
   async fetchAndSet() {
@@ -209,6 +209,24 @@ const userModel = defineModel(
 
 Every query function receives `QueryCtx` as its first argument, which provides an `AbortSignal` for cancellation.
 
+**Query options** (set via `model.setQueryOptions(name, options)` in setup):
+
+| Option      | Type                       | Description                                              |
+| ----------- | -------------------------- | -------------------------------------------------------- |
+| `staleTime` | `number`                   | How long data is fresh (ms). Default: `0` (always stale) |
+| `onData`    | `(ctx: OnDataCtx) => void` | Callback when data arrives (from fetch or setData)       |
+
+`onData` runs in an action context — update state or call actions via `ctx.api`:
+
+```ts
+model.setQueryOptions('fetchById', {
+  staleTime: 30_000,
+  onData({ api, args, data }) {
+    api.currentUser = data // sync fetched data into model state
+  },
+})
+```
+
 **QueryHandle methods** (available on model instances as `instance.queryName`):
 
 | Method                   | Description                       |
@@ -273,7 +291,6 @@ Wraps your app to provide a global store context:
 
 ```tsx
 import { DouraRoot, useModel, useStaticModel } from 'react-doura'
-
 ;<DouraRoot>
   <App />
 </DouraRoot>
@@ -490,7 +507,7 @@ Full details: [Optimize Views](../doc-sites/docs/guides/optimize-views.md) | [AP
 
 ### $patch
 
-Shallow-merge partial state into the model:
+Deep-merge partial state into the model:
 
 ```ts
 const instance = store.getModel(model)

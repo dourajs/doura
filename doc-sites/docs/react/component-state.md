@@ -1,12 +1,14 @@
 ---
 id: component-state
-title: Using at Component Level
+title: Component State
 ---
 
-## First create a model
+Use `useModel(model, selector?, depends?)` inside a `DouraRoot` tree when the
+component should read or update the shared store.
 
 ```tsx
 import { defineModel } from 'doura'
+import { useModel } from 'react-doura'
 
 const countModel = defineModel({
   name: 'count',
@@ -19,32 +21,22 @@ const countModel = defineModel({
     },
   },
 })
-```
-
-## Then bind your components.
-
-```tsx
-import { useModel } from 'react-doura'
 
 function Counter() {
   const counter = useModel(countModel)
 
-  return (
-    <div>
-      <h1>Count: {counter.count}</h1>
-      <button onClick={counter.inc}>inc</button>
-    </div>
-  )
+  return <button onClick={() => counter.inc()}>Count: {counter.count}</button>
 }
 ```
 
-## Selector
+`useModel` returns the model API directly. It does not take a separate name and
+does not return a tuple.
 
-If we only care about a part of state, we should use a selector to pick exactly what we want:
+## Selectors
+
+Use a selector when a component only needs part of the model API:
 
 ```tsx
-import { useModel } from 'react-doura'
-
 const userModel = defineModel({
   name: 'user',
   state: {
@@ -61,36 +53,49 @@ const userModel = defineModel({
 function Login() {
   const { isLogin, login } = useModel(
     userModel,
-    (s) => ({
-      isLogin: s.isLogin,
-      login: s.login,
+    (api, actions) => ({
+      isLogin: api.isLogin,
+      login: actions.login,
     }),
-    [] // deps of selector, empty means the selector function won't change
+    []
   )
 
   return isLogin ? <div>Welcome</div> : <button onClick={login}>Login</button>
 }
 ```
 
-We could also pass a pre-defined selector function instead of an inline function to eliminate the need of passing a dependencies array.
-
-:::tip
-
-For fully isolated per-component state (similar to `useReducer`), use `useDetachedModel` — each component instance gets its own independent model.
-
-:::
+The optional `depends` array controls when an inline selector is recreated. For
+a module-level selector, no dependency array is needed:
 
 ```tsx
-import { Selector } from 'react-doura'
+import type { Selector } from 'react-doura'
 
-const selector: Selector<typeof userModel> = (s) => ({
-  isLogin: s.isLogin,
-  login: s.login,
+const selector: Selector<typeof userModel> = (api, actions) => ({
+  isLogin: api.isLogin,
+  login: actions.login,
 })
 
 function Login() {
   const { isLogin, login } = useModel(userModel, selector)
-
   return isLogin ? <div>Welcome</div> : <button onClick={login}>Login</button>
 }
 ```
+
+## Isolated Component State
+
+Use `useDetachedModel` when each component instance should own an independent
+model store:
+
+```tsx
+import { useDetachedModel } from 'react-doura'
+
+function LocalCounter() {
+  const counter = useDetachedModel(countModel)
+
+  return (
+    <button onClick={() => counter.inc()}>Local count: {counter.count}</button>
+  )
+}
+```
+
+Detached models are not included in a parent store's `getState()`.

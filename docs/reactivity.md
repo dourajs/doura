@@ -18,7 +18,6 @@ Doura 的响应式系统融合了两种范式：
 ### DraftState 结构
 
 ```ts
-// draft.ts:25-45
 interface DraftStateBase<T> {
   id: number
   root: DraftState         // 根 draft state
@@ -35,7 +34,7 @@ interface DraftStateBase<T> {
 
 ### 创建流程
 
-`draft(target, parent?)` (`draft.ts:68-142`)：
+`draft(target, parent?)`：
 
 1. 检查 `targetType`（Object/Array/Map/Set），不可观察类型直接返回
 2. 构造 `DraftState`，`copy: null`, `modified: false`
@@ -47,7 +46,7 @@ interface DraftStateBase<T> {
 
 ### 写入路径（copy-on-write）
 
-发生在 `baseHandlers.ts` 的 `set` trap (`baseHandlers.ts:152-208`)：
+发生在 `baseHandlers.ts` 的 `set` trap：
 
 ```
 this.xxx = value
@@ -65,13 +64,13 @@ set trap 读取 latest(state)（copy || base）
         └── triggerDraft(state)    ← 沿 parent 链标记 mightChange
 ```
 
-`prepareCopy` (`baseHandlers.ts:47-51`): 惰性浅拷贝，只在首次写入时执行。
+`prepareCopy`: 惰性浅拷贝，只在首次写入时执行。
 
 `markChanged` (`common.ts`): 将当前 state 及所有祖先标记为 `modified = true`。**为什么需要冒泡？** 因为 snapshot 时需要知道从根到叶哪些路径发生了变更，只对变更路径创建新拷贝，未变更路径共享旧引用。
 
 ### 读取路径（惰性子 draft 创建）
 
-`baseHandlers.ts` 的 `get` trap (`baseHandlers.ts:100-148`)：
+`baseHandlers.ts` 的 `get` trap：
 
 ```
 this.xxx  (读取嵌套对象)
@@ -92,13 +91,13 @@ get trap: value = Reflect.get(latest(state), prop)
 
 ### 数组变异方法
 
-`baseHandlers.ts:87-97`: `push/pop/shift/unshift/splice` 被拦截，执行时 `pauseTracking()` → 调用原始方法 → `resetTracking()`。
+`baseHandlers.ts`: `push/pop/shift/unshift/splice` 被拦截，执行时 `pauseTracking()` → 调用原始方法 → `resetTracking()`。
 
 **为什么？** 这些方法内部既读又写（比如 `push` 读取 `length`），不暂停追踪会导致无限循环。
 
 ### watch — draft 变更监听
 
-`draft.ts:144-158`: `watch(draft, cb)` 将回调注册到 **root** state 的 `listeners` 数组。当 `trigger()` 执行到末尾时（`effect.ts:375-378`），遍历 `state.root.listeners` 调用所有回调。
+`watch(draft, cb)` 将回调注册到 **root** state 的 `listeners` 数组。当 `trigger()` 执行到末尾时，遍历 `state.root.listeners` 调用所有回调。
 
 这是 Model 层监听 draft 变更的入口：`ModelInternal` 构造时 `watch(this.stateRef, () => queueJob(this._update))`。
 
@@ -106,11 +105,11 @@ get trap: value = Reflect.get(latest(state), prop)
 
 ## 2. Snapshot — 结构共享的不可变视图
 
-> `draft.ts:160-211`, `snapshotHandler.ts`
+> `draft.ts`, `snapshotHandler.ts`
 
 ### 生成流程
 
-`snapshot(value, draft, snapshots?)` (`draft.ts:200-211`)：
+`snapshot(value, draft, snapshots?)`：
 
 1. `takeSnapshotFromDraft(draft, snapshots)` — BFS 遍历整棵 draft 树：
    - `modified` 的 state → `shallowCopy(copy)` 得到新对象，重置 `modified=false`，更新 `base`
@@ -137,14 +136,13 @@ get trap: value = Reflect.get(latest(state), prop)
 ### 数据结构
 
 ```ts
-// effect.ts:21
 const targetMap = new WeakMap<any, KeyToDepMap>()  // target → key → Dep
 // Dep 是 Set<ReactiveEffect>，附加 w（wasTracked）和 n（newlyTracked）位标记
 ```
 
 ### ReactiveEffect
 
-`effect.ts:64-152`: 核心调度单元。
+核心调度单元。
 
 - `fn`: 被追踪的函数
 - `scheduler`: 依赖变更时的调度回调（不直接 re-run fn，而是调度）
@@ -153,7 +151,7 @@ const targetMap = new WeakMap<any, KeyToDepMap>()  // target → key → Dep
 
 ### track / trigger
 
-**track** (`effect.ts:220-233`)：
+**track**：
 
 ```ts
 function track(target, type, key) {
@@ -165,18 +163,18 @@ function track(target, type, key) {
 }
 ```
 
-**trigger** (`effect.ts:303-378`)：
+**trigger**：
 
 1. 从 `targetMap` 找到 target 的所有 dep
 2. 根据操作类型（SET/ADD/DELETE/CLEAR）收集相关 deps
 3. `triggerEffects(deps)` — 先触发 view effect（computed），再触发普通 effect
 4. 最后触发 `state.root.listeners`（draft watch 回调）
 
-**为什么 view effect 先触发？** (`effect.ts:384-393`) 确保 computed 值在普通 effect 读取之前已标记为 dirty，避免读到过期的缓存值。
+**为什么 view effect 先触发？** 确保 computed 值在普通 effect 读取之前已标记为 dirty，避免读到过期的缓存值。
 
 ### 位运算 dep marker
 
-`effect.ts:27, 114-128`: `trackOpBit = 1 << ++effectTrackDepth`
+`trackOpBit = 1 << ++effectTrackDepth`
 
 每层嵌套 effect 占用一个 bit。`initDepMarkers()` 标记所有旧 dep 为 `wasTracked`，`finalizeDepMarkers()` 比较新旧标记，移除不再需要的依赖。比全量 cleanup 更高效。
 
@@ -184,7 +182,7 @@ function track(target, type, key) {
 
 ### triggerDraft
 
-`effect.ts:295-301`: 沿 draft parent 链向上遍历，对每层 state 查找 `referenceMap` 中的 dep，将关联的 view effect 的 `mightChange` 设为 `true`。
+沿 draft parent 链向上遍历，对每层 state 查找 `referenceMap` 中的 dep，将关联的 view effect 的 `mightChange` 设为 `true`。
 
 **为什么需要？** View 的 `getSnapshot()` 需要知道是否需要重新生成 snapshot。如果 view 计算结果本身没变，但 draft 树结构变了（子节点被修改），snapshot 仍需要更新。`mightChange` 标记正是处理这种情况。
 
@@ -197,7 +195,6 @@ function track(target, type, key) {
 `ViewImpl` 类似 Vue 3 的 `computed()`：
 
 ```ts
-// view.ts:22-62
 class ViewImpl<T> {
   dirty = true           // 是否需要重算
   mightChange = false    // draft 结构是否可能变化
@@ -229,7 +226,7 @@ class ViewImpl<T> {
 
 ### View 在 Model 中的使用
 
-`model.ts:357-406` 的 `createView(viewFn)`:
+`model.ts` 的 `createView(viewFn)`:
 
 1. 在 `effectScope` 内创建 `ViewImpl`
 2. 挂载 `getSnapshot()` 方法：读取 `view.value`，如果 `mightChange` 或值变了，调用 `snapshot()` 生成不可变结果

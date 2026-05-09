@@ -3,69 +3,71 @@ id: store
 title: Store
 ---
 
-A model is a definition of your data and logic. It needs to be initialized and accessed by a store.
+A store is created with `doura()`. It owns named model instances, plugins, and
+query defaults.
 
-```js
+```ts
 import { defineModel, doura } from 'doura'
 
-export const counterModel = defineModel({
+const counterModel = defineModel({
   name: 'counter',
-  state: {
-    count: 0,
-  },
+  state: { count: 0 },
   actions: {
-    // since we rely on `this`, we cannot use an arrow function
     increment() {
-      this.count++
-    },
-    randomizeCounter() {
-      this.count = Math.round(100 * Math.random())
+      this.count += 1
     },
   },
 })
 
 const store = doura()
+const counter = store.getModel(counterModel)
 
-const modelInstance = store.getModel(counterModel)
-
-// call the action as a method of the model instance
-modelInstance.increment()
-
-// read the state as a property of the model instance
-console.log(modelInstance.count) // 1
+counter.increment()
+console.log(counter.count) // 1
 ```
 
-## Setting initial state
+## Options
 
-Initial state can be set by passing `initialState` options to `doura()`. The key in `initialState` corresponds to the model's `name`.
-
-```js
+```ts
 const store = doura({
   initialState: {
-    counter: {
-      count: 100,
-    },
+    counter: { count: 100 },
+  },
+  plugins: [[myPlugin, options]],
+  query: {
+    staleTime: 10_000,
+    gcTime: 300_000,
   },
 })
-
-const modelInstance = store.getModel(counterModel)
-
-console.log(modelInstance.count) // 100
 ```
+
+- `initialState` is keyed by model name and applies when a named model is first
+  created.
+- `plugins` is an array of `[plugin, options?]` tuples.
+- `query` sets store-wide defaults for query cache staleness and garbage
+  collection.
+
+## API
+
+| Method                    | Description                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------- |
+| `getModel(model)`         | Get or create a named model instance. The instance is cached by `model.name`.                |
+| `getDetachedModel(model)` | Create an independent model instance that is not cached and is not included in `getState()`. |
+| `getState()`              | Return a snapshot of all named models' state, keyed by model name.                           |
+| `subscribe(fn)`           | Listen to any named model state change. Returns an unsubscribe function.                     |
+| `destroy()`               | Destroy model instances, plugin hooks, subscribers, and query coordination.                  |
 
 ## Multiple Stores
 
-A model can be used in multiple stores, they will have independent state.
+The same model definition can be used in multiple stores. Each store has
+independent state.
 
-```js
+```ts
 const storeA = doura()
 const storeB = doura()
 
 const counterA = storeA.getModel(counterModel)
 const counterB = storeB.getModel(counterModel)
-
-console.log(counterA.count) // 0
-console.log(counterB.count) // 0
 
 counterA.increment()
 

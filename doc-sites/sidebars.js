@@ -49,7 +49,7 @@ const sidebars = {
     'introduction',
     {
       type: 'category',
-      label: 'Getting Stared',
+      label: 'Getting Started',
       items: ['installation', 'playground'],
       collapsed: false,
       collapsible: false,

@@ -16,7 +16,7 @@ In development mode (`__DEV__`), `DouraRoot` automatically enables the `devtool`
 ```ts
 declare const DouraRoot: (
   props: PropsWithChildren<{
-    store?: Doura  // optional — auto-creates a store if omitted
+    store?: Doura // optional — auto-creates a store if omitted
   }>
 ) => JSX.Element
 ```
@@ -27,13 +27,13 @@ declare const DouraRoot: (
 import { DouraRoot } from 'react-doura'
 
 // Simplest usage — store is created internally
-<DouraRoot>
+;<DouraRoot>
   <App />
 </DouraRoot>
 
 // Or pass a pre-created store (useful for SSR/testing)
 import { doura } from 'doura'
-<DouraRoot store={doura({ initialState: { counter: { count: 10 } } })}>
+;<DouraRoot store={doura({ initialState: { counter: { count: 10 } } })}>
   <App />
 </DouraRoot>
 ```
@@ -41,6 +41,9 @@ import { doura } from 'doura'
 ## useModel
 
 Reactive hook connected to the global `DouraRoot` store. The component re-renders when accessed state or views change.
+
+`useModel` accepts the model definition directly. It does not accept a separate
+name and returns the model API directly, not a tuple.
 
 ### Types
 
@@ -71,7 +74,7 @@ function CounterWithSelector() {
   // With selector — only re-renders when selected values change
   const { value, add } = useModel(
     countModel,
-    (s) => ({ value: s.value, add: s.add }),
+    (api, actions) => ({ value: api.value, add: actions.add }),
     [] // deps — empty means selector function won't change
   )
   return <button onClick={() => add(1)}>{value}</button>
@@ -128,9 +131,9 @@ With a selector:
 const App = () => {
   const { value, add } = useDetachedModel(
     countModel,
-    (state) => ({
-      value: state.value,
-      ...state.$actions,
+    (api, actions) => ({
+      value: api.value,
+      add: actions.add,
     }),
     []
   )
@@ -207,9 +210,9 @@ function useQuery<TArgs extends readonly unknown[], TData, TSelected = TData>(
 
 ```ts
 interface QueryOverrides<TData, TSelected = TData> {
-  enabled?: boolean | (() => boolean)  // control whether fetch runs
-  staleTime?: number                   // override per-entry/global staleTime
-  select?: (data: TData) => TSelected  // transform data before returning
+  enabled?: boolean | (() => boolean) // control whether fetch runs
+  staleTime?: number // override per-entry/global staleTime
+  select?: (data: TData) => TSelected // transform data before returning
   placeholderData?: TData | ((prev?: TData) => TData | undefined)
 }
 ```
@@ -220,13 +223,13 @@ interface QueryOverrides<TData, TSelected = TData> {
 interface UseQueryResult<TData, TSelected = TData> {
   data: TSelected | undefined
   error: unknown
-  isLoading: boolean       // no data, no error, enabled
-  isPending: boolean       // no data yet
-  isFetching: boolean      // fetch in progress
-  isSuccess: boolean       // has data, no error
-  isError: boolean         // has error
-  isStale: boolean         // data missing or older than staleTime
-  isRefetching: boolean    // has data AND currently fetching
+  isLoading: boolean // no data, no error, enabled
+  isPending: boolean // no data yet
+  isFetching: boolean // fetch in progress
+  isSuccess: boolean // has data, no error
+  isError: boolean // has error
+  isStale: boolean // data missing or older than staleTime
+  isRefetching: boolean // has data AND currently fetching
   isPlaceholderData: boolean
   refetch: () => Promise<TData>
 }
@@ -241,11 +244,9 @@ import { userModel } from './models/user'
 function UserProfile({ userId }: { userId: string }) {
   const user = useModel(userModel)
 
-  const { data, isLoading, error } = useQuery(
-    user.fetchById,
-    [userId],
-    { staleTime: 60_000 }
-  )
+  const { data, isLoading, error } = useQuery(user.fetchById, [userId], {
+    staleTime: 60_000,
+  })
 
   if (isLoading) return <div>Loading...</div>
   if (error) return <div>Error: {String(error)}</div>
@@ -273,7 +274,7 @@ interface UseActionOptions<TData> {
   onSuccess?: (data: TData) => void
   onError?: (error: unknown) => void
   onSettled?: (data: TData | undefined, error: unknown | null) => void
-  pendingDelay?: number  // ms before showing pending state (default: 300)
+  pendingDelay?: number // ms before showing pending state (default: 300)
 }
 ```
 
@@ -281,7 +282,7 @@ interface UseActionOptions<TData> {
 
 ```ts
 interface UseActionResult<TFn extends (...args: any[]) => any> {
-  run: (...args: Parameters<TFn>) => void           // fire-and-forget
+  run: (...args: Parameters<TFn>) => void // fire-and-forget
   runAsync: (...args: Parameters<TFn>) => Promise<Awaited<ReturnType<TFn>>>
   data: Awaited<ReturnType<TFn>> | undefined
   error: unknown
@@ -378,7 +379,7 @@ function PostList() {
     useInfiniteQuery(posts.fetchPage, {
       initialArgs: [1] as [number],
       getNextArgs: (lastPage, allPages) =>
-        lastPage.hasMore ? [allPages.length + 1] as [number] : undefined,
+        lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
     })
 
   if (isLoading) return <div>Loading...</div>
@@ -408,7 +409,7 @@ Creates an isolated store scope with its own `Provider`, `useSharedModel`, and `
 declare const createContainer: (options?: DouraOptions) => {
   Provider: (
     props: PropsWithChildren<{
-      store?: Doura  // optional — auto-creates if omitted
+      store?: Doura // optional — auto-creates if omitted
     }>
   ) => JSX.Element
   useSharedModel: UseModel
@@ -422,9 +423,9 @@ declare const createContainer: (options?: DouraOptions) => {
 import { createContainer } from 'react-doura'
 
 const {
-  Provider,        // scoped context provider
-  useSharedModel,  // reactive hook scoped to this container
-  useStaticModel,  // non-reactive hook scoped to this container
+  Provider, // scoped context provider
+  useSharedModel, // reactive hook scoped to this container
+  useStaticModel, // non-reactive hook scoped to this container
 } = createContainer()
 ```
 

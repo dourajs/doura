@@ -7,84 +7,100 @@ hide_table_of_contents: true
 custom_edit_url: null
 ---
 
-Doura brings the reactivity to React. It's provided an intuitive and simple way to manage state. It has a powerful type system which all types can be inferred. Doura also splits the `model` from `store`, which means you can write your `models` and share it arcoss projects easily. Doura can be used as a global store(redux), shared stores(React Context) or local store(useReducer).
+Doura is a TypeScript-first state management library built around models.
+Models keep state, actions, views, composed child models, and async queries in a
+single definition. A `doura()` store creates model instances, and React apps use
+`DouraRoot` plus hooks from `react-doura`.
 
-:::info
-
-Doura is greatly inspired by [Immer](https://github.com/immerjs/immer), [Vue.js](https://github.com/vuejs) and [Pinia](https://github.com/vuejs/pinia). Thanks for their excellent work.
-
-:::
+Current packages are published as `0.2.0-beta.0`. `react-doura` has peer
+dependencies on `doura@0.2.0-beta.0` and `react >=18`.
 
 ## Example
 
 ```tsx
-import { defineModel } from 'doura'
-import { useModel } from 'react-doura'
+import { defineModel, doura } from 'doura'
+import { DouraRoot, useModel } from 'react-doura'
 
 const todoModel = defineModel({
   name: 'todos',
   state: {
     todos: [
-      {
-        id: 0,
-        text: 'read books',
-        isFinished: true,
-      },
-      {
-        id: 1,
-        text: 'play games',
-        isFinished: false,
-      },
+      { id: 0, text: 'read books', isFinished: true },
+      { id: 1, text: 'play games', isFinished: false },
     ],
-    /** @type {'all' | 'unfinished'} */
-    filter: 'all',
+    filter: 'all' as 'all' | 'unfinished',
   },
   views: {
     unfinishedTodos() {
-      // autocompletion! ✨
       return this.todos.filter((todo) => !todo.isFinished)
     },
     filteredTodos() {
-      if (this.filter === 'unfinished') {
-        return this.unfinishedTodos
-      }
-      return this.todos
+      return this.filter === 'unfinished' ? this.unfinishedTodos : this.todos
     },
   },
   actions: {
-    // any amount of arguments, return a promise or not
-    setFilter(filter) {
-      // you can directly mutate the state
+    setFilter(filter: 'all' | 'unfinished') {
       this.filter = filter
+    },
+    toggle(id: number) {
+      const todo = this.todos.find((item) => item.id === id)
+      if (todo) todo.isFinished = !todo.isFinished
     },
   },
 })
 
-export function TodoApp() {
-  // type of `filteredTodos` and `setFilter` are inferred automatically
-  const { filteredTodos, setFilter } = useModel(todoModel)
+const store = doura()
+const todos = store.getModel(todoModel)
+todos.setFilter('unfinished')
+
+function TodoList() {
+  const { filteredTodos, setFilter, toggle } = useModel(todoModel)
 
   return (
-    <div>
-      <div>
+    <section>
+      <label>
         <input
           type="checkbox"
-          id="filter"
-          onClick={(event) =>
-            setFilter(event.target.checked ? 'unfinished' : 'all')
+          onChange={(event) =>
+            setFilter(event.currentTarget.checked ? 'unfinished' : 'all')
           }
         />
-        <label htmlFor="filter">Only show unfinished</label>
-      </div>
+        Only show unfinished
+      </label>
+
       <ul>
         {filteredTodos.map((todo) => (
           <li key={todo.id}>
-            <input type="checkbox" checked={todo.isFinished} />
-            {todo.text}
+            <label>
+              <input
+                type="checkbox"
+                checked={todo.isFinished}
+                onChange={() => toggle(todo.id)}
+              />
+              {todo.text}
+            </label>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
+  )
+}
+
+export function App() {
+  return (
+    <DouraRoot>
+      <TodoList />
+    </DouraRoot>
   )
 }
 ```
+
+## API Shape
+
+- `defineModel({ name, state, actions?, views?, models?, queries? }, setup?)`
+  defines a model.
+- `doura({ initialState?, plugins?, query? })` creates a store.
+- `store.getModel(model)` returns a named model instance cached by
+  `model.name` in that store.
+- React hooks accept the model definition directly:
+  `useModel(model, selector?, depends?)`.

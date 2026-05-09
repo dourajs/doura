@@ -3,7 +3,8 @@ id: persist-plugin
 title: Persist Plugin
 ---
 
-The `doura-plugin-persist` plugin saves model state to storage and rehydrates it on startup.
+`doura-plugin-persist` saves named model state to storage and rehydrates it when
+the store starts.
 
 ## Setup
 
@@ -13,41 +14,78 @@ import persist, { createWebStorage } from 'doura-plugin-persist'
 
 const store = doura({
   plugins: [
-    [persist, {
-      key: 'my-app',
-      storage: createWebStorage('local'),
-    }],
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+      },
+    ],
   ],
 })
 ```
 
-`createWebStorage` accepts `'local'` or `'session'` to wrap `localStorage` or `sessionStorage` in the required async interface.
+`createWebStorage('local')` wraps `localStorage`; `createWebStorage('session')`
+wraps `sessionStorage`. Both return the async storage interface expected by the
+plugin.
+
+## Options
+
+```ts
+interface PersistOptions {
+  storage: Storage
+  key: string
+  blacklist?: string[]
+  whitelist?: string[]
+  throttle?: number
+  version?: number
+  migrate?: <S = any>(persistedState: S, version: number) => S | Promise<S>
+  writeFailHandler?: (err: Error) => void
+}
+```
 
 ## Whitelist / Blacklist
 
-Control which models are persisted by name:
+Persist only selected model names with `whitelist`:
 
 ```ts
-[persist, {
-  key: 'my-app',
-  storage: createWebStorage('local'),
-  whitelist: ['user', 'settings'],  // only persist these models
-}]
-
-// OR
-
-[persist, {
-  key: 'my-app',
-  storage: createWebStorage('local'),
-  blacklist: ['ephemeral'],  // persist everything except these
-}]
+const store = doura({
+  plugins: [
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        whitelist: ['user', 'settings'],
+      },
+    ],
+  ],
+})
 ```
 
-Only one of `whitelist` or `blacklist` should be used. If `whitelist` is provided, only those models are persisted. If `blacklist` is provided, all models except those listed are persisted.
+Persist everything except selected model names with `blacklist`:
 
-## Checking Rehydration Status
+```ts
+const store = doura({
+  plugins: [
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        blacklist: ['ephemeral'],
+      },
+    ],
+  ],
+})
+```
 
-The plugin exposes a `persistModel` that tracks rehydration state. Use it to gate rendering until storage is loaded:
+Only one of `whitelist` or `blacklist` should be used.
+
+## Rehydration Status
+
+The plugin exports `persistModel`, a detached control model initialized by the
+plugin. Use it to gate rendering until storage has loaded.
 
 ```tsx
 import { useModel } from 'react-doura'
@@ -65,102 +103,118 @@ function App() {
 ```
 
 `persistModel` state:
-- `rehydrated: boolean` — becomes `true` once stored state has been read and applied
-- `version: number` — the current schema version
+
+- `rehydrated: boolean`
+- `version: number`
 
 ## Schema Migration
 
-When your state shape changes across app versions, use `version` and `migrate` to transform old persisted data:
+Use `version` and `migrate` to transform older persisted state.
 
 ```ts
-[persist, {
-  key: 'my-app',
-  storage: createWebStorage('local'),
-  version: 2,
-  migrate(storageState, version) {
-    if (version < 2) {
-      // Transform v1 state to v2 shape
-      const user = storageState.user
-      if (user && user.fullName) {
-        user.firstName = user.fullName.split(' ')[0]
-        user.lastName = user.fullName.split(' ')[1]
-        delete user.fullName
-      }
-    }
-    return storageState
-  },
-}]
+const store = doura({
+  plugins: [
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        version: 2,
+        migrate(storageState, version) {
+          if (version < 2) {
+            const user = storageState.user
+            if (user?.fullName) {
+              const [firstName, lastName] = user.fullName.split(' ')
+              user.firstName = firstName
+              user.lastName = lastName
+              delete user.fullName
+            }
+          }
+          return storageState
+        },
+      },
+    ],
+  ],
+})
 ```
 
-The `migrate` function receives the entire stored state object (keyed by model name) and the persisted version number. It can return synchronously or return a Promise.
+The migration receives the stored state object keyed by model name and the
+stored version. It may return the migrated state or a promise for it.
 
 ## Throttling Writes
 
-To avoid excessive storage writes, set a `throttle` value in milliseconds:
-
 ```ts
-[persist, {
-  key: 'my-app',
-  storage: createWebStorage('local'),
-  throttle: 1000,  // write at most once per second
-}]
+const store = doura({
+  plugins: [
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        throttle: 1000,
+      },
+    ],
+  ],
+})
 ```
 
-## Custom Storage Adapter
+## Custom Storage
 
-Any object implementing the `Storage` interface can be used:
+Any object implementing `Storage` can be used:
 
 ```ts
-import { Storage } from 'doura-plugin-persist'
+import type { Storage } from 'doura-plugin-persist'
 
 const customStorage: Storage = {
   async getItem(key) {
-    // read from your storage backend
+    return readFromBackend(key)
   },
   async setItem(key, value) {
-    // write to your storage backend
+    await writeToBackend(key, value)
   },
   async removeItem(key) {
-    // delete from your storage backend
+    await deleteFromBackend(key)
   },
 }
 
-[persist, {
-  key: 'my-app',
-  storage: customStorage,
-}]
+const store = doura({
+  plugins: [[persist, { key: 'my-app', storage: customStorage }]],
+})
 ```
 
-## Controlling Persistence at Runtime
+## Runtime Controls
 
-The `persistModel` instance exposes actions for runtime control:
+`persistModel` exposes actions for runtime control:
 
 ```ts
 import { persistModel } from 'doura-plugin-persist'
 
 const persist = store.getModel(persistModel)
 
-// Pause/resume persistence writes
 persist.togglePause()
-
-// Flush pending writes immediately
 await persist.flush()
-
-// Purge all persisted state from storage
 await persist.purge()
 ```
 
-## Error Handling
+- `togglePause()` pauses or resumes writes.
+- `flush()` writes pending changes immediately.
+- `purge()` removes persisted storage for the configured key.
 
-Handle storage write failures with `writeFailHandler`:
+## Write Failures
 
 ```ts
-[persist, {
-  key: 'my-app',
-  storage: createWebStorage('local'),
-  writeFailHandler(err) {
-    console.error('Persistence write failed:', err)
-    // e.g. notify user, fall back to memory-only
-  },
-}]
+const store = doura({
+  plugins: [
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        writeFailHandler(error) {
+          console.error('Persistence write failed:', error)
+        },
+      },
+    ],
+  ],
+})
 ```

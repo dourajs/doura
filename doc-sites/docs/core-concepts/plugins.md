@@ -3,26 +3,27 @@ id: plugins
 title: Plugins
 ---
 
-Plugins extend the behavior of a Doura store by hooking into lifecycle events. A plugin is a function that receives an option argument and returns a `PluginHook` object.
+Plugins extend a store by registering lifecycle hooks. A plugin is a function
+that receives an options object and returns hook handlers.
 
 ## Defining a Plugin
 
 ```ts
-import { Plugin } from 'doura'
+import type { Plugin } from 'doura'
 
-const myPlugin: Plugin<{ verbose?: boolean }> = (option) => {
+const myPlugin: Plugin<{ verbose?: boolean }> = (options) => {
   return {
     onInit({ initialState }, { doura }) {
-      // called once when the store is created
+      // store created
     },
     onModel(name, model, { doura }) {
-      // called when a model definition is first registered
+      // named model definition is being initialized
     },
     onModelInstance(instance, { doura }) {
-      // called when a model instance is created
+      // named model instance was created
     },
     onDestroy() {
-      // called when store.destroy() is invoked
+      // store.destroy() was called
     },
   }
 }
@@ -30,58 +31,76 @@ const myPlugin: Plugin<{ verbose?: boolean }> = (option) => {
 
 ## Lifecycle Hooks
 
-| Hook | Timing | Parameters |
-|------|--------|------------|
-| `onInit` | Store is created | `{ initialState }`, `PluginContext` |
-| `onModel` | Model definition is registered | `name`, `model`, `PluginContext` |
-| `onModelInstance` | Model instance is created | `instance`, `PluginContext` |
-| `onDestroy` | `store.destroy()` is called | — |
+| Hook                                   | Timing                                    |
+| -------------------------------------- | ----------------------------------------- |
+| `onInit({ initialState }, { doura })`  | Store construction.                       |
+| `onModel(name, model, { doura })`      | Before a named model instance is created. |
+| `onModelInstance(instance, { doura })` | After a named model instance is created.  |
+| `onDestroy()`                          | When `store.destroy()` runs.              |
 
-`PluginContext` provides access to the store via `{ doura: ModelManager }`.
+Detached models created with `getDetachedModel()` do not run named model
+registration hooks.
 
 ## Registering Plugins
 
-Pass plugins to `doura()` as an array of `[plugin, options?]` tuples:
+Pass plugins to `doura()` as `[plugin, options?]` tuples:
 
 ```ts
 import { doura } from 'doura'
-import { myPlugin } from './plugins/myPlugin'
+
+const store = doura({
+  plugins: [[myPlugin, { verbose: true }]],
+})
+```
+
+## Logger Plugin
+
+`doura-plugin-log` logs each action and the model's `$rawState` after action
+calls. It does not expose configuration options.
+
+```ts
+import { doura } from 'doura'
+import log from 'doura-plugin-log'
+
+const store = doura({
+  plugins: [[log]],
+})
+```
+
+## Persist Plugin
+
+`doura-plugin-persist` saves named model state to a storage adapter and
+rehydrates state on startup.
+
+```ts
+import persist, { createWebStorage } from 'doura-plugin-persist'
 
 const store = doura({
   plugins: [
-    [myPlugin, { verbose: true }],
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        whitelist: ['user', 'settings'],
+      },
+    ],
   ],
 })
 ```
 
-## Example: Action Logger
+See the [persist guide](../guides/persist-plugin.md) for options and runtime
+controls.
 
-```ts
-import { Plugin } from 'doura'
+## Devtool Plugin
 
-const actionLogger: Plugin = () => ({
-  onModelInstance(instance) {
-    instance.$onAction((action) => {
-      console.log(`[${instance.$name}] ${action.name}`, action.args)
-    })
-  },
-})
-
-const store = doura({
-  plugins: [[actionLogger]],
-})
-```
-
-## Built-in Devtool Plugin
-
-Doura ships with a devtool plugin that connects to the [Redux DevTools Extension](https://github.com/reduxjs/redux-devtools). When using `react-doura`, `DouraRoot` automatically enables this plugin in development mode — no manual setup needed.
-
-For non-React usage, you can enable it manually:
+Doura exports `devtool` for Redux DevTools integration:
 
 ```ts
 import { doura, devtool } from 'doura'
 
-const store = doura({
-  plugins: [[devtool]],
-})
+doura({ plugins: [[devtool]] })
 ```
+
+`DouraRoot` from `react-doura` automatically injects `devtool` in development
+mode.

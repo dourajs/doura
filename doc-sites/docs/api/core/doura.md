@@ -23,24 +23,26 @@ type ActionOptions = Record<string, Function>
 
 ### Action Semantics
 
-Actions can modify state in three ways, each producing a different action type:
+Actions can change state in three public forms:
 
-- **Modify** — Directly mutate state properties via `this`. This is the most common pattern.
+- **Modify** — Directly update state properties via `this`. This is the most common pattern.
   ```ts
   increment() {
     this.count += 1  // triggers a MODIFY action
   }
   ```
 - **Replace** — Assign a new value to `this.$state` to completely replace the model's state.
+
   ```ts
   reset() {
     this.$state = { count: 0 }  // triggers a REPLACE action
   }
   ```
-- **Patch** — Return a plain object from the action to deep-merge it into the current state.
+
+- **Patch** — Call `this.$patch(obj)` to deep-merge a partial object into the current state.
   ```ts
-  patch() {
-    return { count: 2 }  // triggers a PATCH action (deep merge)
+  patchSome() {
+    this.$patch({ count: 2 })  // triggers a PATCH action
   }
   ```
 
@@ -62,11 +64,11 @@ const count = defineModel({
       await timeout(1000)
       this.value += 1
     },
-    changeStateBy$state(n: number) {
-      this.$state.value += n
+    replaceState(n: number) {
+      this.$state = { value: n }
     },
-    changeStateByReturnValue() {
-      return { value: 2 }
+    patchState() {
+      this.$patch({ value: 2 })
     },
   },
 })
@@ -116,23 +118,22 @@ function defineModel<N, S, A, V, Models, Q>(
   options: {
     name: N // required: unique string identifier
     state: S // required: initial state object
-    actions?: A // optional: methods that mutate state
+    actions?: A // optional: methods that update state
     views?: V // optional: computed/derived values
     models?: Models // optional: array of child models for composition
     queries?: Q // optional: async data fetching functions
   },
   setup?: (ctx: {
     model: {
-      setQueryOptions<K extends keyof Q>(
-        name: K,
-        options: { staleTime?: number }
-      ): void
+      setQueryOptions<K extends keyof Q>(name: K, options: QueryOptions): void
     }
   }) => void
-): DefineModel<S, A, V, Models>
+): DefineModel<S, A, V, Models, Q>
 ```
 
-Keys across `state`, `actions`, `views`, `queries`, and `models` must not conflict — TypeScript will report a compile-time error if they do.
+Keys across `state`, `actions`, `views`, `queries`, and `models` must not
+conflict. TypeScript reports conflicts for literal keys, and runtime
+validation warns for dynamic shapes that cannot be checked statically.
 
 ### Example
 
@@ -202,11 +203,30 @@ Query entries are always functions. Configure per-query options in the optional 
 ```ts
 model.setQueryOptions<K extends keyof queries>(
   name: K,
-  options: { staleTime?: number }
+  options: QueryOptions
 ): void
+
+interface QueryOptions<TApi, TArgs, TData> {
+  staleTime?: number
+  onData?: (ctx: OnDataCtx<TApi, TArgs, TData>) => void
+}
+
+interface OnDataCtx<TApi, TArgs, TData> {
+  api: TApi   // the model's internal proxy (same as `this` in actions)
+  args: TArgs // the args tuple passed to the query
+  data: TData // the fetched data
+}
 ```
 
-### Example
+### `staleTime`
+
+Controls how long fetched data is considered fresh (in milliseconds). Defaults to `0` (always stale).
+
+### `onData`
+
+A callback invoked whenever new data arrives for this query (both from `fetch()` and `setData()`). Runs inside an action context — you can update state, call actions, and access child models via `ctx.api`. The query cache is updated automatically after `onData` completes.
+
+Use `onData` to sync fetched data into model state without manual action calls:
 
 ```ts
 import { defineModel } from 'doura'
@@ -223,17 +243,27 @@ const userModel = defineModel(
 
       fetchById: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
-        const user = await res.json()
-        this.users[id] = user
-        return user
+        return res.json()
       },
     },
   },
   ({ model }) => {
-    model.setQueryOptions('fetchById', { staleTime: 30_000 })
+    model.setQueryOptions('fetchById', {
+      staleTime: 30_000,
+      onData({ api, data }) {
+        // Automatically write fetched user into model state
+        api.users[data.id] = data
+      },
+    })
   }
 )
 ```
+
+:::caution
+Query functions do NOT have `this` bound to the model — `this` is `undefined` inside query functions. Use `onData` to update model state when data arrives.
+:::
+
+The advantage of `onData` is that it runs both when `fetch()` completes AND when `setData()` is called manually, ensuring state stays in sync regardless of how data enters the cache.
 
 ## `QueryHandle`
 
@@ -490,4 +520,51 @@ const model = defineModel({
     data: obj, // non-enumerable 'hidden' property will be preserved during copy-on-write
   },
 })
+```
+
+## `nextTick`
+
+Returns a Promise that resolves after the current flush cycle completes. Use this when you need to wait for all pending state updates (queued via the microtask scheduler) to be flushed before reading state.
+
+### Types
+
+```ts
+function nextTick<T = void>(fn?: () => void): Promise<void>
+```
+
+### Example
+
+```ts
+import { nextTick } from 'doura'
+
+// Wait for all queued updates to flush
+await nextTick()
+console.log(store.getState()) // guaranteed to reflect all pending changes
+```
+
+## `computeQueryHash` / `computeArgsKey`
+
+Low-level utilities for computing the cache hash of a query entry. Useful for advanced scenarios such as cache pre-warming or debugging.
+
+### Types
+
+```ts
+function computeQueryHash(
+  modelName: string,
+  queryName: string,
+  key: unknown[]
+): QueryHash
+function computeArgsKey(args: readonly unknown[] | void): unknown[]
+```
+
+- `modelName` — for named models this is `model.name`; for detached models it's an internal `@@detached:<id>` string.
+- `queryName` — the key in `queries`.
+- `key` — the args tuple (produced by `computeArgsKey`). The hash function internally serializes it to a stable string.
+
+### Example
+
+```ts
+import { computeQueryHash, computeArgsKey } from 'doura'
+
+const hash = computeQueryHash('user', 'fetchById', computeArgsKey(['user-1']))
 ```

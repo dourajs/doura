@@ -3,89 +3,85 @@ id: installation
 title: Installation
 ---
 
-Install doura with your favorite package manager:
+Install the packages you use. The repository itself is a pnpm workspace, but
+applications can use any package manager.
 
 ```bash
 pnpm add doura
-# or with yarn
-yarn add doura
-# or with npm
-npm install doura
+pnpm add react-doura
 ```
-
-For React integration, also install `react-doura`:
 
 ```bash
-pnpm add react-doura
-# or with yarn
-yarn add react-doura
-# or with npm
-npm install react-doura
+yarn add doura react-doura
+npm install doura react-doura
 ```
 
-## Usage
+`react-doura` requires `react >=18` and a matching `doura` peer. Current Doura
+packages are `0.2.0-beta.0`.
 
-### Define models
+## Core Usage
 
-A **Model** is an entity holding state and business logic that isn't bound to your Components. It's a bit like a component that is always there and that everybody can read off and write to. It has three concepts, the [state](./core-concepts/state.md), [views](./core-concepts/views.md) and [actions](./core-concepts/actions.md).
+```ts
+import { defineModel, doura } from 'doura'
 
-```ts title="src/models/count.ts"
-import { defineModel } from 'doura'
-
-export const count = defineModel({
+export const countModel = defineModel({
   name: 'count',
-  // initial state
   state: {
     count: 0,
   },
   actions: {
-    // handle state changes
-    increment(n: number) {
+    increment(n = 1) {
       this.count += n
     },
-    // use async/await for async actions
-    async incrementAsync(n: number) {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      this.increment()
+    reset() {
+      this.$state = { count: 0 }
     },
   },
   views: {
-    // derived value from state, value is cached and computed on-demand
     isZero() {
       return this.count === 0
     },
   },
 })
+
+const store = doura({
+  initialState: {
+    count: { count: 10 },
+  },
+})
+
+const count = store.getModel(countModel)
+
+count.increment()
+console.log(count.count) // 11
+console.log(count.isZero) // false
 ```
 
-### Consume models
+`getModel(model)` uses `model.name` as the store key. Repeated calls with the
+same named model in one store return the same instance. Different stores keep
+independent instances.
 
-Store is used to init and persist the state of a model. We can have multiple stores at the same time. 
+## React Usage
 
-```ts title="src/store.ts"
-import { doura } from 'doura';
-import { count } from './models/count';
+```tsx
+import { DouraRoot, useModel } from 'react-doura'
+import { countModel } from './models/count'
 
-const storeA = doura();
-const storeB = doura();
+function Counter() {
+  const count = useModel(countModel)
 
-const modelInstanceA = storeA.getModel(count)
+  return <button onClick={() => count.increment()}>Count: {count.count}</button>
+}
 
-// model will only be initialized once within a store
-console.log(storeA.getModel(count) === modelInstanceA) // true
-
-const modelInstanceB = storeB.getModel(count)
-
-console.log(modelInstanceA.count) // 0
-console.log(modelInstanceA.isZero) // true
-console.log(modelInstanceB.count) // 0
-
-modelInstanceA.increment();
-console.log(modelInstanceA.count) // 1
-console.log(modelInstanceA.isZero) // false
-console.log(modelInstanceB.count) // 0
-
-await modelInstanceB.incrementAsync();
-console.log(modelInstanceB.count) // 1
-console.log(modelInstanceB.isZero) // false
+export function App() {
+  return (
+    <DouraRoot>
+      <Counter />
+    </DouraRoot>
+  )
+}
 ```
+
+`useModel` does not take a separate name and does not return a tuple. It returns
+the model API directly: state, views, actions, query handles, and child models
+are flattened onto one object.

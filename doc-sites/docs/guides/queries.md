@@ -26,29 +26,33 @@ const userModel = defineModel(
 
       fetchById: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
-        const user = await res.json()
-        // Actions on `this` are available — update state as a side effect
-        this.currentUser = user
-        return user
+        return res.json()
       },
     },
   },
   ({ model }) => {
-    model.setQueryOptions('fetchById', { staleTime: 30_000 })
+    model.setQueryOptions('fetchById', {
+      staleTime: 30_000,
+      onData({ api, data }) {
+        // Use onData to sync fetched data into model state
+        api.currentUser = data
+      },
+    })
   }
 )
 ```
 
 ## Cache Identity
 
-Each query entry maintains a cache keyed by its arguments. No custom key function is needed — the args tuple determines cache identity automatically.
+Each query entry maintains a cache keyed by its arguments. No custom key
+function is needed: the args tuple determines cache identity automatically.
 
 ```ts
 // These are different cache entries:
 instance.fetchById.fetch('user-1')
 instance.fetchById.fetch('user-2')
 
-// Same args = same cache entry (deduped):
+// Same args tuple values = same cache entry (deduped):
 instance.fetchById.fetch('user-1') // returns cached or dedupes inflight
 ```
 
@@ -60,12 +64,16 @@ Every query function receives a `QueryCtx` as its first argument, which provides
 queries: {
   search: async function (ctx, term: string) {
     const res = await fetch(`/api/search?q=${term}`, {
-      signal: ctx.signal,  // automatically cancelled if a new search starts
+      signal: ctx.signal,
     })
     return res.json()
   },
 }
 ```
+
+:::caution
+Query functions do NOT have `this` bound to the model — `this` is `undefined`. To update model state when data arrives, use the `onData` query option (see [Configuration](#ondata--sync-fetched-data-into-state) below).
+:::
 
 ## Using Queries in Actions
 
@@ -90,22 +98,31 @@ actions: {
 
 Each query handle provides these methods:
 
-| Method                   | Description                          |
-| ------------------------ | ------------------------------------ |
-| `fetch(...args)`         | Fetch and return data                |
-| `prefetch(...args)`      | Fetch to warm cache (returns `void`) |
-| `getData(...args)`       | Read cached data without fetching    |
-| `getState(...args)`      | Read raw cache entry                 |
-| `isFetching(...args)`    | Check if currently fetching          |
-| `isStale(...args)`       | Check if data is stale               |
-| `cancel(...args?)`       | Cancel inflight request(s)           |
-| `invalidate(...args?)`   | Mark entry/entries stale             |
-| `reset(...args?)`        | Clear entry/entries entirely         |
-| `setData(...args, data)` | Write data into the cache manually   |
+| Method                   | Description                           |
+| ------------------------ | ------------------------------------- |
+| `fetch(...args)`         | Fetch and return data                 |
+| `prefetch(...args)`      | Fetch to warm cache (`Promise<void>`) |
+| `getData(...args)`       | Read cached data without fetching     |
+| `getState(...args)`      | Read raw cache entry                  |
+| `isFetching(...args)`    | Check if currently fetching           |
+| `isStale(...args)`       | Check if data is stale                |
+| `cancel(...args?)`       | Cancel inflight request(s)            |
+| `invalidate(...args?)`   | Mark entry/entries stale              |
+| `reset(...args?)`        | Clear entry/entries entirely          |
+| `setData(...args, data)` | Write data into the cache manually    |
 
 Methods that accept optional args operate on a specific cache slot when args are provided, or on all slots when called with no arguments.
 
 ## Configuration
+
+Configure per-query options via `model.setQueryOptions(name, options)` in the `defineModel` setup function.
+
+### Available Options
+
+| Option      | Type                       | Description                                              |
+| ----------- | -------------------------- | -------------------------------------------------------- |
+| `staleTime` | `number`                   | How long data is fresh (ms). Default: `0` (always stale) |
+| `onData`    | `(ctx: OnDataCtx) => void` | Callback when data arrives (fetch or setData)            |
 
 ### Per-entry staleTime
 
@@ -127,6 +144,48 @@ const userModel = defineModel(
   }
 )
 ```
+
+### onData — Sync fetched data into state
+
+The `onData` callback runs whenever new data arrives for a query — both from a `fetch()` completing and from manual `setData()` calls. It executes in an action context, so you can update state and call actions.
+
+```ts
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: { currentUser: null as User | null },
+    queries: {
+      fetchUser: async function (ctx, id: string) {
+        const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
+        return res.json()
+      },
+    },
+  },
+  ({ model }) => {
+    model.setQueryOptions('fetchUser', {
+      staleTime: 30_000,
+      onData({ api, args, data }) {
+        // api = model's internal proxy (same as `this` in actions)
+        // args = the args tuple passed to fetch (e.g. [id])
+        // data = the resolved data from the query
+        api.currentUser = data
+      },
+    })
+  }
+)
+```
+
+`OnDataCtx` provides:
+
+| Field  | Type  | Description                                  |
+| ------ | ----- | -------------------------------------------- |
+| `api`  | Model | The model proxy — update state, call actions |
+| `args` | TArgs | The args tuple for this cache entry          |
+| `data` | TData | The new data (from fetch result or setData)  |
+
+:::tip
+Use `onData` instead of writing state inside the query function itself when you want state updates to also fire for manual `setData()` calls. This keeps cache writes and state updates in sync regardless of how data enters the system.
+:::
 
 ### Global configuration
 
@@ -183,6 +242,13 @@ function UserProfile({ userId }: { userId: string }) {
     </div>
   )
 }
+```
+
+No-arg queries pass the handle and options directly:
+
+```tsx
+const user = useModel(userModel)
+const result = useQuery(user.fetchAll, { staleTime: 60_000 })
 ```
 
 ### useInfiniteQuery

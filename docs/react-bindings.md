@@ -38,11 +38,11 @@ function createContainer(options?: DouraOptions) {
 
 **返回值**:
 
-| 导出 | 用途 |
-|------|------|
-| `Provider` | 挂载到组件树，提供 store context |
-| `useSharedModel(model, selector?, depends?)` | 订阅 model 变更，触发 re-render |
-| `useStaticModel(model)` | 获取 model 实例的只读引用，不触发 re-render |
+| 导出                                         | 用途                                        |
+| -------------------------------------------- | ------------------------------------------- |
+| `Provider`                                   | 挂载到组件树，提供 store context            |
+| `useSharedModel(model, selector?, depends?)` | 订阅 model 变更，触发 re-render             |
+| `useStaticModel(model)`                      | 获取 model 实例的只读引用，不触发 re-render |
 
 ---
 
@@ -98,7 +98,7 @@ const useDetachedModel: UseDetachedModel = (model, selector?, depends?) => {
   const context = useRef<{ douraStore: Doura } | null>(null)
 
   if (!context.current) {
-    context.current = { douraStore: doura() }  // 组件级独立 store
+    context.current = { douraStore: doura() } // 组件级独立 store
   }
 
   return useMemo(
@@ -133,13 +133,13 @@ const useStaticModel: UseStaticModel = (model) => {
 ```ts
 // createUseModel.tsx
 function useModelInstance(model, doura) {
-  const modelKey = getModelCacheKey(model)  // → model.name
+  const modelKey = getModelCacheKey(model) // → model.name
   const { modelInstance, subscribe } = useMemo(() => {
     const modelInstance = doura.getModel(model)
     return {
       modelInstance,
       subscribe: (onModelChange) =>
-        modelInstance.$subscribe(() => onModelChange()),  // 直连 $subscribe
+        modelInstance.$subscribe(() => onModelChange()), // 直连 $subscribe
     }
   }, [doura, modelKey])
 
@@ -148,6 +148,7 @@ function useModelInstance(model, doura) {
 ```
 
 **与旧版的区别**：
+
 1. 不再接收 `name` 参数 — model 身份由 `model.name` 推导（`getModelCacheKey`）
 2. 订阅方式从 `batchManager.addSubscribe(model, cb)` 简化为 `modelInstance.$subscribe(() => cb())`
 3. memo deps 从 `[name, doura]` 变为 `[doura, modelKey]`
@@ -207,6 +208,7 @@ function useModelWithSelector(model, subscribe, selector, depends) {
 ```
 
 **为什么用 `useRef` + 手动 diff 而非 `useMemo` with deps？** `useMemo` 在 React 并发模式下不保证稳定（React 可能丢弃缓存），而 view 生命周期需要显式 `destroy()` 管理。手动 ref diffing 确保：
+
 1. view 只在真正需要时重建
 2. 旧 view 总是被显式销毁
 3. StrictMode 的 cleanup-rerun 模式正确处理
@@ -225,7 +227,7 @@ const createUseStaticModel = (doura) => (model) => {
   const modelInstance = useMemo(() => doura.getModel(model), [doura, modelKey])
 
   const store = useMemo(() => {
-    if (__DEV__) return readonlyModel(modelInstance)  // 开发模式只读 proxy
+    if (__DEV__) return readonlyModel(modelInstance) // 开发模式只读 proxy
     return modelInstance
   }, [modelInstance])
 
@@ -264,28 +266,28 @@ useQuery<TArgs, TData, TSelected>(
 
 ### QueryOverrides
 
-| 选项 | 类型 | 说明 |
-|------|------|------|
-| `enabled` | `boolean \| () => boolean` | 控制是否自动 fetch。默认 `true` |
-| `staleTime` | `number` | 覆盖 spec/全局的过期时间（ms） |
-| `select` | `(data: TData) => TSelected` | 对真实数据做派生转换 |
-| `placeholderData` | `TData \| (prev?) => TData` | 真实数据到达前的占位值 |
+| 选项              | 类型                         | 说明                            |
+| ----------------- | ---------------------------- | ------------------------------- |
+| `enabled`         | `boolean \| () => boolean`   | 控制是否自动 fetch。默认 `true` |
+| `staleTime`       | `number`                     | 覆盖 spec/全局的过期时间（ms）  |
+| `select`          | `(data: TData) => TSelected` | 对真实数据做派生转换            |
+| `placeholderData` | `TData \| (prev?) => TData`  | 真实数据到达前的占位值          |
 
 ### UseQueryResult
 
-| 字段 | 说明 |
-|------|------|
-| `data` | 转换后数据（select 结果）或 placeholderData |
-| `error` | 最近一次 fetch 错误 |
-| `isLoading` | 首次加载中（无数据 + 无错误 + enabled） |
-| `isPending` | 无数据 |
-| `isFetching` | 正在 fetch（含后台刷新） |
-| `isSuccess` | 有数据且无错误 |
-| `isError` | 有错误 |
-| `isStale` | 数据已过期 |
-| `isRefetching` | 有数据且正在后台刷新 |
-| `isPlaceholderData` | 当前展示的是 placeholder |
-| `refetch` | 手动重新 fetch |
+| 字段                | 说明                                        |
+| ------------------- | ------------------------------------------- |
+| `data`              | 转换后数据（select 结果）或 placeholderData |
+| `error`             | 最近一次 fetch 错误                         |
+| `isLoading`         | 首次加载中（无数据 + 无错误 + enabled）     |
+| `isPending`         | 无数据                                      |
+| `isFetching`        | 正在 fetch（含后台刷新）                    |
+| `isSuccess`         | 有数据且无错误                              |
+| `isError`           | 有错误                                      |
+| `isStale`           | 数据已过期                                  |
+| `isRefetching`      | 有数据且正在后台刷新                        |
+| `isPlaceholderData` | 当前展示的是 placeholder                    |
+| `refetch`           | 手动重新 fetch                              |
 
 ### 生命周期
 
@@ -306,7 +308,7 @@ mount / args 变更
 ```ts
 const subscribe = useCallback(
   (cb) => queryHandleInternal.subscribe(argsRef.current, cb),
-  [queryHandleInternal, hash]  // hash 从 args tuple 稳定计算
+  [queryHandleInternal, hash] // hash 从 args tuple 稳定计算
 )
 useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 ```
@@ -330,23 +332,23 @@ useAction<TFn>(
 
 ### UseActionOptions
 
-| 选项 | 说明 |
-|------|------|
-| `onSuccess(data)` | action 成功后回调 |
-| `onError(error)` | action 失败后回调 |
-| `onSettled(data, error)` | action 结束后回调（无论成败） |
-| `pendingDelay` | 进入 pending 状态的延迟（ms），默认 300。快速操作不会闪现 loading |
+| 选项                     | 说明                                                              |
+| ------------------------ | ----------------------------------------------------------------- |
+| `onSuccess(data)`        | action 成功后回调                                                 |
+| `onError(error)`         | action 失败后回调                                                 |
+| `onSettled(data, error)` | action 结束后回调（无论成败）                                     |
+| `pendingDelay`           | 进入 pending 状态的延迟（ms），默认 300。快速操作不会闪现 loading |
 
 ### UseActionResult
 
-| 字段 | 说明 |
-|------|------|
-| `run(...args)` | 触发 action，fire-and-forget（内部 swallow rejection） |
-| `runAsync(...args)` | 触发 action，返回 Promise |
-| `data` | 最近成功的返回值 |
-| `error` | 最近的错误 |
-| `isIdle` / `isPending` / `isSuccess` / `isError` | 状态标志 |
-| `reset()` | 重置为 idle 状态，取消进行中 run 的写入权限 |
+| 字段                                             | 说明                                                   |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| `run(...args)`                                   | 触发 action，fire-and-forget（内部 swallow rejection） |
+| `runAsync(...args)`                              | 触发 action，返回 Promise                              |
+| `data`                                           | 最近成功的返回值                                       |
+| `error`                                          | 最近的错误                                             |
+| `isIdle` / `isPending` / `isSuccess` / `isError` | 状态标志                                               |
+| `reset()`                                        | 重置为 idle 状态，取消进行中 run 的写入权限            |
 
 ### 设计要点
 
@@ -375,23 +377,23 @@ useInfiniteQuery<TArgs, TData>(
 
 ### InfiniteQueryConfig
 
-| 字段 | 说明 |
-|------|------|
-| `initialArgs` | 首页的 args |
-| `getNextArgs(lastPage, allPages)` | 返回下一页 args，`undefined` 表示无更多 |
-| `getPreviousArgs?(firstPage, allPages)` | 返回上一页 args（可选） |
+| 字段                                    | 说明                                    |
+| --------------------------------------- | --------------------------------------- |
+| `initialArgs`                           | 首页的 args                             |
+| `getNextArgs(lastPage, allPages)`       | 返回下一页 args，`undefined` 表示无更多 |
+| `getPreviousArgs?(firstPage, allPages)` | 返回上一页 args（可选）                 |
 
 ### UseInfiniteQueryResult
 
-| 字段 | 说明 |
-|------|------|
-| `data` | `{ pages: TData[], args: TArgs[] }` 或 `undefined` |
-| `error` | 最近错误 |
-| `isLoading` / `isFetching` / `isSuccess` / `isError` | 状态标志 |
-| `hasNextPage` / `hasPreviousPage` | 是否有更多页 |
-| `isFetchingNextPage` / `isFetchingPreviousPage` | 分页 fetch 方向 |
-| `fetchNextPage()` / `fetchPreviousPage()` | 加载更多 |
-| `refetch()` | 重置为首页并重新加载 |
+| 字段                                                 | 说明                                               |
+| ---------------------------------------------------- | -------------------------------------------------- |
+| `data`                                               | `{ pages: TData[], args: TArgs[] }` 或 `undefined` |
+| `error`                                              | 最近错误                                           |
+| `isLoading` / `isFetching` / `isSuccess` / `isError` | 状态标志                                           |
+| `hasNextPage` / `hasPreviousPage`                    | 是否有更多页                                       |
+| `isFetchingNextPage` / `isFetchingPreviousPage`      | 分页 fetch 方向                                    |
+| `fetchNextPage()` / `fetchPreviousPage()`            | 加载更多                                           |
+| `refetch()`                                          | 重置为首页并重新加载                               |
 
 ### 设计要点
 

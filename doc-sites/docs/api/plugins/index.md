@@ -1,11 +1,9 @@
 ---
 id: index
-title: 'Plugins'
+title: Plugins
 ---
 
-Doura provides the following hooks for plugins to access models and the store.
-
-## Types
+## Core Plugin Types
 
 ```ts
 export interface PluginContext {
@@ -28,22 +26,29 @@ export type PluginHook = {
 export type Plugin<Option = any> = (option: Option) => PluginHook
 ```
 
+Register plugins with `doura({ plugins: [[plugin, options?]] })`.
+
 ## doura-plugin-log
 
-Log action and state
-
-### Example
+`doura-plugin-log` listens to `$onAction` for each named model instance and
+prints the action plus the instance `$rawState`.
 
 ```ts
-import log from 'doura-plugin-log';
+import { doura } from 'doura'
+import log from 'doura-plugin-log'
+
 doura({
   plugins: [[log]],
 })
 ```
 
+The log plugin does not currently expose configuration options.
+
 ## doura-plugin-persist
 
-Persisting doura state, and init store state by it.
+The persist plugin stores `store.getState()` in an async storage adapter,
+rehydrates named models, and exposes `persistModel` for runtime status and
+controls.
 
 ### Types
 
@@ -66,27 +71,45 @@ export interface PersistOptions {
 }
 ```
 
+### Exports
+
+```ts
+import persist, {
+  createWebStorage,
+  persistModel,
+  type PersistOptions,
+  type Storage,
+} from 'doura-plugin-persist'
+```
+
+- `createWebStorage('local' | 'session')` wraps browser storage with the async
+  `Storage` interface.
+- `persistModel` has `rehydrated` and `version` state plus `purge()`,
+  `flush()`, and `togglePause()` actions.
+
 ### Example
 
-```js
-import persist, { createWebStorage } from 'doura-plugin-persist';
+```ts
+import { doura } from 'doura'
+import persist, { createWebStorage } from 'doura-plugin-persist'
+
 doura({
   plugins: [
-    [ persist,
+    [
+      persist,
       {
         key: 'root',
         storage: createWebStorage('local'),
-        // whitelist: ['b'],
-        blacklist: ['b'],
-        migrate: function (storageState: any, version: number) {
-          const count = storageState.count
-          if (count && count.value >= 3) {
-            count.value = 2
-          }
+        blacklist: ['ephemeral'],
+        version: 2,
+        migrate(storageState, version) {
           return storageState
         },
+        writeFailHandler(error) {
+          console.error(error)
+        },
       },
-    ]
+    ],
   ],
 })
 ```

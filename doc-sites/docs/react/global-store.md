@@ -3,28 +3,26 @@ id: global-store
 title: Global Store
 ---
 
-## Provide the Doura Store to React
+`DouraRoot` provides the default React store used by `useModel` and
+`useStaticModel`. In development mode it automatically enables the `devtool`
+plugin.
 
-Wrap your app with `DouraRoot`. It creates and manages a global store automatically (you can optionally pass a pre-created store via the `store` prop).
-
-```tsx title="index.ts"
+```tsx title="index.tsx"
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
 import { DouraRoot } from 'react-doura'
+import { App } from './App'
 
-const root = ReactDOM.createRoot(document.getElementById('root'))
-
-root.render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <DouraRoot>
     <App />
   </DouraRoot>
 )
 ```
 
-### Create a model
+## Create a Model
 
-```tsx title="models/count.ts"
+```ts title="models/count.ts"
 import { defineModel } from 'doura'
 
 export const countModel = defineModel({
@@ -40,23 +38,31 @@ export const countModel = defineModel({
 })
 ```
 
-### Bind your components
-
-Now we can use the React Doura hooks to let React components interact with the Doura store.
+## Use the Model
 
 ```tsx title="components/Counter.tsx"
-import React from 'react'
 import { useModel } from 'react-doura'
-import { countModel } from './models/count'
+import { countModel } from '../models/count'
 
 export function Counter() {
   const { count, inc } = useModel(countModel)
 
-  return (
-    <div>
-      <h1>Count: {count}</h1>
-      <button onClick={inc}>inc</button>
-    </div>
-  )
+  return <button onClick={inc}>Count: {count}</button>
 }
+```
+
+You can pass an existing store for SSR or tests:
+
+```tsx
+import { doura } from 'doura'
+
+const store = doura({
+  initialState: {
+    count: { count: 10 },
+  },
+})
+
+<DouraRoot store={store}>
+  <App />
+</DouraRoot>
 ```

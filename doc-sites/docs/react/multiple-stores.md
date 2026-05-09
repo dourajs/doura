@@ -3,13 +3,10 @@ id: multiple-stores
 title: Multiple Stores
 ---
 
-By default, `DouraRoot` provides a single global store. When you need **isolated state scopes** — for example, a settings panel and a dashboard that should not share state — use `createContainer` to create independent stores.
+Use `createContainer(options?)` when part of the React tree needs an isolated
+store. It returns `{ Provider, useSharedModel, useStaticModel }`.
 
-## `createContainer`
-
-`createContainer` returns a `Provider`, `useSharedModel`, and `useStaticModel` that are scoped to their own store instance.
-
-```ts
+```tsx
 import { createContainer } from 'react-doura'
 
 const {
@@ -18,15 +15,13 @@ const {
   useStaticModel: useSettingsStaticModel,
 } = createContainer()
 
-const {
-  Provider: DashboardProvider,
-  useSharedModel: useDashboardModel,
-} = createContainer()
+const { Provider: DashboardProvider, useSharedModel: useDashboardModel } =
+  createContainer()
 ```
 
-## Providing Stores
+## Providers
 
-Wrap the relevant parts of your component tree with each container's `Provider`. Models accessed through one container are completely independent from those in another.
+Each provider owns its own store unless you pass an external `store` prop.
 
 ```tsx
 function App() {
@@ -43,9 +38,7 @@ function App() {
 }
 ```
 
-## Using Models
-
-Inside each provider, use the corresponding `useSharedModel` hook with the model definition.
+## Scoped Hooks
 
 ```tsx
 import { defineModel } from 'doura'
@@ -55,32 +48,31 @@ const counterModel = defineModel({
   state: { count: 0 },
   actions: {
     increment() {
-      this.count++
+      this.count += 1
     },
   },
 })
 
 function SettingsPanel() {
   const { count, increment } = useSettingsModel(counterModel)
-  // this 'counter' is isolated to SettingsProvider
   return <button onClick={increment}>Settings count: {count}</button>
 }
 
 function Dashboard() {
   const { count, increment } = useDashboardModel(counterModel)
-  // this 'counter' is isolated to DashboardProvider — independent from SettingsPanel
   return <button onClick={increment}>Dashboard count: {count}</button>
 }
 ```
 
-## Passing an External Store
+`SettingsPanel` and `Dashboard` read the same model definition, but the
+instances are isolated because they come from different container stores.
 
-You can also pass a pre-created `Doura` store to a `Provider` via the `store` prop, which is useful for SSR hydration or testing.
+## External Store
 
 ```tsx
 import { doura } from 'doura'
 
-const myStore = doura({
+const store = doura({
   initialState: {
     counter: { count: 42 },
   },
@@ -88,9 +80,12 @@ const myStore = doura({
 
 function App() {
   return (
-    <SettingsProvider store={myStore}>
+    <SettingsProvider store={store}>
       <SettingsPanel />
     </SettingsProvider>
   )
 }
 ```
+
+`createContainer(options?)` forwards its options to `doura()` when the provider
+creates an internal store.
