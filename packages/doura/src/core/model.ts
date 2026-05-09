@@ -301,8 +301,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.effectScope = effectScope()
     this._initModels()
     this._initViews()
-    this._initQueries()
     this._initActions()
+    this._initQueries()
   }
 
   patch(obj: AnyObject) {
@@ -395,13 +395,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
       // Actions and queries are immutable over the model's lifetime —
       // iterate pre-cached keys (built during _initActions/_initQueries).
-      for (let i = 0; i < this._actionKeys.length; i++) {
-        const key = this._actionKeys[i]
-        def(data, key, (this.actions as any)[key])
-      }
       for (let i = 0; i < this._queryKeys.length; i++) {
         const key = this._queryKeys[i]
         def(data, key, (this.queries as any)[key])
+      }
+      for (let i = 0; i < this._actionKeys.length; i++) {
+        const key = this._actionKeys[i]
+        def(data, key, (this.actions as any)[key])
       }
       for (let i = 0; i < this._modelKeys.length; i++) {
         const key = this._modelKeys[i]

@@ -89,7 +89,7 @@ describe('model', () => {
     })
   })
 
-  test('conflicted direct access follows validation precedence', () => {
+  test('conflicted direct access prefers actions over queries', () => {
     const makeChild = (name: string) =>
       createModel({
         name,
@@ -155,14 +155,17 @@ describe('model', () => {
     expect(api.stateKey).toBe('state')
     expect(api.modelKey).toBe(modelKeyChild.proxy)
     expect(api.viewKey).toBe('view')
-    expect(api.queryKey).toBe(api.$queries.queryKey)
+    expect(api.queryKey()).toBe('action-query')
     expect(api.actionKey()).toBe('action')
 
     expect(api.$views.stateKey).toBe('view-state')
     expect(api.$views.modelKey).toBe('view-model')
     expect(api.$actions.stateKey()).toBe('action-state')
     expect(api.$actions.modelKey()).toBe('action-model')
+    expect(api.$actions.queryKey()).toBe('action-query')
     expect(api.$queries.stateKey).toBeDefined()
+    expect(api.$queries.queryKey).toBeDefined()
+    expect(api.$queries.queryKey).not.toBe(api.queryKey)
     expect(api.$models.stateKey).toBe(stateKeyChild.publicInst)
 
     expect(() => {
@@ -518,6 +521,26 @@ describe('model', () => {
       // But calling getApi() again without further changes should reuse
       const api4 = model.getApi()
       expect(api4).toBe(api3)
+    })
+
+    it('should prefer actions over queries with the same key in getApi()', () => {
+      const model = createModel({
+        state: { value: 1 },
+        actions: {
+          sameKey() {
+            return 'action'
+          },
+        },
+        queries: {
+          sameKey: async () => 'query',
+        },
+      })
+
+      const api = model.getApi() as any
+
+      expect(api.sameKey()).toBe('action')
+      expect(api.sameKey).toBe((model.actions as any).sameKey)
+      expect(api.sameKey).not.toBe((model.queries as any).sameKey)
     })
 
     it('should reuse action references across getApi() rebuilds', () => {

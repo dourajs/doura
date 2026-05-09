@@ -76,7 +76,7 @@ const publicPropertiesMap: PublicPropertiesMap =
 const createGetter =
   (isPublicInstance: boolean) =>
   ({ _: instance }: ProxyContext, key: string) => {
-    const { actions, views, accessCache, ctx, models } = instance
+    const { views, actions, queries, accessCache, ctx, models } = instance
 
     let state: any
     if (isPublicInstance) {
@@ -105,7 +105,7 @@ const createGetter =
           case AccessTypes.CONTEXT:
             return ctx[key]
           case AccessTypes.QUERY:
-            return instance.queries[key]
+            return queries[key]
           case AccessTypes.MODEL:
             return isPublicInstance ? models[key] : instance.modelProxies[key]
           // default: just fallthrough
@@ -116,12 +116,12 @@ const createGetter =
       } else if (hasOwn(views, key)) {
         accessCache[key] = AccessTypes.VIEW
         return views[key]
-      } else if (hasOwn(instance.queries, key)) {
-        accessCache[key] = AccessTypes.QUERY
-        return instance.queries[key]
       } else if (hasOwn(actions, key)) {
         accessCache[key] = AccessTypes.ACTION
         return actions[key]
+      } else if (hasOwn(queries, key)) {
+        accessCache[key] = AccessTypes.QUERY
+        return queries[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -153,9 +153,10 @@ const set = (
 ): boolean => {
   const {
     ctx,
-    actions,
-    views,
     models,
+    views,
+    actions,
+    queries,
     accessContext,
     stateRef: { value: state },
   } = instance
@@ -185,18 +186,18 @@ const set = (
       warn(`Attempting to mutate view "${key}". Views are readonly.`, instance)
     }
     return false
-  } else if (hasOwn(instance.queries, key)) {
-    if (__DEV__) {
-      warn(
-        `Attempting to mutate query "${key}". Queries are readonly.`,
-        instance
-      )
-    }
-    return false
   } else if (hasOwn(actions, key)) {
     if (__DEV__) {
       warn(
         `Attempting to mutate action "${key}". Actions are readonly.`,
+        instance
+      )
+    }
+    return false
+  } else if (hasOwn(queries, key)) {
+    if (__DEV__) {
+      warn(
+        `Attempting to mutate query "${key}". Queries are readonly.`,
         instance
       )
     }

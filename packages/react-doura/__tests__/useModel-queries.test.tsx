@@ -104,4 +104,40 @@ describe('useModel with queries', () => {
       </DouraRoot>
     )
   })
+
+  test('action names win over query names in merged API', () => {
+    const conflictModel = defineModel(
+      // @ts-expect-error - intentional runtime conflict fixture
+      {
+        name: 'query-action-conflict',
+        state: { value: 0 },
+        actions: {
+          sameKey() {
+            return 'action'
+          },
+        },
+        queries: {
+          sameKey: (_ctx: any) => Promise.resolve('query'),
+        },
+      }
+    )
+
+    let apiRef: any = null
+    const App = () => {
+      const inst = useModel(conflictModel)
+      apiRef = inst
+      return <div>{inst.value}</div>
+    }
+
+    render(
+      <DouraRoot>
+        <App />
+      </DouraRoot>
+    )
+
+    expect(
+      'key "sameKey" in "actions" is conflicted with the key in "queries"'
+    ).toHaveBeenWarned()
+    expect(apiRef.sameKey()).toBe('action')
+  })
 })
