@@ -7,6 +7,10 @@ import {
 } from 'react'
 import type { QueryHandle, QueryCacheEntry } from 'doura'
 import type { InternalQueryHandle } from '../../doura/src/core/internalQueryTypes'
+import {
+  cancelReactNotification,
+  queueReactNotification,
+} from './notificationQueue'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
 
 function shallowArrayEqual(
@@ -105,7 +109,16 @@ export function useQuery(
   argsRef.current = args
 
   const subscribe = useCallback(
-    (cb: () => void) => queryHandleInternal.subscribe(argsRef.current, cb),
+    (cb: () => void) => {
+      const unsubscribe = queryHandleInternal.subscribe(argsRef.current, () => {
+        queueReactNotification(cb)
+      })
+
+      return () => {
+        unsubscribe()
+        cancelReactNotification(cb)
+      }
+    },
     [queryHandleInternal, hash]
   )
 

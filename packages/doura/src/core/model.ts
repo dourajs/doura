@@ -955,19 +955,20 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       } finally {
         this._watchStateChange = true
       }
-      this._update()
     }
 
     // Always update the query cache entry
-    const hash = this._queryHash(queryName, args)
-    const existing = this.queryCache.get(hash)
     const entry: QueryCacheEntry = {
       data,
       error: undefined,
       dataUpdatedAt: Date.now(),
-      fetchStatus: existing?.fetchStatus || 'idle',
+      fetchStatus: 'idle',
     }
     this.setQueryState(queryName, args, entry)
+
+    if (onData) {
+      this._update()
+    }
   }
 
   getQueryData(queryName: string, args?: readonly unknown[]): unknown {
