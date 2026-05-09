@@ -199,11 +199,7 @@ class ModelManagerInternal implements ModelManager {
   }
 
   private _getInitialState(name: string): State | undefined {
-    const result = this._initialState[name]
-    if (result) {
-      delete this._initialState[name]
-    }
-    return result
+    return this._initialState[name]
   }
 }
 

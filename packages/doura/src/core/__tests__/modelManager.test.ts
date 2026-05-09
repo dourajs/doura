@@ -35,15 +35,16 @@ describe('modelManager', () => {
   })
 
   it('should init store by initialStage', () => {
-    const modelMgr = modelManager({
-      initialState: {
-        one: {
-          value: 'one',
-        },
-        two: {
-          value: 'two',
-        },
+    const initialState = {
+      one: {
+        value: 'one',
       },
+      two: {
+        value: 'two',
+      },
+    }
+    const modelMgr = modelManager({
+      initialState,
     })
     const modelOne = defineModel({
       name: 'one',
@@ -57,6 +58,14 @@ describe('modelManager', () => {
     const storeTwo = modelMgr.getModel(modelTwo)
     expect(storeOne.$state.value).toBe('one')
     expect(storeTwo.$state.value).toBe('two')
+    expect(initialState).toEqual({
+      one: {
+        value: 'one',
+      },
+      two: {
+        value: 'two',
+      },
+    })
   })
 
   it('getState should return the newest state', async () => {

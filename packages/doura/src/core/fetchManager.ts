@@ -63,11 +63,8 @@ export class FetchManager {
   }
 
   destroy(): void {
-    for (const [, entry] of this._inflight) {
-      entry.controller.abort()
-      entry.reject(new DOMException('The operation was aborted.', 'AbortError'))
-      entry.promise.catch(NOOP)
+    for (const [hash, entry] of this._inflight) {
+      this._abortEntry(hash, entry)
     }
-    this._inflight.clear()
   }
 }
