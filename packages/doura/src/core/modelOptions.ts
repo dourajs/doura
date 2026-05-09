@@ -59,6 +59,36 @@ export type ModelChildren<Models> = Models extends readonly AnyObjectModel[]
     }
   : {}
 
+type ModelViewState<Model> = Model extends { state: infer S }
+  ? S extends State
+    ? S
+    : {}
+  : {}
+
+type ModelViewViews<Model> = Model extends { views: infer V }
+  ? V extends ViewOptions
+    ? V
+    : {}
+  : {}
+
+type ModelViewModels<Model> = Model extends { models: infer Models }
+  ? Models extends readonly AnyObjectModel[]
+    ? Models
+    : []
+  : []
+
+type ModelViewThis<Model> = ViewThis<
+  ModelViewState<Model>,
+  ModelViewViews<Model>,
+  ModelViewModels<Model>
+>
+
+export type ViewModelChildren<Models> = Models extends readonly AnyObjectModel[]
+  ? {
+      readonly [M in Models[number] as ModelName<M>]: ModelViewThis<M>
+    }
+  : {}
+
 export type ModelThis<
   S extends State = {},
   A extends ActionOptions = {},
@@ -83,7 +113,7 @@ export type ViewThis<
   $state: S
   $isolate: <T>(fn: (s: S) => T) => T
 } & Views<V> &
-  ModelChildren<Models>
+  ViewModelChildren<Models>
 
 export type ObjectModel<
   S extends State,
