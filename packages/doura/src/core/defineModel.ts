@@ -144,7 +144,7 @@ export function defineModel<
     model: {
       setQueryOptions<K extends Extract<keyof Q, string>>(
         name: K,
-        options: QueryOptionsForEntry<S, Q[K]>
+        options: QueryOptionsForEntry<ModelThis<S, A, V, Q, Models>, Q[K]>
       ): void
     }
   }) => void

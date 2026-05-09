@@ -8,7 +8,7 @@ import {
 } from 'doura'
 // @ts-expect-error — query helper is no longer exported
 import { query as removedQuery } from 'doura'
-import { expectType } from '../helper'
+import { expectNotAny, expectType } from '../helper'
 
 removedQuery({ fn: (_ctx: QueryCtx) => Promise.resolve(1) })
 
@@ -62,11 +62,13 @@ const userModel = defineModel(
   ({ model }) => {
     model.setQueryOptions('fetchUserToState', {
       staleTime: 5000,
-      onData(ctx, data) {
-        expectType<OnDataCtx<{ users: Record<string, User> }, [string]>>(ctx)
-        expectType<[string]>(ctx.args)
+      onData({ api, args, data }) {
+        expectNotAny<typeof api>()
+        expectType<OnDataCtx<typeof api, [string], User>>({ api, args, data })
+        expectType<Record<string, User>>(api.users)
+        expectType<[string]>(args)
         expectType<User>(data)
-        ctx.state.users[ctx.args[0]] = data
+        api.users[args[0]] = data
       },
     })
     // @ts-expect-error — query name must exist in this model
@@ -182,46 +184,80 @@ inst.$prefetchQuery('fetchUser', ['1'])
 
 // --- Cross-model invalidation via models ---
 
-const composedModel = defineModel({
-  name: 'composed',
-  state: {},
-  models: [userModel],
-  actions: {
-    invalidateUsers() {
-      this.userModel.fetchUser.invalidate()
-      this.userModel.fetchUser.setData('1', { id: '1', name: 'Bob' })
-      this.userModel.$cancelQueries()
-      this.userModel.fetchUser.reset()
+const composedModel = defineModel(
+  {
+    name: 'composed',
+    state: {},
+    models: [userModel],
+    actions: {
+      invalidateUsers() {
+        this.userModel.fetchUser.invalidate()
+        this.userModel.fetchUser.setData('1', { id: '1', name: 'Bob' })
+        this.userModel.$cancelQueries()
+        this.userModel.fetchUser.reset()
+      },
+    },
+    queries: {
+      fetchReady: (ctx) => {
+        expectType<QueryCtx>(ctx)
+        return Promise.resolve(true)
+      },
     },
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchReady', {
+      onData({ api, args, data }) {
+        expectType<QueryHandle<[string], User>>(api.userModel.fetchUser)
+        expectType<[]>(args)
+        expectType<boolean>(data)
+      },
+    })
+  }
+)
 
 // --- defineModel with queries alongside actions and views ---
 
-const fullModel = defineModel({
-  name: 'full',
-  state: {
-    count: 0,
-  },
-  actions: {
-    increment() {
-      this.count += 1
-      // $invalidateQueries accessible from action this context
-      this.$invalidateQueries()
+const fullModel = defineModel(
+  {
+    name: 'full',
+    state: {
+      count: 0,
+    },
+    actions: {
+      increment() {
+        this.count += 1
+        // $invalidateQueries accessible from action this context
+        this.$invalidateQueries()
+      },
+    },
+    views: {
+      double() {
+        return this.count * 2
+      },
+    },
+    queries: {
+      fetchCount: (ctx) => {
+        expectType<QueryCtx>(ctx)
+        return Promise.resolve(42)
+      },
     },
   },
-  views: {
-    double() {
-      return this.count * 2
-    },
-  },
-  queries: {
-    fetchCount: (ctx) => {
-      expectType<QueryCtx>(ctx)
-      return Promise.resolve(42)
-    },
-  },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchCount', {
+      onData({ api, args, data }) {
+        expectNotAny<typeof api>()
+        expectType<number>(api.count)
+        expectType<void>(api.$patch({ count: data }))
+        expectType<void>(api.increment())
+        expectType<number>(api.double)
+        expectType<QueryHandle<[], number>>(api.fetchCount)
+        expectType<[]>(args)
+        expectType<number>(data)
+        api.count = data
+      },
+    })
+  }
+)
 
 const fullInst = store.getModel(fullModel)
 expectType<number>(fullInst.count)
@@ -294,21 +330,25 @@ defineModel(
   ({ model }) => {
     model.setQueryOptions('fetchListHelper', { staleTime: 5000 })
     model.setQueryOptions('fetchListHelper', {
-      onData(ctx, data) {
-        expectType<OnDataCtx<InferredState, []>>(ctx)
-        expectType<[]>(ctx.args)
+      onData({ api, args, data }) {
+        expectNotAny<typeof api>()
+        expectType<OnDataCtx<typeof api, [], User[]>>({ api, args, data })
+        expectType<[]>(args)
         expectType<User[]>(data)
-        ctx.state.users = Object.fromEntries(
+        api.users = Object.fromEntries(
           data.map((u: User) => [u.id, u] as const)
         )
       },
     })
     model.setQueryOptions('fetchUserHelper', {
-      onData(ctx, data) {
-        expectType<OnDataCtx<InferredState, [string]>>(ctx)
-        expectType<[string]>(ctx.args)
+      onData({ api, args, data }) {
+        expectNotAny<typeof api>()
+        expectType<
+          OnDataCtx<typeof api, [string], { id: string; name: string }>
+        >({ api, args, data })
+        expectType<[string]>(args)
         expectType<{ id: string; name: string }>(data)
-        ctx.state.users[ctx.args[0]] = data
+        api.users[args[0]] = data
       },
     })
     // @ts-expect-error — query name must exist in this model
@@ -322,6 +362,10 @@ defineModel(
     model.setQueryOptions('fetchListHelper', {
       // @ts-expect-error — reads come from cache
       getData: (_state: InferredState) => 1,
+    })
+    model.setQueryOptions('fetchListHelper', {
+      // @ts-expect-error — onData receives a single { api, args, data } object
+      onData(_ctx, _data) {},
     })
   }
 )

@@ -42,9 +42,11 @@ describe('model queries', () => {
 
     it('should preserve setup query options', () => {
       const fn = async (_ctx: any, id: number) => ({ id })
-      const onData = jest.fn((ctx: any, data: { id: number }) => {
-        ctx.state.user = data
-      })
+      const onData = jest.fn(
+        ({ api, data }: { api: any; data: { id: number } }) => {
+          api.user = data
+        }
+      )
 
       const model = defineModel(
         {
@@ -250,8 +252,8 @@ describe('model queries', () => {
         },
         ({ model }) => {
           model.setQueryOptions('fetchUser', {
-            onData(ctx, data) {
-              ctx.state.user = data
+            onData({ api, data }) {
+              api.user = data
             },
           })
         }

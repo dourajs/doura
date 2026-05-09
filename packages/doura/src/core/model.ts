@@ -969,13 +969,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     if (onData) {
       this._watchStateChange = false
       try {
-        ;(onData as Function)(
-          {
-            state: this.stateRef.value,
-            args,
-          },
-          data
-        )
+        ;(onData as Function)({
+          api: this.proxy,
+          args,
+          data,
+        })
       } finally {
         this._watchStateChange = true
       }

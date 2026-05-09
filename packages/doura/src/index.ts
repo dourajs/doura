@@ -7,6 +7,7 @@ export type {
   ViewOptions,
   ModelOptions,
   ObjectModel,
+  ModelThis,
   DefineModel,
   AnyObjectModel,
   AnyModel,

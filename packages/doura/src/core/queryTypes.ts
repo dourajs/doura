@@ -6,9 +6,14 @@ export interface QueryCtx {
 
 type QueryArgsTuple = readonly unknown[]
 
-export interface OnDataCtx<S = any, TArgs extends QueryArgsTuple = any[]> {
-  state: S
+export interface OnDataCtx<
+  TApi = any,
+  TArgs extends QueryArgsTuple = any[],
+  TData = any,
+> {
+  api: TApi
   args: TArgs
+  data: TData
 }
 
 /** Coordinator interface — breaks the circular import between model.ts

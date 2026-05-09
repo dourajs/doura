@@ -110,8 +110,8 @@ describe('QueryCoordinator', () => {
 
     it('should apply onData only once for a deduplicated response', async () => {
       const coordinator = new QueryCoordinator()
-      const onData = jest.fn(({ state }, data: number) => {
-        state.value += data
+      const onData = jest.fn(({ api, data }) => {
+        api.value += data
       })
       const fn = jest.fn(async () => {
         return 1

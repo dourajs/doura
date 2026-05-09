@@ -65,8 +65,8 @@ function makeLandingModel(fetchData: () => Promise<number>) {
     },
     ({ model }) => {
       model.setQueryOptions('fetchData', {
-        onData({ state }, data: number) {
-          state.value = data
+        onData({ api, data }) {
+          api.value = data
         },
       })
     }
