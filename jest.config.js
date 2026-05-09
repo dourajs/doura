@@ -1,7 +1,24 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
+const tsJestConfig = {
+  tsconfig: {
+    jsx: 'react',
+    allowJs: true,
+    target: 'es6',
+    lib: ['dom', 'esnext'],
+    module: 'esnext',
+    moduleResolution: 'nodenext',
+    skipLibCheck: true,
+    esModuleInterop: true,
+    noUnusedLocals: false,
+    noUnusedParameters: false,
+  },
+}
+
 module.exports = {
   testEnvironment: 'jsdom',
-  preset: 'ts-jest/presets/js-with-ts',
+  transform: {
+    '^.+\\.[tj]sx?$': ['ts-jest', tsJestConfig],
+  },
   setupFilesAfterEnv: ['./scripts/setupJestEnv.ts'],
   verbose: true,
   forceExit: false,
@@ -14,20 +31,6 @@ module.exports = {
     __GLOBAL__: false,
     __ESM_BUNDLER__: true,
     __ESM_BROWSER__: false,
-    'ts-jest': {
-      tsconfig: {
-        jsx: 'react',
-        allowJs: true,
-        target: 'es6',
-        lib: ['dom', 'esnext'],
-        module: 'esnext',
-        moduleResolution: 'nodenext',
-        skipLibCheck: true,
-        esModuleInterop: true,
-        noUnusedLocals: false,
-        noUnusedParameters: false,
-      },
-    },
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   moduleNameMapper: {

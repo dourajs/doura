@@ -542,7 +542,10 @@ describe('useModel (with name)', () => {
     })
 
     const App = () => {
-      const counter = useModel({ ...countModel, name: '' } as typeof countModel)
+      const counter = useModel({
+        ...countModel,
+        name: '',
+      } as unknown as typeof countModel)
       return <div id="value">{counter.value}</div>
     }
 
@@ -876,7 +879,10 @@ describe('useStaticModel', () => {
     })
 
     const App1 = () => {
-      const counter = useStaticModel({ ...count, name: '' } as typeof count)
+      const counter = useStaticModel({
+        ...count,
+        name: '',
+      } as unknown as typeof count)
       return <div id="value">{counter.value}</div>
     }
     const App2 = () => {
