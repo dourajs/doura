@@ -92,10 +92,10 @@ export type ObjectModel<
   Models extends readonly AnyObjectModel[] = [],
   Q extends Record<
     string,
-    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   > = Record<
     string,
-    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   >,
 > = {
   name: string
@@ -113,10 +113,10 @@ export type ModelOptions<
   Models extends readonly AnyObjectModel[] = [],
   Q extends Record<
     string,
-    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   > = Record<
     string,
-    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   >,
 > = ObjectModel<S, A, V, Models, Q>
 

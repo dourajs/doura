@@ -1,4 +1,11 @@
-import { defineModel, doura, QueryCtx, ModelQueries, QueryHandle } from 'doura'
+import {
+  defineModel,
+  doura,
+  QueryCtx,
+  OnDataCtx,
+  ModelQueries,
+  QueryHandle,
+} from 'doura'
 // @ts-expect-error — query helper is no longer exported
 import { query as removedQuery } from 'doura'
 import { expectType } from '../helper'
@@ -46,18 +53,25 @@ const userModel = defineModel(
 
       fetchUserToState(ctx, id: string) {
         expectType<QueryCtx>(ctx)
-        expectType<Record<string, User>>(this.users)
-        const user = { id, name: 'User' }
-        this.users[id] = user
-        return Promise.resolve(user)
+        // @ts-expect-error — query functions do not receive model `this`
+        this.updateUser({ id, name: 'User' })
+        return Promise.resolve({ id, name: 'User' })
       },
     },
   },
   ({ model }) => {
-    model.setQueryOptions('fetchUserToState', { staleTime: 5000 })
+    model.setQueryOptions('fetchUserToState', {
+      staleTime: 5000,
+      onData(ctx, data) {
+        expectType<OnDataCtx<{ users: Record<string, User> }, [string]>>(ctx)
+        expectType<[string]>(ctx.args)
+        expectType<User>(data)
+        ctx.state.users[ctx.args[0]] = data
+      },
+    })
     // @ts-expect-error — query name must exist in this model
     model.setQueryOptions('missingName', { staleTime: 5000 })
-    // @ts-expect-error — only staleTime is supported in query options
+    // @ts-expect-error — only staleTime/onData are supported in query options
     model.setQueryOptions('fetchUser', { gcTime: 5000 })
   }
 )
@@ -265,6 +279,7 @@ defineModel(
       fetchUserHelper: function (ctx, id: string) {
         expectType<QueryCtx>(ctx)
         expectType<string>(id)
+        // @ts-expect-error — query functions do not receive model `this`
         expectType<Record<string, User>>(this.users)
         return Promise.resolve({ id, name: 'User ' + id })
       },
@@ -278,15 +293,30 @@ defineModel(
   },
   ({ model }) => {
     model.setQueryOptions('fetchListHelper', { staleTime: 5000 })
-    model.setQueryOptions('fetchUserHelper', {})
+    model.setQueryOptions('fetchListHelper', {
+      onData(ctx, data) {
+        expectType<OnDataCtx<InferredState, []>>(ctx)
+        expectType<[]>(ctx.args)
+        expectType<User[]>(data)
+        ctx.state.users = Object.fromEntries(
+          data.map((u: User) => [u.id, u] as const)
+        )
+      },
+    })
+    model.setQueryOptions('fetchUserHelper', {
+      onData(ctx, data) {
+        expectType<OnDataCtx<InferredState, [string]>>(ctx)
+        expectType<[string]>(ctx.args)
+        expectType<{ id: string; name: string }>(data)
+        ctx.state.users[ctx.args[0]] = data
+      },
+    })
     // @ts-expect-error — query name must exist in this model
     model.setQueryOptions('removedKey', { staleTime: 1 })
     // @ts-expect-error — cache identity comes from args
     model.setQueryOptions('fetchListHelper', { key: () => ['x'] })
-    // @ts-expect-error — write state inside fn
-    model.setQueryOptions('fetchListHelper', { onData: () => undefined })
     model.setQueryOptions('fetchListHelper', {
-      // @ts-expect-error — write state inside fn
+      // @ts-expect-error — writes use onData
       setData: (_state: InferredState, _data: number) => undefined,
     })
     model.setQueryOptions('fetchListHelper', {

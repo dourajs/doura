@@ -108,19 +108,26 @@ describe('QueryCoordinator', () => {
       mgr.destroy()
     })
 
-    it('should apply inline state writes only once for a deduplicated response', async () => {
+    it('should apply onData only once for a deduplicated response', async () => {
       const coordinator = new QueryCoordinator()
-      const fn = jest.fn(async function (this: any) {
-        this.value += 1
+      const onData = jest.fn(({ state }, data: number) => {
+        state.value += data
+      })
+      const fn = jest.fn(async () => {
         return 1
       })
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        queries: {
-          fetchData: fn,
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            fetchData: fn,
+          },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchData', { onData })
+        }
+      )
 
       const mgr = modelManager({ query: {} })
       const inst = mgr.getModel(model)
@@ -134,23 +141,30 @@ describe('QueryCoordinator', () => {
       expect(r1).toBe(1)
       expect(r2).toBe(1)
       expect(fn).toHaveBeenCalledTimes(1)
+      expect(onData).toHaveBeenCalledTimes(1)
       expect(inst.$state.value).toBe(1)
 
       mgr.destroy()
     })
 
-    it('should reject every waiter if shared query function throws', async () => {
+    it('should reject every waiter if shared onData commit throws', async () => {
       const coordinator = new QueryCoordinator()
-      const fn = jest.fn(() => {
+      const fn = jest.fn(async () => 1)
+      const onData = jest.fn(() => {
         throw new Error('onData exploded')
       })
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        queries: {
-          fetchData: fn,
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            fetchData: fn,
+          },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchData', { onData })
+        }
+      )
 
       const mgr = modelManager({ query: {} })
       const inst = mgr.getModel(model)
@@ -162,8 +176,10 @@ describe('QueryCoordinator', () => {
       await expect(p1).rejects.toThrow('onData exploded')
       await expect(p2).rejects.toThrow('onData exploded')
       expect(fn).toHaveBeenCalledTimes(1)
+      expect(onData).toHaveBeenCalledTimes(1)
       expect(inst.$queries.fetchData.getState()?.fetchStatus).toBe('idle')
       expect(inst.$queries.fetchData.getState()?.error).toBeInstanceOf(Error)
+      expect(inst.$queries.fetchData.getData()).toBeUndefined()
 
       mgr.destroy()
     })
@@ -741,16 +757,24 @@ describe('QueryCoordinator', () => {
 
     it('should abort inflight fetches and keep destroyed caches empty', async () => {
       let signal!: AbortSignal
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        queries: {
-          fetchData: (ctx: any) => {
-            signal = ctx.signal
-            return new Promise((resolve) => setTimeout(() => resolve(1), 5000))
+      const onData = jest.fn()
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            fetchData: (ctx: any) => {
+              signal = ctx.signal
+              return new Promise((resolve) =>
+                setTimeout(() => resolve(1), 5000)
+              )
+            },
           },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchData', { onData })
+        }
+      )
 
       const store = doura({ query: {} })
       const inst = store.getModel(model)
@@ -761,6 +785,7 @@ describe('QueryCoordinator', () => {
 
       expect(signal.aborted).toBe(true)
       await expect(promise).rejects.toThrow()
+      expect(onData).not.toHaveBeenCalled()
       expect(internal.queryCache.size).toBe(0)
     })
   })

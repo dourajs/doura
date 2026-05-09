@@ -1,6 +1,7 @@
 import { AnyObjectModel } from '../modelOptions'
 import { ModelInternal, ActionType, ModelInternalOptions } from '../model'
 import { nextTick } from '../scheduler'
+import { defineModel } from '../defineModel'
 
 let oldEnv: any
 beforeAll(() => {
@@ -19,10 +20,10 @@ const createModel = (
   options: ModelInternalOptions = {}
 ) =>
   new ModelInternal(
-    {
+    defineModel({
       name: model.name || `model-${++modelId}`,
       ...model,
-    } as AnyObjectModel,
+    }) as AnyObjectModel,
     options
   )
 

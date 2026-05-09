@@ -25,6 +25,7 @@ export type {
   ModelManagerOptions,
   Plugin,
   QueryCtx,
+  OnDataCtx,
   QueryCacheEntry,
   QueryConfig,
   QueryHandle,

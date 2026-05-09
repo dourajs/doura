@@ -1,24 +1,39 @@
-import type { QueryCtx } from './queryTypes'
+import type { OnDataCtx, QueryCtx } from './queryTypes'
 
 export type QueryArgsTuple = readonly unknown[]
 
 export type QueryFunction<
   TArgs extends QueryArgsTuple = any[],
   TData = any,
-  TThis = any,
+  TThis = void,
 > = (this: TThis, ctx: QueryCtx, ...args: TArgs) => Promise<TData>
 
-export interface QueryOptions {
+export interface QueryOptions<
+  S = any,
+  TArgs extends QueryArgsTuple = any[],
+  TData = any,
+> {
   staleTime?: number
+  onData?: (ctx: OnDataCtx<S, TArgs>, data: TData) => void
 }
 
 export interface NormalizedQuerySpec<
   TArgs extends QueryArgsTuple = any[],
   TData = any,
+  S = any,
 > {
   fn: (ctx: QueryCtx, ...args: TArgs) => Promise<TData>
   staleTime?: number
+  onData?: (ctx: OnDataCtx<S, TArgs>, data: TData) => void
 }
+
+export type QueryOptionsForEntry<S, T> = T extends (
+  this: any,
+  ctx: QueryCtx,
+  ...args: infer TArgs extends QueryArgsTuple
+) => Promise<infer TData>
+  ? QueryOptions<S, TArgs, TData>
+  : QueryOptions<S>
 
 export function decorateModelQueries(modelOptions: any): void {
   const queries = modelOptions?.queries

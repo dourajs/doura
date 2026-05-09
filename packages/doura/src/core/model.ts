@@ -43,7 +43,7 @@ import {
 import { queueJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
 import { IQueryCoordinator, QueryCacheEntry, QueryHash } from './queryTypes'
-import { decorateModelQueries, NormalizedQuerySpec } from './queryOptions'
+import { isQuerySpecLike, NormalizedQuerySpec } from './queryOptions'
 import type { InternalQueryHandle } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
 import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
@@ -706,6 +706,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     if (queries) {
       for (const queryName of Object.keys(queries)) {
         const spec = queries[queryName]
+        if (!isQuerySpecLike(spec)) {
+          continue
+        }
         this._cacheAccess(queryName, AccessTypes.QUERY)
         this._queryKeys.push(queryName)
         const handle = this._buildQueryHandle(queryName, spec)
@@ -936,6 +939,25 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     args: readonly unknown[],
     data: unknown
   ): void {
+    const handle = this.queries[queryName]
+    const onData = handle?._spec.onData
+
+    if (onData) {
+      this._watchStateChange = false
+      try {
+        ;(onData as Function)(
+          {
+            state: this.stateRef.value,
+            args,
+          },
+          data
+        )
+      } finally {
+        this._watchStateChange = true
+      }
+      this._update()
+    }
+
     // Always update the query cache entry
     const hash = this._queryHash(queryName, args)
     const existing = this.queryCache.get(hash)
@@ -999,8 +1021,6 @@ export function createModelInstance<IModel extends AnyObjectModel>(
   modelOptions: IModel,
   options: ModelInternalOptions = {}
 ) {
-  decorateModelQueries(modelOptions)
-
   if (__DEV__) {
     validateModelOptions(modelOptions)
   }

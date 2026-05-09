@@ -6,6 +6,11 @@ export interface QueryCtx {
 
 type QueryArgsTuple = readonly unknown[]
 
+export interface OnDataCtx<S = any, TArgs extends QueryArgsTuple = any[]> {
+  state: S
+  args: TArgs
+}
+
 /** Coordinator interface — breaks the circular import between model.ts
  *  and queryCoordinator.ts. ModelInternal depends only on this interface;
  *  the concrete QueryCoordinator implements it. */

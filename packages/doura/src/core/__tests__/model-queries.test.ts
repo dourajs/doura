@@ -41,6 +41,9 @@ describe('model queries', () => {
 
     it('should preserve setup query options', () => {
       const fn = async (_ctx: any, id: number) => ({ id })
+      const onData = jest.fn((ctx: any, data: { id: number }) => {
+        ctx.state.user = data
+      })
 
       const model = defineModel(
         {
@@ -51,7 +54,7 @@ describe('model queries', () => {
           },
         },
         ({ model }) => {
-          model.setQueryOptions('fetchUser', { staleTime: 5000 })
+          model.setQueryOptions('fetchUser', { staleTime: 5000, onData })
         }
       )
 
@@ -60,6 +63,7 @@ describe('model queries', () => {
       expect(handle._spec).toBe((model as any).queries.fetchUser)
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
+      expect(handle._spec.onData).toBe(onData)
     })
 
     it('should skip entries without a callable query function', () => {
@@ -211,7 +215,7 @@ describe('model queries', () => {
     })
   })
 
-  describe('inline query state mutation', () => {
+  describe('query data commits', () => {
     it('setData should write cache without mutating model state', () => {
       const model = defineModel({
         name: 'model',
@@ -234,6 +238,37 @@ describe('model queries', () => {
       })
     })
 
+    it('setData should apply onData and write query cache', () => {
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { user: null as any },
+          queries: {
+            fetchUser: async () => ({ id: 1, name: '' }),
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('fetchUser', {
+            onData(ctx, data) {
+              ctx.state.user = data
+            },
+          })
+        }
+      )
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({
+        id: 1,
+        name: 'Alice',
+      })
+
+      expect(store.$rawState.user).toEqual({ id: 1, name: 'Alice' })
+      expect(store.$queries.fetchUser.getData()).toEqual({
+        id: 1,
+        name: 'Alice',
+      })
+    })
+
     it('should read from query cache even when model state is populated', () => {
       const model = defineModel({
         name: 'model',
@@ -248,14 +283,15 @@ describe('model queries', () => {
       expect(data).toBeUndefined()
     })
 
-    it('should apply state writes made inside the query function', async () => {
+    it('should not bind model this inside the query function', async () => {
+      const seenThis = jest.fn()
       const model = defineModel({
         name: 'model',
         state: { user: null as any },
         queries: {
-          async fetchUser() {
+          fetchUser: async function (this: any) {
+            seenThis(this)
             const user = { id: 1, name: 'Alice' }
-            this.user = user
             return user
           },
         },
@@ -264,7 +300,8 @@ describe('model queries', () => {
       const store = modelMgr.getModel(model)
       await store.$queries.fetchUser.fetch()
 
-      expect(store.$rawState.user).toEqual({ id: 1, name: 'Alice' })
+      expect(seenThis).toHaveBeenCalledWith(undefined)
+      expect(store.$rawState.user).toBeNull()
       expect(store.$queries.fetchUser.getData()).toEqual({
         id: 1,
         name: 'Alice',
@@ -511,6 +548,41 @@ describe('model queries', () => {
 
       inst.$resetQueries()
       expect(listener).toHaveBeenCalled()
+    })
+  })
+
+  describe('onData exception safety', () => {
+    it('should restore _watchStateChange if onData throws', () => {
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            broken: async () => 42,
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('broken', {
+            onData() {
+              throw new Error('onData exploded')
+            },
+          })
+        }
+      )
+
+      const inst = modelMgr.getModel(model)
+      const internal = (inst as any)._
+
+      expect(() => {
+        inst.$queries.broken.setData(42)
+      }).toThrow('onData exploded')
+
+      expect(internal._watchStateChange).toBe(true)
+      expect(inst.$queries.broken.getData()).toBeUndefined()
+
+      internal.stateRef.value.value = 99
+      internal._update()
+      expect(inst.$state.value).toBe(99)
     })
   })
 

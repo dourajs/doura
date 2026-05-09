@@ -50,7 +50,7 @@ export class QueryCoordinator {
     const appliedPromise = this._fetchManager
       .fetch(hash, (signal) => {
         const ctx = { signal }
-        return (fn as Function).call(model.proxy, ctx, ...argsTuple)
+        return (fn as Function)(ctx, ...argsTuple)
       })
       .then((result) => {
         if (!model.destroyed) {

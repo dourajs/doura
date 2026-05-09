@@ -13,6 +13,7 @@ import {
 import {
   decorateModelQueries,
   QueryOptions,
+  QueryOptionsForEntry,
   setDecoratedQueryOptions,
 } from './queryOptions'
 import type { QueryCtx } from './queryTypes'
@@ -24,10 +25,10 @@ export type DefineModel<
   Models extends readonly AnyObjectModel[] = [],
   Q extends Record<
     string,
-    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   > = Record<
     string,
-    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   >,
 > = ModelOptions<S, A, V, Models, Q> & {} // BUG: {} is required
 
@@ -120,17 +121,9 @@ export function defineModel<
   const Models extends readonly AnyObjectModel[] = [],
   const Q extends Record<
     string,
-    (
-      this: ModelThis<S, A, V, Q, Models>,
-      ctx: QueryCtx,
-      ...args: any[]
-    ) => Promise<any>
+    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   > & {
-    [K in keyof Q]: (
-      this: ModelThis<S, A, V, Q, Models>,
-      ctx: QueryCtx,
-      ...args: any[]
-    ) => Promise<any>
+    [K in keyof Q]: (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   } = {},
   M extends ObjectModel<S, A, V, Models> = ObjectModel<S, A, V, Models>,
 >(
@@ -143,11 +136,7 @@ export function defineModel<
     queries?: Q &
       Record<
         string,
-        (
-          this: ModelThis<S, A, V, Q, Models>,
-          ctx: QueryCtx,
-          ...args: any[]
-        ) => Promise<any>
+        (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
       >
   } & NoModelKeyConflicts<S, A, V, Q, Models> &
     ThisType<ModelThis<S, A, V, Q, Models>>,
@@ -155,7 +144,7 @@ export function defineModel<
     model: {
       setQueryOptions<K extends Extract<keyof Q, string>>(
         name: K,
-        options: { staleTime?: number }
+        options: QueryOptionsForEntry<S, Q[K]>
       ): void
     }
   }) => void
