@@ -112,14 +112,24 @@ Defines a model — the unit of state, logic, and derived data in Doura.
 ### Types
 
 ```ts
-function defineModel<N, S, A, V, Models, Q>(options: {
-  name: N                    // required: unique string identifier
-  state: S                   // required: initial state object
-  actions?: A                // optional: methods that mutate state
-  views?: V                  // optional: computed/derived values
-  models?: Models            // optional: array of child models for composition
-  queries?: Q                // optional: async data fetching with caching
-}): DefineModel<S, A, V, Models>
+function defineModel<N, S, A, V, Models, Q>(
+  options: {
+    name: N // required: unique string identifier
+    state: S // required: initial state object
+    actions?: A // optional: methods that mutate state
+    views?: V // optional: computed/derived values
+    models?: Models // optional: array of child models for composition
+    queries?: Q // optional: async data fetching functions
+  },
+  setup?: (ctx: {
+    model: {
+      setQueryOptions<K extends keyof Q>(
+        name: K,
+        options: { staleTime?: number }
+      ): void
+    }
+  }) => void
+): DefineModel<S, A, V, Models>
 ```
 
 Keys across `state`, `actions`, `views`, `queries`, and `models` must not conflict — TypeScript will report a compile-time error if they do.
@@ -183,46 +193,46 @@ const parentModel = defineModel({
 })
 ```
 
-## `query`
+## Query Options
 
-Helper function to define a query entry with full options. Prefer a shorthand function when the entry only needs `fn`; use `query(...)` when options such as `staleTime` are needed. Full query specs must be created with `query(...)`; direct `{ fn }` objects are rejected.
+Query entries are always functions. Configure per-query options in the optional second argument to `defineModel()` with `model.setQueryOptions(name, options)`.
 
 ### Types
 
 ```ts
-function query<TArgs, TData>(spec: {
-  fn: (this: ModelThis, ctx: QueryCtx, ...args: TArgs) => Promise<TData>
-  staleTime?: number
-}): QuerySpec<TArgs, TData>
+model.setQueryOptions<K extends keyof queries>(
+  name: K,
+  options: { staleTime?: number }
+): void
 ```
 
 ### Example
 
 ```ts
-import { defineModel, query } from 'doura'
+import { defineModel } from 'doura'
 
-const userModel = defineModel({
-  name: 'user',
-  state: { users: {} as Record<string, User> },
-  queries: {
-    // Preferred when only fn is needed
-    fetchAll: async function (ctx) {
-      const res = await fetch('/api/users', { signal: ctx.signal })
-      return res.json()
-    },
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: { users: {} as Record<string, User> },
+    queries: {
+      fetchAll: async function (ctx) {
+        const res = await fetch('/api/users', { signal: ctx.signal })
+        return res.json()
+      },
 
-    // Use query(...) when options are needed
-    fetchById: query({
-      fn: async function (ctx, id: string) {
+      fetchById: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
         const user = await res.json()
         this.users[id] = user
         return user
       },
-      staleTime: 30_000,
-    }),
+    },
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchById', { staleTime: 30_000 })
+  }
+)
 ```
 
 ## `QueryHandle`
@@ -231,24 +241,24 @@ The runtime query object available on model instances for each query entry. Acce
 
 ### Methods
 
-| Method | Description |
-|--------|-------------|
-| `getData(...args)` | Read cached data without triggering a fetch. Returns `undefined` if absent. |
-| `getState(...args)` | Read the raw cache entry (`{ data, error, dataUpdatedAt, fetchStatus }`). |
-| `isFetching(...args)` | `true` if the query is currently fetching. |
-| `isStale(...args)` | `true` if the cached data is missing or older than `staleTime`. |
-| `fetch(...args)` | Kick off a fetch. Returns a Promise resolving with the data. |
-| `prefetch(...args)` | Fetch and warm the cache. Returns `Promise<void>`. |
-| `cancel(...args?)` | Cancel inflight request for specific args, or all inflight requests (no args). |
-| `invalidate(...args?)` | Mark cached entry stale without clearing data. No args = invalidate all. |
-| `reset(...args?)` | Clear the cached entry entirely. No args = reset all. |
-| `setData(...args, data)` | Write data directly into the cache. |
+| Method                   | Description                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| `getData(...args)`       | Read cached data without triggering a fetch. Returns `undefined` if absent.    |
+| `getState(...args)`      | Read the raw cache entry (`{ data, error, dataUpdatedAt, fetchStatus }`).      |
+| `isFetching(...args)`    | `true` if the query is currently fetching.                                     |
+| `isStale(...args)`       | `true` if the cached data is missing or older than `staleTime`.                |
+| `fetch(...args)`         | Kick off a fetch. Returns a Promise resolving with the data.                   |
+| `prefetch(...args)`      | Fetch and warm the cache. Returns `Promise<void>`.                             |
+| `cancel(...args?)`       | Cancel inflight request for specific args, or all inflight requests (no args). |
+| `invalidate(...args?)`   | Mark cached entry stale without clearing data. No args = invalidate all.       |
+| `reset(...args?)`        | Clear the cached entry entirely. No args = reset all.                          |
+| `setData(...args, data)` | Write data directly into the cache.                                            |
 
 ### `QueryCtx`
 
 ```ts
 interface QueryCtx {
-  signal: AbortSignal  // fires when cancel() is called
+  signal: AbortSignal // fires when cancel() is called
 }
 ```
 
@@ -276,7 +286,7 @@ interface DouraOptions {
   initialState?: Record<string, any>
   plugins?: [Plugin, any?][]
   query?: {
-    gcTime?: number    // garbage collection time (default: 5 min)
+    gcTime?: number // garbage collection time (default: 5 min)
     staleTime?: number // how long data is fresh (default: 0)
   }
 }
@@ -324,31 +334,31 @@ const model = defineModel({
 })
 
 const instance = store.getModel(model)
-instance.value       // 0 (state)
+instance.value // 0 (state)
 instance.actionOne() // call action
-instance.double      // 0 (view)
+instance.double // 0 (view)
 ```
 
 ### `$`-prefixed API
 
-| Property / Method | Description |
-|-------------------|-------------|
-| `$name` | The model's name |
-| `$state` | Current state (assignable to replace) |
-| `$rawState` | Raw state snapshot |
-| `$actions` | Actions map |
-| `$views` | Views map |
-| `$queries` | Query handles map |
-| `$models` | Child model instances map |
-| `$patch(obj)` | Deep merge partial state |
-| `$onAction(listener)` | Subscribe to action calls. Returns unsubscribe. |
-| `$subscribe(listener)` | Subscribe to state changes. Returns unsubscribe. |
-| `$isolate(fn)` | Read state without tracking (for view optimization) |
-| `$getApi()` | Get a snapshot of the full API (state + views + actions + queries + models) |
-| `$createView(selector)` | Create a reactive derived view. Returns `{ (): T, destroy(): void }`. |
-| `$invalidateQueries()` | Mark all query cache entries stale |
-| `$cancelQueries()` | Cancel all inflight query requests |
-| `$resetQueries()` | Clear all query cache entries |
+| Property / Method       | Description                                                                 |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `$name`                 | The model's name                                                            |
+| `$state`                | Current state (assignable to replace)                                       |
+| `$rawState`             | Raw state snapshot                                                          |
+| `$actions`              | Actions map                                                                 |
+| `$views`                | Views map                                                                   |
+| `$queries`              | Query handles map                                                           |
+| `$models`               | Child model instances map                                                   |
+| `$patch(obj)`           | Deep merge partial state                                                    |
+| `$onAction(listener)`   | Subscribe to action calls. Returns unsubscribe.                             |
+| `$subscribe(listener)`  | Subscribe to state changes. Returns unsubscribe.                            |
+| `$isolate(fn)`          | Read state without tracking (for view optimization)                         |
+| `$getApi()`             | Get a snapshot of the full API (state + views + actions + queries + models) |
+| `$createView(selector)` | Create a reactive derived view. Returns `{ (): T, destroy(): void }`.       |
+| `$invalidateQueries()`  | Mark all query cache entries stale                                          |
+| `$cancelQueries()`      | Cancel all inflight query requests                                          |
+| `$resetQueries()`       | Clear all query cache entries                                               |
 
 ## `Doura`
 
@@ -360,7 +370,9 @@ The store object returned by `doura()`. Manages named and detached model instanc
 interface Doura {
   getState(): Record<string, State>
   getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
-  getDetachedModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
+  getDetachedModel<IModel extends AnyModel>(
+    model: IModel
+  ): ModelInstance<IModel>
   subscribe(fn: () => any): () => void
   destroy(): void
 }
@@ -414,7 +426,7 @@ const userModel = defineModel({
     userName() {
       // without $isolate, changes to user.age would also invalidate this view
       const user = this.$isolate((state) => state.user)
-      return user.name  // only re-evaluates when user.name changes
+      return user.name // only re-evaluates when user.name changes
     },
   },
 })
@@ -444,7 +456,7 @@ class SomeExternalLib {
 const model = defineModel({
   name: 'app',
   state: {
-    lib: markRaw(new SomeExternalLib()),  // will not be made reactive
+    lib: markRaw(new SomeExternalLib()), // will not be made reactive
     count: 0,
   },
 })
@@ -475,7 +487,7 @@ const obj = markStrict(
 const model = defineModel({
   name: 'app',
   state: {
-    data: obj,  // non-enumerable 'hidden' property will be preserved during copy-on-write
+    data: obj, // non-enumerable 'hidden' property will be preserved during copy-on-write
   },
 })
 ```

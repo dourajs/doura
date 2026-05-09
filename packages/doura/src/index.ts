@@ -25,10 +25,6 @@ export type {
   ModelManagerOptions,
   Plugin,
   QueryCtx,
-  QuerySpec,
-  QueryShorthand,
-  NormalizedQuerySpec,
-  QueriesOption,
   QueryCacheEntry,
   QueryConfig,
   QueryHandle,
@@ -36,13 +32,7 @@ export type {
   FetchStatus,
 } from './core'
 
-export {
-  defineModel,
-  query,
-  nextTick,
-  computeQueryHash,
-  computeArgsKey,
-} from './core'
+export { defineModel, nextTick, computeQueryHash, computeArgsKey } from './core'
 
 export { Doura, DouraOptions, doura } from './doura'
 

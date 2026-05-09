@@ -75,7 +75,7 @@ action 调用
 
 **为什么用 depth 计数？** 嵌套 action（action A 调用 action B）只在最外层完成时刷新一次，避免中间状态产生不必要的 snapshot。
 
-### _update — 状态转换
+### \_update — 状态转换
 
 `model.ts:491-500`：
 
@@ -100,11 +100,11 @@ _update() {
 
 `model.ts:408-425`：
 
-| Action Type | 行为 |
-|-------------|------|
-| `MODIFY` | `snapshot(stateRef.value, stateRef.value, lastDraftToSnapshot)` — 从 draft 生成不可变 snapshot |
-| `PATCH` | 同 MODIFY（patch 已在 `patch()` 方法中直接修改了 draft） |
-| `REPLACE` | 直接返回 `action.payload`（新的 plain object） |
+| Action Type | 行为                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `MODIFY`    | `snapshot(stateRef.value, stateRef.value, lastDraftToSnapshot)` — 从 draft 生成不可变 snapshot |
+| `PATCH`     | 同 MODIFY（patch 已在 `patch()` 方法中直接修改了 draft）                                       |
+| `REPLACE`   | 直接返回 `action.payload`（新的 plain object）                                                 |
 
 `lastDraftToSnapshot` (`model.ts:201`) 是 snapshot 缓存 Map，实现跨 dispatch 的结构共享。
 
@@ -255,42 +255,44 @@ Plugin 通过 `onModelInstance` 拿到 `ModelInstance`，可以调用 `$subscrib
 
 ## 6. Query 系统
 
-> `core/model.ts`（_initQueries, _buildQueryHandle）、`core/queryCoordinator.ts`、`core/queryTypes.ts`
+> `core/model.ts`（\_initQueries, \_buildQueryHandle）、`core/queryCoordinator.ts`、`core/queryTypes.ts`
 
 Query 系统为 model 提供声明式的异步数据获取能力，支持缓存、去重、过期控制和垃圾回收。
 
 ### defineModel queries 选项
 
 ```ts
-const userModel = defineModel({
-  name: 'user',
-  state: { users: {} as Record<string, User> },
-  queries: {
-    // 只有 fn 时优先直接写函数
-    fetchUser: async function (ctx, id: string) {
-      const user = await api.getUser(id)
-      this.users[id] = user
-      return user
-    },
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: { users: {} as Record<string, User> },
+    queries: {
+      fetchUser: async function (ctx, id: string) {
+        const user = await api.getUser(id)
+        this.users[id] = user
+        return user
+      },
 
-    // 需要 staleTime 等选项时使用 query() helper
-    fetchList: query({
-      fn: async function (ctx, page: number) {
+      fetchList: async function (ctx, page: number) {
         return await api.getUserList(page)
       },
-      staleTime: 30_000,  // 30s 内视为新鲜
-    }),
+    },
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchList', { staleTime: 30_000 })
+  }
+)
 ```
 
-**两种声明方式**：
-- **Shorthand**（推荐用于只有 `fn` 的场景）：`(ctx: QueryCtx, ...args) => Promise<TData>`
-- **QuerySpec**（用于额外选项）：`query({ fn, staleTime? })`
+**声明方式**：
 
-只有 `fn` 时不要包一层 `query(...)`。`query()` helper 是 full spec 的唯一入口，用于 `staleTime` 等选项；不要在 `queries` 中直接写 `{ fn }` 对象。
+- `queries` 中每个 entry 都是函数：`(ctx: QueryCtx, ...args) => Promise<TData>`
+- 每个 query 的 options 通过 `defineModel` 第二参配置：`model.setQueryOptions('fetchList', { staleTime })`
+
+不要在 `queries` 中写 `{ fn }` 对象；query entry 必须直接是函数。
 
 **fn 签名**：`fn(this: ModelThis, ctx: QueryCtx, ...args: TArgs): Promise<TData>`
+
 - `this` 绑定到 model 的 internal proxy，可以在 query fn 内部访问/修改 state
 - `ctx.signal` 是 `AbortSignal`，fetch 被取消时会 abort
 
@@ -298,31 +300,32 @@ const userModel = defineModel({
 
 每个 query 在 model 上对外暴露一个 `QueryHandle<TArgs, TData>`：
 
-| 方法 | 说明 |
-|------|------|
-| `getData(...args)` | 读缓存数据，无则返回 `undefined` |
-| `getState(...args)` | 读原始缓存条目（data, error, fetchStatus, dataUpdatedAt） |
-| `isFetching(...args)` | 是否正在 fetch |
-| `isStale(...args)` | 缓存是否过期（data 缺失或超过 staleTime） |
-| `fetch(...args)` | 发起 fetch，返回 Promise<TData> |
-| `prefetch(...args)` | 预热缓存（同 fetch 但 swallow rejection） |
-| `cancel(...args?)` | 取消指定 args 的 inflight；无参则取消该 query 所有 inflight |
-| `invalidate(...args?)` | 标记过期（不清数据）；无参则标记该 query 所有 entry |
-| `reset(...args?)` | 清除缓存条目；无参则清除该 query 所有 entry |
-| `setData(data)` / `setData(...args, data)` | 手动写入缓存 |
+| 方法                                       | 说明                                                        |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| `getData(...args)`                         | 读缓存数据，无则返回 `undefined`                            |
+| `getState(...args)`                        | 读原始缓存条目（data, error, fetchStatus, dataUpdatedAt）   |
+| `isFetching(...args)`                      | 是否正在 fetch                                              |
+| `isStale(...args)`                         | 缓存是否过期（data 缺失或超过 staleTime）                   |
+| `fetch(...args)`                           | 发起 fetch，返回 Promise<TData>                             |
+| `prefetch(...args)`                        | 预热缓存（同 fetch 但 swallow rejection）                   |
+| `cancel(...args?)`                         | 取消指定 args 的 inflight；无参则取消该 query 所有 inflight |
+| `invalidate(...args?)`                     | 标记过期（不清数据）；无参则标记该 query 所有 entry         |
+| `reset(...args?)`                          | 清除缓存条目；无参则清除该 query 所有 entry                 |
+| `setData(data)` / `setData(...args, data)` | 手动写入缓存                                                |
 
 `cancel`/`invalidate`/`reset` 无参时作用于该 query 的所有缓存 entry。
 
 ### 初始化流程
 
 `_initQueries()` 遍历 `model.queries`，对每个 entry：
+
 1. 调用 `_cacheAccess(queryName, QUERY)` 注册到 accessCache
-2. Normalize spec（shorthand 函数或 `query(...)` spec → internal `{ fn, staleTime? }`）
+2. 读取 query 函数，并合并 `defineModel` setup 中的内部 query options
 3. `_buildQueryHandle(queryName, spec)` 构造 handle 对象
 4. 注册到 `this.queries`（proxy 可访问）和 `this._queryHandles`（getApi 遍历用）
 5. 两份 record 都 `Object.freeze`，不可运行时追加
 
-**_hasArgs 标志**：通过 `spec.fn.length > 1` 判断。有参 query 的 `setData` 签名为 `(...args, data)`；无参 query 的 `setData` 签名为 `(data)`。
+**\_hasArgs 标志**：通过 `spec.fn.length > 1` 判断。有参 query 的 `setData` 签名为 `(...args, data)`；无参 query 的 `setData` 签名为 `(data)`。
 
 ### QueryCoordinator — 协调层
 
@@ -338,6 +341,7 @@ QueryCoordinator
 **FetchManager 去重**：同一 hash 的并发 fetch 共享同一个 Promise。第二个调用者直接获得进行中的 Promise。fetch 完成（成功或失败）后清除记录。
 
 **GCManager 引用计数**：
+
 - `observeQuery(hash)` — 增加引用计数（React hook mount 时调用）
 - `unobserveQuery(hash, cleanup)` — 减少引用计数。归零后启动 `gcTime` 定时器，到期执行 `cleanup`（清除缓存条目）
 
@@ -359,17 +363,17 @@ hash 格式保证不同 store、不同 model、不同 args 之间缓存完全隔
 
 ```
 hook 级 staleTime (QueryOverrides.staleTime)
-  → spec 级 staleTime (query({ staleTime }))
+  → query options staleTime (model.setQueryOptions)
     → 全局 staleTime (doura({ query: { staleTime } }))
       → 默认 0（每次都重新 fetch）
 ```
 
 ### model 级批量操作
 
-| 方法 | 行为 |
-|------|------|
-| `$invalidateQueries()` | 标记该 model 所有 query 的所有 entry 过期 |
-| `$cancelQueries()` | 取消该 model 所有 query 的所有 inflight fetch |
-| `$resetQueries()` | 清除该 model 所有 query 的所有缓存 entry |
+| 方法                   | 行为                                          |
+| ---------------------- | --------------------------------------------- |
+| `$invalidateQueries()` | 标记该 model 所有 query 的所有 entry 过期     |
+| `$cancelQueries()`     | 取消该 model 所有 query 的所有 inflight fetch |
+| `$resetQueries()`      | 清除该 model 所有 query 的所有缓存 entry      |
 
 这三个操作通过 `_queryIndex`（前缀索引）定位属于当前 model 的所有 hash，然后逐一操作。

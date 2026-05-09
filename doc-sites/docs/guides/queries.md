@@ -7,36 +7,36 @@ Queries provide built-in async data fetching with caching, directly in your mode
 
 ## Defining Queries
 
-Add a `queries` field to your model. Prefer a shorthand function when the query only needs `fn`; use the `query()` helper only for full specs with options. Direct `{ fn }` objects are not supported.
+Add a `queries` field to your model. Each query entry is a function. Configure per-query options, such as `staleTime`, in the optional second argument to `defineModel()`.
 
 ```ts
-import { defineModel, query } from 'doura'
+import { defineModel } from 'doura'
 
-const userModel = defineModel({
-  name: 'user',
-  state: {
-    currentUser: null as User | null,
-  },
-  queries: {
-    // Preferred when only fn is needed
-    fetchAll: async function (ctx) {
-      const res = await fetch('/api/users', { signal: ctx.signal })
-      return await res.json() as User[]
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: {
+      currentUser: null as User | null,
     },
+    queries: {
+      fetchAll: async function (ctx) {
+        const res = await fetch('/api/users', { signal: ctx.signal })
+        return (await res.json()) as User[]
+      },
 
-    // Use query(...) when per-entry options are needed
-    fetchById: query({
-      fn: async function (ctx, id: string) {
+      fetchById: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
         const user = await res.json()
         // Actions on `this` are available — update state as a side effect
         this.currentUser = user
         return user
       },
-      staleTime: 30_000, // data is fresh for 30 seconds
-    }),
+    },
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchById', { staleTime: 30_000 })
+  }
+)
 ```
 
 ## Cache Identity
@@ -49,7 +49,7 @@ instance.fetchById.fetch('user-1')
 instance.fetchById.fetch('user-2')
 
 // Same args = same cache entry (deduped):
-instance.fetchById.fetch('user-1')  // returns cached or dedupes inflight
+instance.fetchById.fetch('user-1') // returns cached or dedupes inflight
 ```
 
 ## QueryCtx and Cancellation
@@ -90,18 +90,18 @@ actions: {
 
 Each query handle provides these methods:
 
-| Method | Description |
-|--------|-------------|
-| `fetch(...args)` | Fetch and return data |
-| `prefetch(...args)` | Fetch to warm cache (returns `void`) |
-| `getData(...args)` | Read cached data without fetching |
-| `getState(...args)` | Read raw cache entry |
-| `isFetching(...args)` | Check if currently fetching |
-| `isStale(...args)` | Check if data is stale |
-| `cancel(...args?)` | Cancel inflight request(s) |
-| `invalidate(...args?)` | Mark entry/entries stale |
-| `reset(...args?)` | Clear entry/entries entirely |
-| `setData(...args, data)` | Write data into the cache manually |
+| Method                   | Description                          |
+| ------------------------ | ------------------------------------ |
+| `fetch(...args)`         | Fetch and return data                |
+| `prefetch(...args)`      | Fetch to warm cache (returns `void`) |
+| `getData(...args)`       | Read cached data without fetching    |
+| `getState(...args)`      | Read raw cache entry                 |
+| `isFetching(...args)`    | Check if currently fetching          |
+| `isStale(...args)`       | Check if data is stale               |
+| `cancel(...args?)`       | Cancel inflight request(s)           |
+| `invalidate(...args?)`   | Mark entry/entries stale             |
+| `reset(...args?)`        | Clear entry/entries entirely         |
+| `setData(...args, data)` | Write data into the cache manually   |
 
 Methods that accept optional args operate on a specific cache slot when args are provided, or on all slots when called with no arguments.
 
@@ -109,13 +109,23 @@ Methods that accept optional args operate on a specific cache slot when args are
 
 ### Per-entry staleTime
 
-Set `staleTime` in the `query()` spec to control how long data is considered fresh for a specific query. If the query only has `fn`, use the shorthand function form instead.
+Set `staleTime` with `model.setQueryOptions()` to control how long data is considered fresh for a specific query.
 
 ```ts
-fetchUser: query({
-  fn: async function (ctx, id: string) { /* ... */ },
-  staleTime: 60_000,  // fresh for 1 minute
-})
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: {},
+    queries: {
+      fetchUser: async function (ctx, id: string) {
+        /* ... */
+      },
+    },
+  },
+  ({ model }) => {
+    model.setQueryOptions('fetchUser', { staleTime: 60_000 })
+  }
+)
 ```
 
 ### Global configuration
@@ -127,8 +137,8 @@ import { doura } from 'doura'
 
 const store = doura({
   query: {
-    staleTime: 10_000,  // default: 0 (always stale)
-    gcTime: 300_000,    // default: 5 minutes (garbage collect unused entries)
+    staleTime: 10_000, // default: 0 (always stale)
+    gcTime: 300_000, // default: 5 minutes (garbage collect unused entries)
   },
 })
 ```
@@ -142,9 +152,9 @@ Model instances provide bulk operations that affect all queries:
 ```ts
 const instance = store.getModel(userModel)
 
-instance.$invalidateQueries()  // mark all entries stale
-instance.$cancelQueries()      // cancel all inflight requests
-instance.$resetQueries()       // clear all cache entries
+instance.$invalidateQueries() // mark all entries stale
+instance.$cancelQueries() // cancel all inflight requests
+instance.$resetQueries() // clear all cache entries
 ```
 
 ## React Integration
@@ -167,7 +177,11 @@ function UserProfile({ userId }: { userId: string }) {
 
   if (isLoading) return <div>Loading...</div>
   if (error) return <div>Error!</div>
-  return <div>{data.name} <button onClick={refetch}>Refresh</button></div>
+  return (
+    <div>
+      {data.name} <button onClick={refetch}>Refresh</button>
+    </div>
+  )
 }
 ```
 
@@ -185,7 +199,7 @@ function PostList() {
     useInfiniteQuery(posts.fetchPage, {
       initialArgs: [1] as [number],
       getNextArgs: (lastPage, allPages) =>
-        lastPage.hasMore ? [allPages.length + 1] as [number] : undefined,
+        lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
     })
 
   return (

@@ -1,13 +1,8 @@
 import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn, isArray } from '../utils'
-import {
-  QueriesOption,
-  QueryCtx,
-  QueryHandle,
-  QuerySpec,
-  isQuerySpec,
-} from './queryTypes'
+import { QueryCtx, QueryHandle } from './queryTypes'
+import { isQuerySpecLike } from './queryOptions'
 import type { ModelInstance } from './modelPublicInstance'
 
 export type State = {
@@ -95,21 +90,35 @@ export type ObjectModel<
   A extends ActionOptions,
   V extends ViewOptions,
   Models extends readonly AnyObjectModel[] = [],
+  Q extends Record<
+    string,
+    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+  > = Record<
+    string,
+    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+  >,
 > = {
   name: string
   state: S
   actions?: A
   views?: V & ThisType<ViewThis<S, V, Models>>
-  queries?: QueriesOption<S>
+  queries?: Q
   models?: Models
-} & ThisType<ModelThis<S, A, V, {}, Models>>
+} & ThisType<ModelThis<S, A, V, Q, Models>>
 
 export type ModelOptions<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
   Models extends readonly AnyObjectModel[] = [],
-> = ObjectModel<S, A, V, Models>
+  Q extends Record<
+    string,
+    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+  > = Record<
+    string,
+    (this: any, ctx: QueryCtx, ...args: any[]) => Promise<any>
+  >,
+> = ObjectModel<S, A, V, Models, Q>
 
 export type AnyObjectModel = ObjectModel<any, any, any, any>
 
@@ -144,17 +153,15 @@ export type ModelModels<Model> = Model extends { models: infer Models }
   ? ModelChildren<Models>
   : {}
 
-/** Infer (TArgs, TData) from a user-provided query entry (shorthand fn or
- *  query() spec), then surface them as a QueryHandle. */
+/** Infer (TArgs, TData) from a user-provided query function, then surface
+ *  them as a QueryHandle. */
 type HandleFromEntry<T> = T extends (
   this: any,
   ctx: QueryCtx,
   ...args: infer A
 ) => Promise<infer D>
   ? QueryHandle<A, D>
-  : T extends QuerySpec<infer A, infer D, any, any>
-    ? QueryHandle<A, D>
-    : QueryHandle<any, any>
+  : QueryHandle<any, any>
 
 /** Extract the queries type from a model definition as QueryHandle refs. */
 export type ModelQueries<Model> = Model extends { queries: infer Q }
@@ -180,8 +187,10 @@ function validateQueries(model: AnyObjectModel) {
   invariant(isPlainObject(queries), `model.queries should be object!`)
   for (const key of Object.keys(queries)) {
     const spec = queries[key]
-    if (typeof spec !== 'function' && !isQuerySpec(spec)) {
-      warn(`query "${key}" must be a function or a spec created by query(...)`)
+    if (!isQuerySpecLike(spec)) {
+      warn(
+        `query "${key}" must be a function. Configure query options with defineModel(..., setup).`
+      )
       continue
     }
   }

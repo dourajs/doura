@@ -1,4 +1,4 @@
-import { defineModel, modelManager, query, QueryCoordinator } from '../index'
+import { defineModel, modelManager, QueryCoordinator } from '../index'
 import { DEFAULT_QUERY_CONFIG } from '../queryTypes'
 import { doura } from '../../doura'
 
@@ -510,16 +510,18 @@ describe('QueryCoordinator', () => {
   describe('staleTime resolution', () => {
     it('should use override staleTime when provided', () => {
       const coordinator = new QueryCoordinator({ staleTime: 1000 })
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        queries: {
-          fetchData: query({
-            fn: async () => 'result',
-            staleTime: 5000,
-          }),
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            fetchData: async () => 'result',
+          },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchData', { staleTime: 5000 })
+        }
+      )
 
       const mgr = modelManager({ query: {} })
       mgr.getModel(model)
@@ -533,16 +535,18 @@ describe('QueryCoordinator', () => {
 
     it('should use query spec staleTime over store default', () => {
       const coordinator = new QueryCoordinator({ staleTime: 1000 })
-      const model = defineModel({
-        name: 'model',
-        state: { value: 0 },
-        queries: {
-          fetchData: query({
-            fn: async () => 'result',
-            staleTime: 5000,
-          }),
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            fetchData: async () => 'result',
+          },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchData', { staleTime: 5000 })
+        }
+      )
 
       const mgr = modelManager({ query: {} })
       mgr.getModel(model)

@@ -1,4 +1,5 @@
-import type { NormalizedQuerySpec, QueryHandle, QueryHash } from './queryTypes'
+import type { QueryHandle, QueryHash } from './queryTypes'
+import type { NormalizedQuerySpec } from './queryOptions'
 
 type QueryArgsTuple = readonly unknown[]
 type MutableTuple<T extends QueryArgsTuple> = [...T]

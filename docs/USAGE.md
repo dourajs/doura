@@ -30,7 +30,7 @@ const counterModel = defineModel({
 const store = doura()
 const counter = store.getModel(counterModel)
 counter.increment()
-console.log(counter.count)  // 1
+console.log(counter.count) // 1
 console.log(counter.double) // 2
 ```
 
@@ -64,12 +64,22 @@ Full details: [Installation](../doc-sites/docs/installation.md) | [Introduction]
 import { defineModel, query } from 'doura'
 
 const model = defineModel({
-  name: 'uniqueName',    // required: unique string identifier
-  state: { /* ... */ },  // required: initial state (plain object)
-  actions: { /* ... */ }, // optional: methods that mutate state
-  views: { /* ... */ },   // optional: computed/derived values
-  models: [ /* ... */ ],  // optional: array of child model definitions
-  queries: { /* ... */ }, // optional: async data fetching with caching
+  name: 'uniqueName', // required: unique string identifier
+  state: {
+    /* ... */
+  }, // required: initial state (plain object)
+  actions: {
+    /* ... */
+  }, // optional: methods that mutate state
+  views: {
+    /* ... */
+  }, // optional: computed/derived values
+  models: [
+    /* ... */
+  ], // optional: array of child model definitions
+  queries: {
+    /* ... */
+  }, // optional: async data fetching with caching
 })
 ```
 
@@ -145,7 +155,11 @@ Compose child models via the `models` option. Children are accessed by their `na
 const childModel = defineModel({
   name: 'child',
   state: { value: 0 },
-  actions: { inc() { this.value++ } },
+  actions: {
+    inc() {
+      this.value++
+    },
+  },
 })
 
 const parentModel = defineModel({
@@ -154,7 +168,7 @@ const parentModel = defineModel({
   models: [childModel],
   actions: {
     doSomething() {
-      this.child.inc()  // access child by its name
+      this.child.inc() // access child by its name
     },
   },
 })
@@ -166,49 +180,49 @@ Full details: [Composing Models](../doc-sites/docs/guides/compose-model.md)
 
 ### Queries
 
-Built-in async data fetching with caching. Each query entry maintains a cache keyed by its arguments. Prefer a direct function entry when the query only needs `fn`; use `query(...)` only for full specs with options. Direct `{ fn }` objects are not supported.
+Built-in async data fetching with caching. Each query entry is a function and maintains a cache keyed by its arguments. Configure per-query options in the optional second argument to `defineModel()`.
 
 ```ts
-import { defineModel, query } from 'doura'
+import { defineModel } from 'doura'
 
-const userModel = defineModel({
-  name: 'user',
-  state: { currentUser: null as User | null },
-  queries: {
-    // Preferred when only fn is needed
-    fetchAll: async function (ctx) {
-      const res = await fetch('/api/users', { signal: ctx.signal })
-      return res.json()
-    },
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: { currentUser: null as User | null },
+    queries: {
+      fetchAll: async function (ctx) {
+        const res = await fetch('/api/users', { signal: ctx.signal })
+        return res.json()
+      },
 
-    // Use query(...) when options are needed
-    fetchById: query({
-      fn: async function (ctx, id: string) {
+      fetchById: async function (ctx, id: string) {
         const res = await fetch(`/api/users/${id}`, { signal: ctx.signal })
         return res.json()
       },
-      staleTime: 30_000,
-    }),
+    },
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchById', { staleTime: 30_000 })
+  }
+)
 ```
 
 Every query function receives `QueryCtx` as its first argument, which provides an `AbortSignal` for cancellation.
 
 **QueryHandle methods** (available on model instances as `instance.queryName`):
 
-| Method | Description |
-|--------|-------------|
-| `fetch(...args)` | Fetch and return data |
-| `prefetch(...args)` | Warm cache without awaiting |
-| `getData(...args)` | Read cached data without fetching |
-| `getState(...args)` | Read raw cache entry |
-| `isFetching(...args)` | Check if currently fetching |
-| `isStale(...args)` | Check if data is stale |
-| `cancel(...args?)` | Cancel inflight request(s) |
-| `invalidate(...args?)` | Mark entry/entries stale |
-| `reset(...args?)` | Clear entry/entries entirely |
-| `setData(...args, data)` | Write data into cache manually |
+| Method                   | Description                       |
+| ------------------------ | --------------------------------- |
+| `fetch(...args)`         | Fetch and return data             |
+| `prefetch(...args)`      | Warm cache without awaiting       |
+| `getData(...args)`       | Read cached data without fetching |
+| `getState(...args)`      | Read raw cache entry              |
+| `isFetching(...args)`    | Check if currently fetching       |
+| `isStale(...args)`       | Check if data is stale            |
+| `cancel(...args?)`       | Cancel inflight request(s)        |
+| `invalidate(...args?)`   | Mark entry/entries stale          |
+| `reset(...args?)`        | Clear entry/entries entirely      |
+| `setData(...args, data)` | Write data into cache manually    |
 
 Full details: [Queries Guide](../doc-sites/docs/guides/queries.md) | [QueryHandle API](../doc-sites/docs/api/core/doura.md#queryhandle)
 
@@ -222,21 +236,21 @@ The `doura()` factory creates a store that manages model instances.
 import { doura } from 'doura'
 
 const store = doura({
-  initialState: { counter: { count: 10 } },  // optional: pre-seed state
-  plugins: [[myPlugin, options]],              // optional: plugin tuples
-  query: { gcTime: 300_000, staleTime: 0 },   // optional: query defaults
+  initialState: { counter: { count: 10 } }, // optional: pre-seed state
+  plugins: [[myPlugin, options]], // optional: plugin tuples
+  query: { gcTime: 300_000, staleTime: 0 }, // optional: query defaults
 })
 ```
 
 ### Store API
 
-| Method | Description |
-|--------|-------------|
-| `getModel(model)` | Get or create a named model instance (singleton per store) |
-| `getDetachedModel(model)` | Create an independent instance not tracked by the store |
-| `getState()` | Snapshot of all named models' state |
-| `subscribe(fn)` | Listen to any state change; returns unsubscribe fn |
-| `destroy()` | Tear down all models and plugins |
+| Method                    | Description                                                |
+| ------------------------- | ---------------------------------------------------------- |
+| `getModel(model)`         | Get or create a named model instance (singleton per store) |
+| `getDetachedModel(model)` | Create an independent instance not tracked by the store    |
+| `getState()`              | Snapshot of all named models' state                        |
+| `subscribe(fn)`           | Listen to any state change; returns unsubscribe fn         |
+| `destroy()`               | Tear down all models and plugins                           |
 
 ```ts
 const counter = store.getModel(counterModel)
@@ -260,7 +274,7 @@ Wraps your app to provide a global store context:
 ```tsx
 import { DouraRoot, useModel, useStaticModel } from 'react-doura'
 
-<DouraRoot>
+;<DouraRoot>
   <App />
 </DouraRoot>
 ```
@@ -279,7 +293,7 @@ const counter = useModel(counterModel)
 const { count, increment } = useModel(
   counterModel,
   (s) => ({ count: s.count, increment: s.increment }),
-  []  // deps for selector stability
+  [] // deps for selector stability
 )
 ```
 
@@ -343,28 +357,28 @@ function UserProfile({ userId }: { userId: string }) {
 
 **Options** (`QueryOverrides`):
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `enabled` | `boolean \| () => boolean` | Control whether fetch runs |
-| `staleTime` | `number` | Override staleness threshold |
-| `select` | `(data) => TSelected` | Transform data before returning |
-| `placeholderData` | `TData \| (prev?) => TData` | Show before real data arrives |
+| Option            | Type                        | Description                     |
+| ----------------- | --------------------------- | ------------------------------- |
+| `enabled`         | `boolean \| () => boolean`  | Control whether fetch runs      |
+| `staleTime`       | `number`                    | Override staleness threshold    |
+| `select`          | `(data) => TSelected`       | Transform data before returning |
+| `placeholderData` | `TData \| (prev?) => TData` | Show before real data arrives   |
 
 **Result** (`UseQueryResult`):
 
-| Field | Description |
-|-------|-------------|
-| `data` | The query data (or selected/transformed) |
-| `error` | Error if fetch failed |
-| `isLoading` | No data, no error, enabled |
-| `isPending` | No data yet |
-| `isFetching` | Fetch in progress |
-| `isSuccess` | Has data, no error |
-| `isError` | Has error |
-| `isStale` | Data missing or older than staleTime |
-| `isRefetching` | Has data AND currently fetching |
-| `isPlaceholderData` | Showing placeholder data |
-| `refetch()` | Manually trigger a refetch |
+| Field               | Description                              |
+| ------------------- | ---------------------------------------- |
+| `data`              | The query data (or selected/transformed) |
+| `error`             | Error if fetch failed                    |
+| `isLoading`         | No data, no error, enabled               |
+| `isPending`         | No data yet                              |
+| `isFetching`        | Fetch in progress                        |
+| `isSuccess`         | Has data, no error                       |
+| `isError`           | Has error                                |
+| `isStale`           | Data missing or older than staleTime     |
+| `isRefetching`      | Has data AND currently fetching          |
+| `isPlaceholderData` | Showing placeholder data                 |
+| `refetch()`         | Manually trigger a refetch               |
 
 Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#usequery)
 
@@ -384,13 +398,13 @@ function PostList() {
     useInfiniteQuery(posts.fetchPage, {
       initialArgs: [1] as [number],
       getNextArgs: (lastPage, allPages) =>
-        lastPage.hasMore ? [allPages.length + 1] as [number] : undefined,
+        lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
     })
 
   return (
     <div>
-      {data?.pages.flatMap(page =>
-        page.items.map(item => <div key={item.id}>{item.title}</div>)
+      {data?.pages.flatMap((page) =>
+        page.items.map((item) => <div key={item.id}>{item.title}</div>)
       )}
       {hasNextPage && (
         <button onClick={fetchNextPage} disabled={isFetchingNextPage}>
@@ -403,6 +417,7 @@ function PostList() {
 ```
 
 **Config** (`InfiniteQueryConfig`):
+
 - `initialArgs` — args for the first page
 - `getNextArgs(lastPage, allPages)` — return next args or `undefined` to stop
 - `getPreviousArgs?(firstPage, allPages)` — optional reverse pagination
@@ -422,7 +437,7 @@ function SaveButton() {
   const form = useModel(formModel)
   const { run, isPending, isError, error } = useAction(form.submit, {
     onSuccess: () => alert('Saved!'),
-    pendingDelay: 300,  // ms before showing pending (avoids flash)
+    pendingDelay: 300, // ms before showing pending (avoids flash)
   })
 
   return (
@@ -434,17 +449,20 @@ function SaveButton() {
 ```
 
 **Options** (`UseActionOptions`):
+
 - `onSuccess?(data)` — called on success
 - `onError?(error)` — called on failure
 - `onSettled?(data, error)` — called either way
 - `pendingDelay?` — ms before entering pending state (default: 300)
 
 **Result** (`UseActionResult`):
+
 - `run(...args)` — fire-and-forget (swallows rejections)
 - `runAsync(...args)` — returns Promise, throws on failure
 - `data`, `error`, `isIdle`, `isPending`, `isSuccess`, `isError`, `reset()`
 
 Semantics:
+
 - Synchronous actions skip pending entirely
 - Async actions use `pendingDelay` to prevent loading flash for fast operations
 - Race-safe: only the most recent call can write state
@@ -508,8 +526,8 @@ const view = instance.$createView((api) => ({
   total: api.count + api.bonus,
 }))
 
-console.log(view())  // { total: ... }
-view.destroy()       // cleanup when done
+console.log(view()) // { total: ... }
+view.destroy() // cleanup when done
 ```
 
 ### markRaw
@@ -548,10 +566,18 @@ Plugins extend store behavior via lifecycle hooks.
 import { Plugin } from 'doura'
 
 const myPlugin: Plugin<{ verbose: boolean }> = (option) => ({
-  onInit({ initialState }, { doura }) { /* store created */ },
-  onModel(name, model, { doura }) { /* model registered */ },
-  onModelInstance(instance, { doura }) { /* instance created */ },
-  onDestroy() { /* store destroyed */ },
+  onInit({ initialState }, { doura }) {
+    /* store created */
+  },
+  onModel(name, model, { doura }) {
+    /* model registered */
+  },
+  onModelInstance(instance, { doura }) {
+    /* instance created */
+  },
+  onDestroy() {
+    /* store destroyed */
+  },
 })
 
 const store = doura({
@@ -574,13 +600,20 @@ doura({ plugins: [[log]] })
 import persist, { createWebStorage } from 'doura-plugin-persist'
 
 doura({
-  plugins: [[persist, {
-    key: 'my-app',
-    storage: createWebStorage('local'),
-    whitelist: ['user', 'settings'],
-    version: 2,
-    migrate(state, version) { /* transform old state */ return state },
-  }]],
+  plugins: [
+    [
+      persist,
+      {
+        key: 'my-app',
+        storage: createWebStorage('local'),
+        whitelist: ['user', 'settings'],
+        version: 2,
+        migrate(state, version) {
+          /* transform old state */ return state
+        },
+      },
+    ],
+  ],
 })
 ```
 
@@ -629,27 +662,27 @@ Full details: [TypeScript Guide](../doc-sites/docs/guides/typescript.md)
 
 Every model instance (from `store.getModel()`, `useModel()`, etc.) exposes:
 
-| Access | Description |
-|--------|-------------|
-| `instance.stateKey` | Direct state access |
-| `instance.actionName()` | Call action |
-| `instance.viewName` | Read computed view |
-| `instance.queryName` | QueryHandle object |
-| `instance.childName` | Child model instance |
-| `instance.$state` | Full state (assignable to replace) |
-| `instance.$rawState` | Raw unproxied state |
-| `instance.$actions` | Actions namespace |
-| `instance.$views` | Views namespace |
-| `instance.$queries` | Queries namespace |
-| `instance.$models` | Child models namespace |
-| `instance.$patch(obj)` | Deep merge partial state |
-| `instance.$onAction(fn)` | Subscribe to actions |
-| `instance.$subscribe(fn)` | Subscribe to state changes |
-| `instance.$isolate(fn)` | Read without tracking |
-| `instance.$getApi()` | Full API snapshot |
-| `instance.$createView(selector)` | Create external reactive view |
-| `instance.$invalidateQueries()` | Mark all queries stale |
-| `instance.$cancelQueries()` | Cancel all inflight queries |
-| `instance.$resetQueries()` | Clear all query caches |
+| Access                           | Description                        |
+| -------------------------------- | ---------------------------------- |
+| `instance.stateKey`              | Direct state access                |
+| `instance.actionName()`          | Call action                        |
+| `instance.viewName`              | Read computed view                 |
+| `instance.queryName`             | QueryHandle object                 |
+| `instance.childName`             | Child model instance               |
+| `instance.$state`                | Full state (assignable to replace) |
+| `instance.$rawState`             | Raw unproxied state                |
+| `instance.$actions`              | Actions namespace                  |
+| `instance.$views`                | Views namespace                    |
+| `instance.$queries`              | Queries namespace                  |
+| `instance.$models`               | Child models namespace             |
+| `instance.$patch(obj)`           | Deep merge partial state           |
+| `instance.$onAction(fn)`         | Subscribe to actions               |
+| `instance.$subscribe(fn)`        | Subscribe to state changes         |
+| `instance.$isolate(fn)`          | Read without tracking              |
+| `instance.$getApi()`             | Full API snapshot                  |
+| `instance.$createView(selector)` | Create external reactive view      |
+| `instance.$invalidateQueries()`  | Mark all queries stale             |
+| `instance.$cancelQueries()`      | Cancel all inflight queries        |
+| `instance.$resetQueries()`       | Clear all query caches             |
 
 Full details: [ModelInstance API](../doc-sites/docs/api/core/doura.md#modelinstance)

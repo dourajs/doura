@@ -1,12 +1,9 @@
-import {
-  defineModel,
-  doura,
-  query,
-  QueryCtx,
-  ModelQueries,
-  QueryHandle,
-} from 'doura'
+import { defineModel, doura, QueryCtx, ModelQueries, QueryHandle } from 'doura'
+// @ts-expect-error — query helper is no longer exported
+import { query as removedQuery } from 'doura'
 import { expectType } from '../helper'
+
+removedQuery({ fn: (_ctx: QueryCtx) => Promise.resolve(1) })
 
 // --- defineModel with queries ---
 
@@ -15,57 +12,62 @@ interface User {
   name: string
 }
 
-const userModel = defineModel({
-  name: 'userModel',
-  state: {
-    users: {} as Record<string, User>,
-  },
-  actions: {
-    async updateUser(payload: { id: string; name: string }) {
-      this.users[payload.id] = payload
-      // query methods accessible from actions via this
-      this.fetchUser.invalidate()
-      this.fetchUser.invalidate(payload.id)
-      this.fetchUser.cancel(payload.id)
-      this.fetchUser.reset(payload.id)
-      this.$invalidateQueries()
-      this.$cancelQueries()
-      this.$resetQueries()
+const userModel = defineModel(
+  {
+    name: 'userModel',
+    state: {
+      users: {} as Record<string, User>,
     },
-  },
-  queries: {
-    // shorthand — bare function, no args (ctx should auto-infer as QueryCtx)
-    fetchList: (ctx) => {
-      expectType<QueryCtx>(ctx)
-      return Promise.resolve([{ id: '1', name: 'Alice' }])
+    actions: {
+      async updateUser(payload: { id: string; name: string }) {
+        this.users[payload.id] = payload
+        // query methods accessible from actions via this
+        this.fetchUser.invalidate()
+        this.fetchUser.invalidate(payload.id)
+        this.fetchUser.cancel(payload.id)
+        this.fetchUser.reset(payload.id)
+        this.$invalidateQueries()
+        this.$cancelQueries()
+        this.$resetQueries()
+      },
     },
+    queries: {
+      // shorthand — bare function, no args (ctx should auto-infer as QueryCtx)
+      fetchList: (ctx) => {
+        expectType<QueryCtx>(ctx)
+        return Promise.resolve([{ id: '1', name: 'Alice' }])
+      },
 
-    // shorthand — bare function, with args (ctx should auto-infer as QueryCtx)
-    fetchUser: (ctx, id: string) => {
-      expectType<QueryCtx>(ctx)
-      return Promise.resolve({ id, name: 'User' })
-    },
+      // shorthand — bare function, with args (ctx should auto-infer as QueryCtx)
+      fetchUser: (ctx, id: string) => {
+        expectType<QueryCtx>(ctx)
+        return Promise.resolve({ id, name: 'User' })
+      },
 
-    // full spec via query() — only fn/staleTime are supported.
-    fetchUserToState: query({
-      fn(ctx, id: string) {
+      fetchUserToState(ctx, id: string) {
         expectType<QueryCtx>(ctx)
         expectType<Record<string, User>>(this.users)
         const user = { id, name: 'User' }
         this.users[id] = user
         return Promise.resolve(user)
       },
-      staleTime: 5000,
-    }),
+    },
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchUserToState', { staleTime: 5000 })
+    // @ts-expect-error — query name must exist in this model
+    model.setQueryOptions('missingName', { staleTime: 5000 })
+    // @ts-expect-error — only staleTime is supported in query options
+    model.setQueryOptions('fetchUser', { gcTime: 5000 })
+  }
+)
 
 defineModel({
-  name: 'directQuerySpecRejected',
+  name: 'directQueryObjectRejected',
   state: {},
   queries: {
-    // @ts-expect-error — full specs must be created by query(...)
     fetchUser: {
+      // @ts-expect-error — query entries must be functions
       fn: (_ctx: QueryCtx, id: string) => Promise.resolve({ id }),
     },
   },
@@ -220,9 +222,9 @@ store.getModel(composedModel)
 // Downstream handle typing — fn signatures reach ModelQueries
 // =============================================================
 //
-// `const Q` + InferQueryEntry on defineModel captures each entry's
-// literal fn signature, so downstream `ModelQueries<typeof model>` /
-// handle typing extracts TArgs/TData correctly.
+// `const Q` on defineModel captures each entry's literal fn signature, so
+// downstream `ModelQueries<typeof model>` / handle typing extracts TArgs/TData
+// correctly.
 
 const inferredModel = defineModel({
   name: 'inferred',
@@ -240,60 +242,56 @@ expectType<QueryHandle<[string], { id: string; value: number }>>(
 )
 
 // =============================================================
-// Preferred shorthand and query() options
+// Function queries and setup options
 // =============================================================
 //
 // Prefer the shorthand function form when a query only needs `fn`.
-// Use query(...) only when the entry needs per-query options such as staleTime.
+// Use defineModel's setup callback for per-query options such as staleTime.
 
 interface InferredState {
   users: Record<string, User>
 }
 
-defineModel({
-  name: 'queryHelper',
-  state: { users: {} as Record<string, User> } as InferredState,
-  queries: {
-    // query(...) form with per-entry options.
-    fetchListHelper: query({
-      fn: (ctx): Promise<User[]> => {
+defineModel(
+  {
+    name: 'queryOptions',
+    state: { users: {} as Record<string, User> } as InferredState,
+    queries: {
+      fetchListHelper: (ctx): Promise<User[]> => {
         expectType<QueryCtx>(ctx)
         return Promise.resolve([{ id: '1', name: 'Alice' }])
       },
-      staleTime: 5000,
-    }),
 
-    // Args form — prefer shorthand when only fn is needed.
-    fetchUserHelper: (ctx, id: string) => {
-      expectType<QueryCtx>(ctx)
-      expectType<string>(id)
-      return Promise.resolve({ id, name: 'User ' + id })
-    },
+      fetchUserHelper: function (ctx, id: string) {
+        expectType<QueryCtx>(ctx)
+        expectType<string>(id)
+        expectType<Record<string, User>>(this.users)
+        return Promise.resolve({ id, name: 'User ' + id })
+      },
 
-    objectArgHelper: (ctx, args: { id: string }) => {
-      expectType<QueryCtx>(ctx)
-      expectType<{ id: string }>(args)
-      return Promise.resolve({ id: args.id, name: 'User ' + args.id })
+      objectArgHelper: (ctx, args: { id: string }) => {
+        expectType<QueryCtx>(ctx)
+        expectType<{ id: string }>(args)
+        return Promise.resolve({ id: args.id, name: 'User ' + args.id })
+      },
     },
-    removedKey: query({
-      fn: (_ctx) => Promise.resolve(1),
-      // @ts-expect-error — removed from query specs; cache identity comes from args
-      key: () => ['x'],
-    }),
-    removedOnData: query({
-      fn: (_ctx) => Promise.resolve(1),
-      // @ts-expect-error — removed from query specs; write state inside fn
-      onData: () => undefined,
-    }),
-    removedSetData: query({
-      fn: (_ctx) => Promise.resolve(1),
-      // @ts-expect-error — removed from query specs; write state inside fn
-      setData: (_state: InferredState, _data: number) => undefined,
-    }),
-    removedGetData: query({
-      fn: (_ctx) => Promise.resolve(1),
-      // @ts-expect-error — removed from query specs; reads come from cache
-      getData: (_state: InferredState) => 1,
-    }),
   },
-})
+  ({ model }) => {
+    model.setQueryOptions('fetchListHelper', { staleTime: 5000 })
+    model.setQueryOptions('fetchUserHelper', {})
+    // @ts-expect-error — query name must exist in this model
+    model.setQueryOptions('removedKey', { staleTime: 1 })
+    // @ts-expect-error — cache identity comes from args
+    model.setQueryOptions('fetchListHelper', { key: () => ['x'] })
+    // @ts-expect-error — write state inside fn
+    model.setQueryOptions('fetchListHelper', { onData: () => undefined })
+    model.setQueryOptions('fetchListHelper', {
+      // @ts-expect-error — write state inside fn
+      setData: (_state: InferredState, _data: number) => undefined,
+    })
+    model.setQueryOptions('fetchListHelper', {
+      // @ts-expect-error — reads come from cache
+      getData: (_state: InferredState) => 1,
+    })
+  }
+)

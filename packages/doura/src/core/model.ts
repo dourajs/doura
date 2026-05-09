@@ -42,13 +42,8 @@ import {
 } from './modelPublicInstance'
 import { queueJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
-import {
-  IQueryCoordinator,
-  NormalizedQuerySpec,
-  QueryCacheEntry,
-  QueryHash,
-  isQuerySpec,
-} from './queryTypes'
+import { IQueryCoordinator, QueryCacheEntry, QueryHash } from './queryTypes'
+import { decorateModelQueries, NormalizedQuerySpec } from './queryOptions'
 import type { InternalQueryHandle } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
 import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
@@ -711,24 +706,9 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     if (queries) {
       for (const queryName of Object.keys(queries)) {
         const spec = queries[queryName]
-        if (typeof spec !== 'function' && !isQuerySpec(spec)) {
-          if (__DEV__) {
-            warn(
-              `query "${queryName}" must be a function or a spec created by query(...)`
-            )
-          }
-          continue
-        }
         this._cacheAccess(queryName, AccessTypes.QUERY)
         this._queryKeys.push(queryName)
-        const normalized: NormalizedQuerySpec =
-          typeof spec === 'function'
-            ? { fn: spec }
-            : {
-                fn: spec.fn,
-                staleTime: spec.staleTime,
-              }
-        const handle = this._buildQueryHandle(queryName, normalized)
+        const handle = this._buildQueryHandle(queryName, spec)
         ;(this.queries as any)[queryName] = handle
       }
     }
@@ -1019,6 +999,8 @@ export function createModelInstance<IModel extends AnyObjectModel>(
   modelOptions: IModel,
   options: ModelInternalOptions = {}
 ) {
+  decorateModelQueries(modelOptions)
+
   if (__DEV__) {
     validateModelOptions(modelOptions)
   }

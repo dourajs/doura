@@ -3,7 +3,6 @@ import {
   modelManager,
   computeQueryHash,
   computeArgsKey,
-  query,
 } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -33,44 +32,49 @@ describe('model queries', () => {
       })
 
       const inst = modelMgr.getModel(model)
+      const spec = (model as any).queries.fetchUser
+      expect(typeof spec).toBe('object')
+      expect(spec.fn).toBe(fetchUser)
       expect(inst.$queries.fetchUser).toBeDefined()
-      expect((inst.$queries.fetchUser as any)._spec.fn).toBe(fetchUser)
+      expect((inst.$queries.fetchUser as any)._spec).toBe(spec)
     })
 
-    it('should preserve supported spec options', () => {
+    it('should preserve setup query options', () => {
       const fn = async (_ctx: any, id: number) => ({ id })
 
-      const model = defineModel({
-        name: 'model',
-        state: { user: null as { id: number } | null },
-        queries: {
-          fetchUser: query({
-            fn,
-            staleTime: 5000,
-          }),
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { user: null as { id: number } | null },
+          queries: {
+            fetchUser: fn,
+          },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchUser', { staleTime: 5000 })
+        }
+      )
 
       const inst = modelMgr.getModel(model)
       const handle = inst.$queries.fetchUser as any
+      expect(handle._spec).toBe((model as any).queries.fetchUser)
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
     })
 
-    it('should reject direct object specs that were not created by query()', () => {
-      const fn = async (_ctx: any) => ({ id: 1 })
+    it('should skip entries without a callable query function', () => {
       const model = defineModel({
         name: 'model',
         state: { value: 0 },
         queries: {
-          fetchUser: { fn },
+          fetchUser: { staleTime: 1000 },
         } as any,
       })
 
       const inst = modelMgr.getModel(model)
       expect(Object.keys(inst.$queries)).toHaveLength(0)
       expect(
-        'query "fetchUser" must be a function or a spec created by query(...)'
+        'query "fetchUser" must be a function. Configure query options with defineModel(..., setup).'
       ).toHaveBeenWarned()
     })
 
@@ -614,16 +618,18 @@ describe('model queries', () => {
     })
 
     it('isStale — no data is always stale; fresh data under staleTime is not', () => {
-      const freshModel = defineModel({
-        name: 'stale',
-        state: {},
-        queries: {
-          fetchFresh: query({
-            fn: (_ctx: any) => Promise.resolve(1),
-            staleTime: 60_000,
-          }),
+      const freshModel = defineModel(
+        {
+          name: 'stale',
+          state: {},
+          queries: {
+            fetchFresh: (_ctx: any) => Promise.resolve(1),
+          },
         },
-      })
+        ({ model }) => {
+          model.setQueryOptions('fetchFresh', { staleTime: 60_000 })
+        }
+      )
       const inst = modelMgr.getModel(freshModel)
 
       // No data yet → stale
