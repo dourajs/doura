@@ -14,11 +14,6 @@ import {
   hasOwn,
   ModelAPI,
 } from 'doura'
-import {
-  cancelReactNotification,
-  hasPendingReactNotifications,
-  queueReactNotification,
-} from './notificationQueue'
 
 type SubscribeFn = (onStoreChange: () => void) => () => void
 
@@ -150,18 +145,7 @@ function useModelInstance<IModel extends AnyModel>(
     return {
       modelInstance,
       subscribe: (onModelChange: () => void) => {
-        const unsubscribe = modelInstance.$subscribe(() => {
-          if (hasPendingReactNotifications()) {
-            queueReactNotification(onModelChange)
-          } else {
-            onModelChange()
-          }
-        })
-
-        return () => {
-          unsubscribe()
-          cancelReactNotification(onModelChange)
-        }
+        return modelInstance.$subscribe(onModelChange)
       },
     }
   }, [doura, modelKey])

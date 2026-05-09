@@ -12,7 +12,8 @@
  */
 import React from 'react'
 import { render, act, waitFor } from '@testing-library/react'
-import { defineModel } from 'doura'
+import { flushSync } from 'react-dom'
+import { defineModel, doura, nextTick } from 'doura'
 import { DouraRoot, useModel, useStaticModel } from '../src/useModel'
 import { useQuery } from '../src/useQuery'
 
@@ -77,6 +78,76 @@ function commitText(query: any, value?: number) {
 }
 
 describe('render isolation — query landing coalescing', () => {
+  test('raw core subscribers coalesce query cache and state in one commit', async () => {
+    const model = defineModel({
+      name: `rawLandingModel${++modelId}`,
+      state: { value: 0 },
+      actions: {
+        async inner() {
+          await Promise.resolve()
+          this.fetchData.setData(1)
+          this.value = 1
+        },
+        async test() {
+          await this.inner()
+        },
+      },
+      queries: {
+        fetchData: async () => 0,
+      },
+    })
+
+    const store = doura().getModel(model)
+    let commits = 0
+    let renders = 0
+    const snapshots: string[] = []
+
+    const Comp = () => {
+      renders++
+      const state = React.useSyncExternalStore(
+        (cb) => store.$subscribe(cb),
+        () => store.$state,
+        () => store.$state
+      )
+      const data = React.useSyncExternalStore(
+        (cb) =>
+          (store.$queries.fetchData as any).subscribe([], () => {
+            flushSync(cb)
+          }),
+        () => store.$queries.fetchData.getData(),
+        () => store.$queries.fetchData.getData()
+      )
+      const text = `${data ?? 'none'}:${state.value}`
+      snapshots.push(text)
+      return <span data-testid="result">{text}</span>
+    }
+
+    const { container } = render(
+      <React.Profiler id="raw-landing" onRender={() => commits++}>
+        <Comp />
+      </React.Profiler>
+    )
+
+    expect(container.querySelector('[data-testid="result"]')?.textContent).toBe(
+      'none:0'
+    )
+
+    const baselineCommits = commits
+    const baselineRenders = renders
+
+    await act(async () => {
+      await store.test()
+      await nextTick()
+    })
+
+    expect(container.querySelector('[data-testid="result"]')?.textContent).toBe(
+      '1:1'
+    )
+    expect(snapshots).not.toContain('1:0')
+    expect(commits - baselineCommits).toBe(1)
+    expect(renders - baselineRenders).toBe(1)
+  })
+
   test('onData and query cache landing commit once in the same component', async () => {
     const pending = deferred<number>()
     const model = makeLandingModel(() => pending.promise)

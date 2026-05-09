@@ -40,7 +40,7 @@ import {
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
-import { queueJob, invalidateJob } from './scheduler'
+import { queueJob, queuePostJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
 import {
   FetchStatus,
@@ -249,6 +249,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   coordinator: IQueryCoordinator | undefined = undefined
   queryCache: Map<QueryHash, QueryCacheEntry> = new Map()
   queryNotifiers: Map<QueryHash, (() => void)[]> = new Map()
+  private _pendingQueryNotifierHashes: Set<QueryHash> = new Set()
   private _queryIndex = new QueryHashIndex<null>()
 
   constructor(
@@ -261,6 +262,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.isolate = this.isolate.bind(this)
     this.getApi = this.getApi.bind(this)
     this._update = this._update.bind(this)
+    this._flushQueryListeners = this._flushQueryListeners.bind(this)
 
     this.options = model
     this.name = name || ''
@@ -578,6 +580,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     // clear query caches
     this.queryCache.clear()
     this.queryNotifiers.clear()
+    this._pendingQueryNotifierHashes.clear()
     this._queryIndex.clear()
 
     // notify dependents so they can clean up references to this model
@@ -910,11 +913,26 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 
   private _notifyQueryListeners(hash: QueryHash) {
-    const listeners = this.queryNotifiers.get(hash)
-    if (listeners) {
-      const snapshot = listeners.slice()
-      for (let i = 0; i < snapshot.length; i++) {
-        snapshot[i]()
+    this._pendingQueryNotifierHashes.add(hash)
+    queuePostJob(this._flushQueryListeners)
+  }
+
+  private _flushQueryListeners() {
+    if (this._destroyed) {
+      this._pendingQueryNotifierHashes.clear()
+      return
+    }
+
+    const hashes = Array.from(this._pendingQueryNotifierHashes)
+    this._pendingQueryNotifierHashes.clear()
+
+    for (let i = 0; i < hashes.length; i++) {
+      const listeners = this.queryNotifiers.get(hashes[i])
+      if (listeners) {
+        const snapshot = listeners.slice()
+        for (let j = 0; j < snapshot.length; j++) {
+          snapshot[j]()
+        }
       }
     }
   }

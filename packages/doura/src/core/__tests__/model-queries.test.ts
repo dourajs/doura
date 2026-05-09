@@ -3,6 +3,7 @@ import {
   modelManager,
   computeQueryHash,
   computeArgsKey,
+  nextTick,
 } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -424,7 +425,7 @@ describe('model queries', () => {
   })
 
   describe('query cache subscription and notification', () => {
-    it('should notify subscribers when query state changes', () => {
+    it('should notify subscribers when query state changes', async () => {
       const model = defineModel({
         name: 'model',
         state: { value: 0 },
@@ -439,14 +440,110 @@ describe('model queries', () => {
       const unsub = (store as any)._.subscribeQuery('fetchUser', [], listener)
 
       store.$queries.fetchUser.setData({ id: 1 })
+      expect(listener).not.toHaveBeenCalled()
+      await nextTick()
       expect(listener).toHaveBeenCalledTimes(1)
 
       store.$queries.fetchUser.setData({ id: 2 })
+      await nextTick()
       expect(listener).toHaveBeenCalledTimes(2)
 
       unsub()
       store.$queries.fetchUser.setData({ id: 3 })
+      await nextTick()
       expect(listener).toHaveBeenCalledTimes(2) // no more calls
+    })
+
+    it('should dedupe query notifications for the same args slot', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async (_ctx: any, id: string) => ({
+            id,
+            name: 'User ' + id,
+          }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const internal = (store as any)._
+      const listener = jest.fn(() => {
+        expect(store.$queries.fetchUser.getData('1')).toEqual({
+          id: '1',
+          name: 'Bob',
+        })
+      })
+
+      internal.subscribeQuery('fetchUser', ['1'], listener)
+
+      store.$queries.fetchUser.setData('1', { id: '1', name: 'Alice' })
+      store.$queries.fetchUser.setData('1', { id: '1', name: 'Bob' })
+
+      await nextTick()
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    it('should skip subscribers removed before query notification flush', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const listener = jest.fn()
+      const unsub = (store as any)._.subscribeQuery('fetchUser', [], listener)
+
+      store.$queries.fetchUser.setData({ id: 1 })
+      unsub()
+
+      await nextTick()
+      expect(listener).not.toHaveBeenCalled()
+    })
+
+    it('should not expose an intermediate query/state snapshot in one continuation', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        actions: {
+          async inner() {
+            await Promise.resolve()
+            this.fetchData.setData(1)
+            this.value = 1
+          },
+          async test() {
+            await this.inner()
+          },
+        },
+        queries: {
+          fetchData: async () => 0,
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const snapshots: string[] = []
+      const readSnapshot = () => {
+        snapshots.push(
+          `${store.$queries.fetchData.getData() ?? 'none'}:${
+            store.$state.value
+          }`
+        )
+      }
+
+      store.$subscribe(readSnapshot)
+      ;(store as any)._.subscribeQuery('fetchData', [], readSnapshot)
+
+      const promise = store.test()
+      expect(snapshots).toEqual([])
+
+      await promise
+      await nextTick()
+
+      expect(snapshots).not.toContain('1:0')
+      expect(snapshots).toEqual(['1:1', '1:1'])
     })
   })
 
@@ -482,7 +579,7 @@ describe('model queries', () => {
       },
     })
 
-    it('handle.invalidate should notify observers and produce new entry reference', () => {
+    it('handle.invalidate should notify observers and produce new entry reference', async () => {
       const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
@@ -498,6 +595,7 @@ describe('model queries', () => {
 
       // Invalidate
       inst.$queries.fetchData.invalidate('1')
+      await nextTick()
       expect(listener).toHaveBeenCalledTimes(1)
 
       // Entry reference must change (for useSyncExternalStore)
@@ -507,7 +605,7 @@ describe('model queries', () => {
       expect(entryAfter.data).toEqual({ id: '1' }) // data preserved
     })
 
-    it('$invalidateQueries() without args should notify all observers', () => {
+    it('$invalidateQueries() without args should notify all observers', async () => {
       const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
@@ -520,11 +618,12 @@ describe('model queries', () => {
       internal.subscribeQuery('fetchData', ['2'], listener2)
 
       inst.$invalidateQueries()
+      await nextTick()
       expect(listener1).toHaveBeenCalled()
       expect(listener2).toHaveBeenCalled()
     })
 
-    it('handle.reset should notify observers', () => {
+    it('handle.reset should notify observers', async () => {
       const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
@@ -534,10 +633,11 @@ describe('model queries', () => {
       internal.subscribeQuery('fetchData', ['1'], listener)
 
       inst.$queries.fetchData.reset('1')
+      await nextTick()
       expect(listener).toHaveBeenCalled()
     })
 
-    it('$resetQueries() without args should notify all observers', () => {
+    it('$resetQueries() without args should notify all observers', async () => {
       const inst = modelMgr.getModel(model)
       const internal = (inst as any)._
 
@@ -547,6 +647,7 @@ describe('model queries', () => {
       internal.subscribeQuery('fetchData', ['1'], listener)
 
       inst.$resetQueries()
+      await nextTick()
       expect(listener).toHaveBeenCalled()
     })
   })
@@ -645,13 +746,14 @@ describe('model queries', () => {
       expect(inst.$queries.fetchUser.getData('2')).toBeUndefined()
     })
 
-    it('setData via handle — void case writes cache and triggers notifier', () => {
+    it('setData via handle — void case writes cache and triggers notifier', async () => {
       const inst = modelMgr.getModel(voidModel)
       const listener = jest.fn()
       const internal = (inst as any)._
       const unsub = internal.subscribeQuery('fetchData', [], listener)
 
       inst.$queries.fetchData.setData(123)
+      await nextTick()
       expect(listener).toHaveBeenCalled()
       expect(inst.$queries.fetchData.getData()).toBe(123)
 

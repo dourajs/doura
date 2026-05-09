@@ -172,6 +172,43 @@ describe('defineModel/actions', () => {
     expect(store.$state).toEqual({ value: 4 })
   })
 
+  it('should flush nested async action continuations separately', async () => {
+    const snapshots: Array<{ status: string; count: number }> = []
+    const model = defineModel({
+      name: 'nested-async-action',
+      state: { status: 'idle', count: 0 },
+      actions: {
+        async load() {
+          await this.otherAction()
+          this.count++
+        },
+        async otherAction() {
+          await Promise.resolve()
+          this.status = 'xx'
+        },
+      },
+    })
+
+    const store = modelMgr.getModel(model)
+    store.$subscribe(() => {
+      snapshots.push({ ...store.$state })
+    })
+
+    const promise = store.load()
+    expect(snapshots).toEqual([])
+
+    await promise
+    await nextTick()
+
+    // This matches Vue 3's microtask update queue behavior. The inner
+    // continuation queues the status flush before the outer await continuation
+    // resumes and increments count, so these are two expected notifications.
+    expect(snapshots).toEqual([
+      { status: 'xx', count: 0 },
+      { status: 'xx', count: 1 },
+    ])
+  })
+
   it("should not trigger change event if state doesn't change", async () => {
     const fn = jest.fn()
     const count = defineModel({
