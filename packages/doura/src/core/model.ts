@@ -746,6 +746,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     spec: NormalizedQuerySpec
   ): InternalQueryHandle {
     const self = this
+    const shouldIgnoreQueryCallInView = (methodName: string) => {
+      if (self.accessContext !== AccessContext.VIEW) {
+        return false
+      }
+      if (__DEV__) {
+        warn(
+          `Query "${queryName}.${methodName}" is called in view function, it will be ignored and has no effect.`
+        )
+      }
+      return true
+    }
     // fn.length > 1 means fn(ctx, args) — i.e. the query requires args.
     const hasArgs = spec.fn.length > 1
     const handle: any = {
@@ -755,43 +766,99 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       _hasArgs: hasArgs,
     }
 
-    handle.getData = (...args: any[]) => self.getQueryData(queryName, args)
-    handle.getState = (...args: any[]) => self.getQueryState(queryName, args)
-    handle.isFetching = (...args: any[]) =>
-      self.getQueryState(queryName, args)?.fetchStatus === 'fetching'
-    handle.isStale = (...args: any[]): boolean => {
-      if (!self.coordinator) return true
-      return self.coordinator.isStale(self, queryName, args)
+    handle.getData = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('getData')) {
+        return undefined
+      }
+      return self.getQueryData(queryName, args)
     }
-    handle.fetch = (...args: any[]): Promise<any> => {
-      if (!self.coordinator) return Promise.resolve(undefined)
-      return self.coordinator.fetch(self, queryName, args) as Promise<any>
-    }
-    handle.prefetch = (...args: any[]): Promise<void> =>
-      self.prefetchQuery(queryName, args)
-    handle.cancel = (...args: any[]) => self.cancelQueries(queryName, args)
-    handle.invalidate = (...args: any[]) =>
-      self.invalidateQueries(queryName, args)
-    handle.reset = (...args: any[]) => self.resetQueries(queryName, args)
     handle.setData = hasArgs
       ? (...argsAndData: any[]) => {
+          if (shouldIgnoreQueryCallInView('setData')) {
+            return
+          }
           const data = argsAndData[argsAndData.length - 1]
           const args = argsAndData.slice(0, -1)
           self.setQueryData(queryName, args, data)
         }
-      : (data: any) => self.setQueryData(queryName, emptyArray, data)
+      : (data: any) => {
+          if (shouldIgnoreQueryCallInView('setData')) {
+            return
+          }
+          self.setQueryData(queryName, emptyArray, data)
+        }
+    handle.getState = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('getState')) {
+        return undefined
+      }
+      return self.getQueryState(queryName, args)
+    }
+    handle.isFetching = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('isFetching')) {
+        return false
+      }
+      return self.getQueryState(queryName, args)?.fetchStatus === 'fetching'
+    }
+    handle.isStale = (...args: any[]): boolean => {
+      if (shouldIgnoreQueryCallInView('isStale')) {
+        return true
+      }
+      if (!self.coordinator) return true
+      return self.coordinator.isStale(self, queryName, args)
+    }
+    handle.fetch = (...args: any[]): Promise<any> => {
+      if (shouldIgnoreQueryCallInView('fetch')) {
+        return Promise.resolve(undefined)
+      }
+      if (!self.coordinator) return Promise.resolve(undefined)
+      return self.coordinator.fetch(self, queryName, args) as Promise<any>
+    }
+    handle.prefetch = (...args: any[]): Promise<void> => {
+      if (shouldIgnoreQueryCallInView('prefetch')) {
+        return Promise.resolve()
+      }
+      return self.prefetchQuery(queryName, args)
+    }
+    handle.cancel = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('cancel')) {
+        return
+      }
+      self.cancelQueries(queryName, args)
+    }
+    handle.invalidate = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('invalidate')) {
+        return
+      }
+      self.invalidateQueries(queryName, args)
+    }
+    handle.reset = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('reset')) {
+        return
+      }
+      self.resetQueries(queryName, args)
+    }
 
     // Hook integration
     handle.computeHash = (...args: any[]): QueryHash =>
       self._queryHash(queryName, args)
-    handle.subscribe = (args: readonly unknown[], listener: () => void) =>
-      self.subscribeQuery(queryName, args, listener)
+    handle.subscribe = (args: readonly unknown[], listener: () => void) => {
+      if (shouldIgnoreQueryCallInView('subscribe')) {
+        return NOOP
+      }
+      return self.subscribeQuery(queryName, args, listener)
+    }
     handle.observe = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('observe')) {
+        return
+      }
       if (self.coordinator) {
         self.coordinator.observeQuery(self._queryHash(queryName, args))
       }
     }
     handle.unobserve = (args: readonly unknown[], cleanup: () => void) => {
+      if (shouldIgnoreQueryCallInView('unobserve')) {
+        return
+      }
       if (self.coordinator) {
         self.coordinator.unobserveQuery(
           self._queryHash(queryName, args),

@@ -81,6 +81,82 @@ describe('defineModel/views', () => {
     ).toHaveBeenWarned()
   })
 
+  it('should warn when calling query fetch in a view', () => {
+    const fetchUser = jest.fn(async () => ({ id: 1 }))
+    const model = defineModel({
+      name: 'test',
+      state: {
+        a: 0,
+      },
+      queries: {
+        fetchUser,
+      },
+      views: {
+        view() {
+          void (this as any).fetchUser.fetch()
+          return this.a
+        },
+      },
+    })
+    const store = modelMgr.getModel(model)
+
+    expect(store.view).toEqual(0)
+    expect(fetchUser).not.toHaveBeenCalled()
+    expect(store.$queries.fetchUser.getState()).toBeUndefined()
+    expect(
+      'Query "fetchUser.fetch" is called in view function, it will be ignored and has no effect.'
+    ).toHaveBeenWarned()
+  })
+
+  it('should warn when mutating query cache in a view', () => {
+    const model = defineModel({
+      name: 'test',
+      state: {
+        a: 0,
+      },
+      queries: {
+        fetchUser: async () => ({ id: 1 }),
+      },
+      views: {
+        view() {
+          ;(this as any).fetchUser.setData({ id: 1 })
+          return this.a
+        },
+      },
+    })
+    const store = modelMgr.getModel(model)
+
+    expect(store.view).toEqual(0)
+    expect(store.$queries.fetchUser.getData()).toBeUndefined()
+    expect(
+      'Query "fetchUser.setData" is called in view function, it will be ignored and has no effect.'
+    ).toHaveBeenWarned()
+  })
+
+  it('should warn when reading query cache in a view', () => {
+    const model = defineModel({
+      name: 'test',
+      state: {
+        a: 0,
+      },
+      queries: {
+        fetchUser: async () => ({ id: 1 }),
+      },
+      views: {
+        view() {
+          return (this as any).fetchUser.getData()
+        },
+      },
+    })
+    const store = modelMgr.getModel(model)
+    store.$queries.fetchUser.setData({ id: 1 })
+
+    expect(store.view).toBeUndefined()
+    expect(
+      'Query "fetchUser.getData" is called in view function, it will be ignored and has no effect.'
+    ).toHaveBeenWarned()
+  })
+
   it('should warn when return "this" or "this.$state"', () => {
     const model = defineModel({
       name: 'test',
