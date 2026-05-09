@@ -658,6 +658,24 @@ describe('model queries', () => {
       unsub()
     })
 
+    it('setData via handle should preserve an in-flight fetch status', () => {
+      const inst = modelMgr.getModel(voidModel)
+      const internal = (inst as any)._
+
+      internal.setQueryState('fetchData', [], {
+        data: 'old',
+        error: undefined,
+        dataUpdatedAt: 1,
+        fetchStatus: 'fetching',
+      })
+
+      inst.$queries.fetchData.setData(123)
+
+      const state = inst.$queries.fetchData.getState()
+      expect(state!.data).toBe(123)
+      expect(state!.fetchStatus).toBe('fetching')
+    })
+
     it('setData via handle — args case writes cache for the given args', () => {
       const inst = modelMgr.getModel(argsModel)
       inst.$queries.fetchUser.setData('x', { id: 'x', name: 'Xena' })

@@ -42,7 +42,12 @@ import {
 } from './modelPublicInstance'
 import { queueJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
-import { IQueryCoordinator, QueryCacheEntry, QueryHash } from './queryTypes'
+import {
+  FetchStatus,
+  IQueryCoordinator,
+  QueryCacheEntry,
+  QueryHash,
+} from './queryTypes'
 import { isQuerySpecLike, NormalizedQuerySpec } from './queryOptions'
 import type { InternalQueryHandle } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
@@ -937,7 +942,8 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   setQueryData(
     queryName: string,
     args: readonly unknown[],
-    data: unknown
+    data: unknown,
+    fetchStatus?: FetchStatus
   ): void {
     const handle = this.queries[queryName]
     const onData = handle?._spec.onData
@@ -958,11 +964,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
 
     // Always update the query cache entry
+    const hash = this._queryHash(queryName, args)
+    const existing = this.queryCache.get(hash)
     const entry: QueryCacheEntry = {
       data,
       error: undefined,
       dataUpdatedAt: Date.now(),
-      fetchStatus: 'idle',
+      fetchStatus: fetchStatus ?? existing?.fetchStatus ?? 'idle',
     }
     this.setQueryState(queryName, args, entry)
 

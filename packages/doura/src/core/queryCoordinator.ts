@@ -54,7 +54,7 @@ export class QueryCoordinator {
       })
       .then((result) => {
         if (!model.destroyed) {
-          model.setQueryData(queryName, argsTuple, result)
+          model.setQueryData(queryName, argsTuple, result, 'idle')
         }
         return result
       })
