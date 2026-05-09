@@ -624,6 +624,43 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
+  private _runAction(
+    action: () => any,
+    options: {
+      name?: string
+      beforeAction?: () => void
+    } = {}
+  ) {
+    const { name, beforeAction } = options
+
+    if (name && this.accessContext === AccessContext.VIEW) {
+      if (__DEV__) {
+        warn(
+          `Action "${String(
+            name
+          )}" is called in view function, it will be ignored and has no effect.`
+        )
+      }
+      return
+    }
+
+    this._actionDepth++
+    let res: any
+    try {
+      beforeAction?.()
+      res = action()
+    } finally {
+      // Flush changes to the model synchronously after the outermost action.
+      // This prevents issues like https://github.com/pmndrs/valtio/issues/270.
+      if (--this._actionDepth === 0) {
+        invalidateJob(this._update)
+        this._update()
+      }
+    }
+
+    return res
+  }
+
   private _initActions() {
     // map actions names to dispatch actions
     const actions = this.options.actions
@@ -638,39 +675,18 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
           enumerable: true,
           writable: false,
           value: (...args: any[]) => {
-            if (this.accessContext === AccessContext.VIEW) {
-              if (__DEV__) {
-                warn(
-                  `Action "${String(
-                    actionName
-                  )}" is called in view function, it will be ignored and has no effect.`
-                )
-              }
-              return
-            }
-
-            this._actionDepth++
-            let res: any
-            try {
-              const actionListeners = this._actionListeners.slice()
-              for (let i = 0; i < actionListeners.length; i++) {
-                actionListeners[i]({
-                  name: actionName,
-                  args,
-                })
-              }
-              res = action.call(this.proxy, ...args)
-            } finally {
-              // flush changes to model synchronously right after an action.
-              // this prevent issues like https://github.com/pmndrs/valtio/issues/270
-
-              if (--this._actionDepth === 0) {
-                invalidateJob(this._update)
-                this._update()
-              }
-            }
-
-            return res
+            return this._runAction(() => action.apply(this.proxy, args), {
+              name: actionName,
+              beforeAction: () => {
+                const actionListeners = this._actionListeners.slice()
+                for (let i = 0; i < actionListeners.length; i++) {
+                  actionListeners[i]({
+                    name: actionName,
+                    args,
+                  })
+                }
+              },
+            })
           },
         })
       }
@@ -966,33 +982,33 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const handle = this.queries[queryName]
     const onData = handle?._spec.onData
 
+    // Always update the query cache entry
+    const writeQueryCache = () => {
+      const hash = this._queryHash(queryName, args)
+      const existing = this.queryCache.get(hash)
+      const entry: QueryCacheEntry = {
+        data,
+        error: undefined,
+        dataUpdatedAt: Date.now(),
+        fetchStatus: fetchStatus ?? existing?.fetchStatus ?? 'idle',
+      }
+      this.setQueryState(queryName, args, entry)
+    }
+
     if (onData) {
-      this._watchStateChange = false
-      try {
-        ;(onData as Function)({
+      const applyOnData = onData as Function
+      this._runAction(() => {
+        applyOnData({
           api: this.proxy,
           args,
           data,
         })
-      } finally {
-        this._watchStateChange = true
-      }
+        writeQueryCache()
+      })
+      return
     }
 
-    // Always update the query cache entry
-    const hash = this._queryHash(queryName, args)
-    const existing = this.queryCache.get(hash)
-    const entry: QueryCacheEntry = {
-      data,
-      error: undefined,
-      dataUpdatedAt: Date.now(),
-      fetchStatus: fetchStatus ?? existing?.fetchStatus ?? 'idle',
-    }
-    this.setQueryState(queryName, args, entry)
-
-    if (onData) {
-      this._update()
-    }
+    writeQueryCache()
   }
 
   getQueryData(queryName: string, args?: readonly unknown[]): unknown {

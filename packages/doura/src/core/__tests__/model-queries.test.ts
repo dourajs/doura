@@ -272,6 +272,61 @@ describe('model queries', () => {
       })
     })
 
+    it('setData should batch actions and state writes in onData', () => {
+      const model = defineModel(
+        {
+          name: 'model',
+          state: {
+            user: 0 as number | { id: number },
+            status: '',
+          },
+          actions: {
+            action1() {
+              this.status = 'xx'
+            },
+            action2() {
+              this.status = 'oo'
+            },
+          },
+          queries: {
+            fetchUser: async () => ({ id: 1 }),
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('fetchUser', {
+            onData({ api, data }) {
+              api.action1()
+              api.action2()
+              api.user = data
+            },
+          })
+        }
+      )
+
+      const store = modelMgr.getModel(model)
+      const snapshots: Array<{
+        user: number | { id: number }
+        status: string
+      }> = []
+      const actionEvents: Array<{ name: string; args: any[] }> = []
+
+      store.$subscribe(() => {
+        snapshots.push({ ...store.$rawState })
+      })
+      store.$onAction((action) => {
+        actionEvents.push(action)
+      })
+
+      store.$queries.fetchUser.setData({ id: 1 })
+
+      expect(snapshots).toEqual([{ user: { id: 1 }, status: 'oo' }])
+      expect(actionEvents).toEqual([
+        { name: 'action1', args: [] },
+        { name: 'action2', args: [] },
+      ])
+      expect(store.$queries.fetchUser.getData()).toEqual({ id: 1 })
+    })
+
     it('should read from query cache even when model state is populated', () => {
       const model = defineModel({
         name: 'model',
