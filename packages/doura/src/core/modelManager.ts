@@ -81,14 +81,14 @@ class ModelManagerInternal implements ModelManager {
   }) {
     if (typeof model === 'object' && !detached) {
       const name = getModelName(model)
-      const cachedInstace = this._models.get(name)
-      if (cachedInstace) {
+      const cachedInstance = this._models.get(name)
+      if (cachedInstance) {
         if (this._modelOptions.get(name) !== model) {
           warn(
             `model "${name}" has already been initialized with a different model options reference`
           )
         }
-        return cachedInstace
+        return cachedInstance
       }
     }
 
