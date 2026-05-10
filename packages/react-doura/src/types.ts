@@ -1,18 +1,18 @@
-import { AnyModel, Selector, ModelAPI } from 'doura'
+import { Model, ModelDefinition, Selector, ModelAPI } from 'doura'
 
 export interface UseDetachedModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selectors: S,
     depends?: any[]
   ): ReturnType<S>
 }
 
 export interface UseModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selectors: S,
     depends?: any[]
   ): ReturnType<S>
@@ -21,9 +21,9 @@ export interface UseModel {
 export interface UseSharedModel extends UseModel {}
 
 export interface UseDetachedStaticModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
 }
 
 export interface UseStaticModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
 }

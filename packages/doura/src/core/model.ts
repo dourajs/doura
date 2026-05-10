@@ -25,11 +25,11 @@ import {
 import {
   Views,
   State,
-  AnyModel,
-  AnyObjectModel,
-  ModelState,
-  ModelActions,
-  ModelViews,
+  ModelDefinition,
+  Model,
+  ModelStateFromModel,
+  ModelActionsFromModel,
+  ModelViewsFromModel,
   validateModelOptions,
 } from './modelOptions'
 import {
@@ -37,7 +37,7 @@ import {
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
-import type { ModelPublicFields } from './modelApi'
+import type { ModelApiSnapshot } from './modelApi'
 import { queueJob, queuePostJob, invalidateJob } from './scheduler'
 import { AnyObject } from '../types'
 import {
@@ -48,6 +48,7 @@ import {
 } from './queryTypes'
 import { isQuerySpecLike, NormalizedQuerySpec } from './queryOptions'
 import type { InternalQueryHandle } from './internalQueryTypes'
+import { DOURA_QUERY_HANDLE } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
 import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
 
@@ -107,9 +108,9 @@ export type Action = ModifyAction | PatchAction | ReplaceAction
 export interface ModelChangeEventBase {
   type: ActionType
   // the model to which the event is attached.
-  model: ModelInstance<AnyModel>
+  model: ModelInstance<ModelDefinition<Model>>
   // the model that triggered the event.
-  target: ModelInstance<AnyModel>
+  target: ModelInstance<ModelDefinition<Model>>
 }
 
 export interface ModelModifyEvent extends ModelChangeEventBase {
@@ -143,10 +144,13 @@ export const enum AccessTypes {
   MODEL,
 }
 
-export type ModelData<Model extends AnyModel> = ModelState<Model> &
-  ModelViews<Model>
+export type ModelData<ModelDef extends ModelDefinition<Model>> =
+  ModelDef extends ModelDefinition<infer M>
+    ? ModelStateFromModel<M> & ModelViewsFromModel<M>
+    : never
 
-export type ModelAPI<IModel extends AnyModel> = ModelPublicFields<IModel>
+export type ModelAPI<ModelDef extends ModelDefinition<Model>> =
+  ModelApiSnapshot<ModelDef>
 
 type ViewExt = View & {
   getSnapshot(): any
@@ -182,9 +186,9 @@ export interface ModelInternalOptions {
 
 let detachedModelQueryScopeId = 0
 
-export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
+export class ModelInternal<M extends Model = Model> {
   name: string
-  options: IModel
+  options: M
 
   ctx: Record<string, any>
   accessCache: Record<string, AccessTypes>
@@ -192,17 +196,18 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   /**
    * proxy for this in the context of views and actions
    */
-  proxy: ModelInstance<IModel>
+  proxy: ModelInstance<ModelDefinition<M>>
 
   /**
    * proxy this public api
    */
-  publicInst: ModelInstance<IModel>
+  publicInst: ModelInstance<ModelDefinition<M>>
 
   // props
-  actions: ModelActions<IModel>
-  views: Views<ModelViews<IModel>>
+  actions: ModelActionsFromModel<M>
+  views: Views<ModelViewsFromModel<M>>
   queries: Record<string, InternalQueryHandle>
+  queryFetches: Record<string, (...args: any[]) => Promise<any>>
   models: Record<string, ModelInstance<any>>
   modelProxies: Record<string, ModelInstance<any>>
   viewInstances: ViewExt[] = []
@@ -216,11 +221,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   effectScope: EffectScope
 
   private _actionDepth = 0
-  private _api: ModelAPI<IModel> | null = null
+  private _api: ModelAPI<ModelDefinition<M>> | null = null
   private _actionKeys: string[] = []
   private _queryKeys: string[] = []
   private _modelKeys: string[] = []
-  private _initState: ModelState<IModel>
+  private _initState: ModelStateFromModel<M>
   private _currentState: any
   private _actionListeners: ActionListener[] = []
   private _subscribers: SubscriptionCallback[] = []
@@ -241,7 +246,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _queryIndex = new QueryHashIndex<null>()
 
   constructor(
-    model: IModel,
+    model: M,
     { name, initState, models, modelProxies }: ModelInternalOptions
   ) {
     this.patch = this.patch.bind(this)
@@ -256,7 +261,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.name = name || ''
     this._queryHashScope = name || `@@detached:${++detachedModelQueryScopeId}`
     this._isDispatching = false
-    this._initState = initState || model.state
+    this._initState = (initState || model.state) as ModelStateFromModel<M>
     this.stateRef = draft({
       value: this._initState,
     })
@@ -271,6 +276,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.actions = Object.create(null)
     this.views = Object.create(null)
     this.queries = Object.create(null)
+    this.queryFetches = Object.create(null)
     this.models = models || Object.create(null)
     this.modelProxies = modelProxies || this.models
     this.accessContext = AccessContext.DEFAULT
@@ -280,11 +286,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.proxy = new Proxy(
       this.ctx,
       InternalInstanceProxyHandlers
-    ) as ModelInstance<IModel>
+    ) as ModelInstance<ModelDefinition<M>>
     this.publicInst = new Proxy(
       this.ctx,
       PublicInstanceProxyHandlers
-    ) as ModelInstance<IModel>
+    ) as ModelInstance<ModelDefinition<M>>
 
     this.effectScope = effectScope()
     this._initModels()
@@ -382,20 +388,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         ...this._currentState,
         ...this.views,
       })
+      def(data, '$queries', this.queries)
 
       // Actions and queries are immutable over the model's lifetime —
       // iterate pre-cached keys (built during _initActions/_initQueries).
       for (let i = 0; i < this._queryKeys.length; i++) {
         const key = this._queryKeys[i]
-        def(data, key, (this.queries as any)[key])
+        def(data, key, this.queryFetches[key])
       }
       for (let i = 0; i < this._actionKeys.length; i++) {
         const key = this._actionKeys[i]
         def(data, key, (this.actions as any)[key])
-      }
-      for (let i = 0; i < this._modelKeys.length; i++) {
-        const key = this._modelKeys[i]
-        def(data, key, this.models[key])
       }
     }
 
@@ -423,7 +426,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
    * but they cannot cause the reactive scope of the caller to be re-evaluated
    * when they change
    */
-  isolate<T>(fn: (s: ModelState<IModel>) => T): T {
+  isolate<T>(fn: (s: ModelStateFromModel<M>) => T): T {
     pauseTracking()
     const res = fn(this.stateValue)
     resetTracking()
@@ -493,7 +496,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return view!
   }
 
-  reducer(state: ModelState<AnyModel>, action: Action) {
+  reducer(state: ModelStateFromModel<M>, action: Action) {
     switch (action.type) {
       case ActionType.MODIFY:
       case ActionType.PATCH: {
@@ -588,7 +591,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return this._queryHashScope
   }
 
-  private _setState(newState: ModelState<IModel>) {
+  private _setState(newState: ModelStateFromModel<M>) {
     this._api = null
     this._currentState = newState
     this.stateValue = this.stateRef.value
@@ -727,15 +730,21 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         this._queryKeys.push(queryName)
         const handle = this._buildQueryHandle(queryName, spec)
         ;(this.queries as any)[queryName] = handle
+        Object.defineProperty(handle.fetch, DOURA_QUERY_HANDLE, {
+          configurable: false,
+          enumerable: false,
+          writable: false,
+          value: handle,
+        })
+        ;(this.queryFetches as any)[queryName] = handle.fetch
       }
     }
     Object.freeze(this.queries)
+    Object.freeze(this.queryFetches)
   }
 
   private _cacheAccess(key: string, type: AccessTypes) {
-    if (this.accessCache[key] === undefined) {
-      this.accessCache[key] = type
-    }
+    this.accessCache[key] = type
   }
 
   private _buildQueryHandle(
@@ -1048,13 +1057,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   }
 }
 
-export function createModelInstance<IModel extends AnyObjectModel>(
-  modelOptions: IModel,
+export function createModelInstance<M extends Model>(
+  modelOptions: M,
   options: ModelInternalOptions = {}
 ) {
   if (__DEV__) {
     validateModelOptions(modelOptions)
   }
 
-  return new ModelInternal<IModel>(modelOptions, options)
+  return new ModelInternal<M>(modelOptions, options)
 }

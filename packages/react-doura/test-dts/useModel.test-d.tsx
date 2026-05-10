@@ -80,8 +80,13 @@ const standaloneCount = defineModel({
   },
 })
 
-// @ts-expect-error — function models were removed
-defineModel(() => ({ name: 'functionCount', state: { value: 1 } }))
+const parentCount = defineModel({
+  name: 'parentCount',
+  state: {
+    parentValue: 1,
+  },
+  models: [standaloneCount],
+})
 
 const countSelector: Selector<typeof count> = function (
   stateAndViews,
@@ -114,6 +119,11 @@ function Test() {
   expectType<number>(implicitNamedModel.n)
   expectType<void>(implicitNamedModel.addValue())
   expectType<number>(useModel(standaloneCount).value)
+  expectType<number>(useModel(parentCount).parentValue)
+  // @ts-expect-error — child models are not exposed in ModelAPI snapshots
+  useModel(parentCount).standaloneCount
+  // @ts-expect-error — child models are only available on ModelInstance.$models
+  useModel(parentCount).$models
 
   // @ts-expect-error — explicit name overloads were removed
   useModel('count', count)

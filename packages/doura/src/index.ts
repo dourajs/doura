@@ -5,12 +5,10 @@ export type {
   Action,
   ActionOptions,
   ViewOptions,
-  ModelOptions,
-  ObjectModel,
+  Model,
+  ModelDefinition,
   ModelThis,
   DefineModel,
-  AnyObjectModel,
-  AnyModel,
   Selector,
   ModelView,
   ModelState,
@@ -29,12 +27,27 @@ export type {
   OnDataCtx,
   QueryCacheEntry,
   QueryConfig,
+  QueryFetch,
   QueryHandle,
   QueryHash,
   FetchStatus,
+  InternalQueryHandle,
+  InternalQueryFetch,
+  InternalQueryDefinitionRef,
+  InternalActionDefinitionRef,
+  QueryDefinitionRef,
+  ActionDefinitionRef,
 } from './core'
 
-export { defineModel, nextTick, computeQueryHash, computeArgsKey } from './core'
+export {
+  defineModel,
+  nextTick,
+  computeQueryHash,
+  computeArgsKey,
+  DOURA_QUERY_HANDLE,
+  DOURA_QUERY_REF,
+  DOURA_ACTION_REF,
+} from './core'
 
 export { Doura, DouraOptions, doura } from './doura'
 

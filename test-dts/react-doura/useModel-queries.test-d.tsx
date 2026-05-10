@@ -1,5 +1,5 @@
-import { defineModel, QueryHandle, QueryCtx } from 'doura'
-import { useDetachedModel, useModel } from 'react-doura'
+import { defineModel, QueryFetch, QueryHandle, QueryCtx } from 'doura'
+import { useDetachedModel, useModel, useQuery } from 'react-doura'
 import { expectType } from '../helper'
 
 interface User {
@@ -44,68 +44,80 @@ export function TestUseModelQueryTypes() {
   // queries alongside state/views/actions.
   const api = useModel(userModel)
 
-  // --- Query handles surface with full inference, not `any` ---
+  // --- Direct query fetch functions surface with full inference, not `any` ---
 
-  expectType<QueryHandle<[], User[]>>(api.fetchList)
-  expectType<QueryHandle<[string], User>>(api.fetchUser)
-  expectType<QueryHandle<[string], User>>(api.fetchUserSpec)
+  expectType<QueryFetch<[], User[]>>(api.fetchList)
+  expectType<QueryFetch<[string], User>>(api.fetchUser)
+  expectType<QueryFetch<[string], User>>(api.fetchUserSpec)
+  expectType<QueryHandle<[], User[]>>(api.$queries.fetchList)
+  expectType<QueryHandle<[string], User>>(api.$queries.fetchUser)
+  expectType<QueryHandle<[string], User>>(api.$queries.fetchUserSpec)
 
   // Internal descriptor and hook protocol fields are hidden from public API.
   // @ts-expect-error — internal descriptor is not public
-  api.fetchList._queryName
+  api.$queries.fetchList._queryName
   // @ts-expect-error — internal descriptor is not public
-  api.fetchList._spec
+  api.$queries.fetchList._spec
   // @ts-expect-error — internal descriptor is not public
-  api.fetchList._model
+  api.$queries.fetchList._model
   // @ts-expect-error — internal discriminator is not public
-  api.fetchList._hasArgs
+  api.$queries.fetchList._hasArgs
   // @ts-expect-error — hook integration protocol is internal
-  api.fetchList.computeHash()
+  api.$queries.fetchList.computeHash()
   // @ts-expect-error — hook integration protocol is internal
-  api.fetchList.unobserve([], () => {})
+  api.$queries.fetchList.unobserve([], () => {})
 
   // --- Runtime methods carry the inferred TArgs / TData ---
 
-  // void-args: call with no args
-  expectType<User[] | undefined>(api.fetchList.getData())
-  expectType<boolean>(api.fetchList.isFetching())
-  expectType<boolean>(api.fetchList.isStale())
-  expectType<Promise<User[]>>(api.fetchList.fetch())
-  api.fetchList.setData([{ id: '1', name: 'Alice' }])
+  // void-args: direct fetch call with no args; handle ops via $queries
+  expectType<Promise<User[]>>(api.fetchList())
+  expectType<User[] | undefined>(api.$queries.fetchList.getData())
+  expectType<boolean>(api.$queries.fetchList.isFetching())
+  expectType<boolean>(api.$queries.fetchList.isStale())
+  expectType<Promise<User[]>>(api.$queries.fetchList.fetch())
+  api.$queries.fetchList.setData([{ id: '1', name: 'Alice' }])
 
-  // args-query: call with args
-  expectType<User | undefined>(api.fetchUser.getData('1'))
-  expectType<boolean>(api.fetchUser.isFetching('1'))
-  expectType<Promise<User>>(api.fetchUser.fetch('1'))
-  api.fetchUser.setData('1', { id: '1', name: 'Alice' })
+  // args-query: direct fetch call with args; handle ops via $queries
+  expectType<Promise<User>>(api.fetchUser('1'))
+  expectType<User | undefined>(api.$queries.fetchUser.getData('1'))
+  expectType<boolean>(api.$queries.fetchUser.isFetching('1'))
+  expectType<Promise<User>>(api.$queries.fetchUser.fetch('1'))
+  api.$queries.fetchUser.setData('1', { id: '1', name: 'Alice' })
 
   // invalidate / reset accept either specific args or "all entries".
-  api.fetchUser.invalidate()
-  api.fetchUser.invalidate('1')
-  api.fetchUser.reset()
-  api.fetchUser.reset('1')
-  api.fetchList.invalidate()
-  api.fetchList.reset()
+  api.$queries.fetchUser.invalidate()
+  api.$queries.fetchUser.invalidate('1')
+  api.$queries.fetchUser.reset()
+  api.$queries.fetchUser.reset('1')
+  api.$queries.fetchList.invalidate()
+  api.$queries.fetchList.reset()
 
   // --- Wrong-shape calls are type errors ---
 
   // @ts-expect-error — fetchUser requires args
-  api.fetchUser.getData()
+  api.fetchUser()
 
   // @ts-expect-error — void query must not take an args object
-  api.fetchList.getData('1')
+  api.fetchList('1')
 
   // Explicit shape check of the conditional setData signature.
-  const setUser: (id: string, data: User) => void = api.fetchUser.setData
+  const setUser: (id: string, data: User) => void =
+    api.$queries.fetchUser.setData
   expectType<(id: string, data: User) => void>(setUser)
-  const setList: (data: User[]) => void = api.fetchList.setData
+  const setList: (data: User[]) => void = api.$queries.fetchList.setData
   expectType<(data: User[]) => void>(setList)
 
   // @ts-expect-error — data must match TData (User), not a number
-  api.fetchUser.setData('1', 42)
+  api.$queries.fetchUser.setData('1', 42)
 
   // @ts-expect-error — data for void query must be User[], not a string
-  api.fetchList.setData('not an array')
+  api.$queries.fetchList.setData('not an array')
+
+  // @ts-expect-error — direct query fetches do not expose handle methods
+  api.fetchUser.fetch('1')
+
+  useQuery(userModel.fetchUser, ['1'])
+  useQuery(api.fetchUser, ['1'])
 
   // @ts-expect-error — unknown property on ModelAPI
   api.nonExistentQuery
@@ -126,8 +138,10 @@ export function TestUseDetachedModelQueryTypes() {
 
   const api = useDetachedModel(userModel)
 
-  expectType<QueryHandle<[], User[]>>(api.fetchList)
-  expectType<QueryHandle<[string], User>>(api.fetchUser)
-  expectType<Promise<User>>(api.fetchUser.fetch('1'))
+  expectType<QueryFetch<[], User[]>>(api.fetchList)
+  expectType<QueryFetch<[string], User>>(api.fetchUser)
+  expectType<QueryHandle<[], User[]>>(api.$queries.fetchList)
+  expectType<QueryHandle<[string], User>>(api.$queries.fetchUser)
+  expectType<Promise<User>>(api.fetchUser('1'))
   expectType<number>(api.count)
 }

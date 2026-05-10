@@ -52,8 +52,13 @@ describe('useQuery', () => {
       name: 'model',
       state: {},
       queries: {
-        fetchUser: (_ctx: any, id: string) =>
-          Promise.resolve({ id, name: 'User ' + id }),
+        fetchUser: (
+          _ctx: any,
+          id: string
+        ): Promise<{
+          id: string
+          name: string
+        }> => Promise.resolve({ id, name: 'User ' + id }),
       },
     })
 
@@ -70,6 +75,99 @@ describe('useQuery', () => {
     )
     await waitFor(() => {
       expect(container.querySelector('#data')?.textContent).toContain('User 1')
+    })
+  })
+
+  test('should resolve definition query refs without subscribing to model state', async () => {
+    const store = doura()
+    const { Provider } = createContainer()
+    const model = defineModel({
+      name: 'definitionRefQueryModel',
+      state: { count: 0 },
+      actions: {
+        bump() {
+          this.count += 1
+        },
+      },
+      queries: {
+        state: (_ctx: any) => Promise.resolve('state-query'),
+        name: (_ctx: any) => Promise.resolve('name-query'),
+        fetchUser: (_ctx: any, id: string) =>
+          Promise.resolve({ id, name: 'User ' + id }),
+      },
+    })
+
+    let renders = 0
+    const App = () => {
+      renders++
+      const user = useQuery(model.fetchUser, ['1'])
+      const state = useQuery(model.state)
+      const name = useQuery(model.name)
+      return (
+        <div id="data">
+          {user.data ? user.data.name : 'none'}:{state.data ?? 'none'}:
+          {name.data ?? 'none'}
+        </div>
+      )
+    }
+
+    const { container } = render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#data')?.textContent).toBe(
+        'User 1:state-query:name-query'
+      )
+    })
+    const baseline = renders
+
+    await act(async () => {
+      store.getModel(model).bump()
+      await Promise.resolve()
+    })
+
+    expect(renders).toBe(baseline)
+  })
+
+  test('definition query refs rebind when Provider store changes', async () => {
+    const storeA = doura()
+    const storeB = doura()
+    const { Provider } = createContainer()
+    const model = defineModel({
+      name: 'definitionRefStoreSwapQueryModel',
+      state: {},
+      queries: {
+        fetchLabel: (_ctx: any) => Promise.resolve('network'),
+      },
+    })
+
+    storeA.getModel(model).$queries.fetchLabel.setData('store-a')
+    storeB.getModel(model).$queries.fetchLabel.setData('store-b')
+
+    const App = () => {
+      const { data } = useQuery(model.fetchLabel, { enabled: false })
+      return <div id="data">{data ?? 'none'}</div>
+    }
+
+    const { container, rerender } = render(
+      <Provider store={storeA}>
+        <App />
+      </Provider>
+    )
+
+    expect(container.querySelector('#data')?.textContent).toBe('store-a')
+
+    rerender(
+      <Provider store={storeB}>
+        <App />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#data')?.textContent).toBe('store-b')
     })
   })
 
@@ -96,7 +194,7 @@ describe('useQuery', () => {
 
     const App = ({ id }: { id: string }) => {
       const api = useModel(model)
-      patchHandle?.(api.fetchUser)
+      patchHandle?.(api.$queries.fetchUser)
       useQuery(api.fetchUser, [id], { enabled: false })
       return <div id="id">{id}</div>
     }

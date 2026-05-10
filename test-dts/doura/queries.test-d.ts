@@ -4,6 +4,7 @@ import {
   QueryCtx,
   OnDataCtx,
   ModelQueries,
+  QueryFetch,
   QueryHandle,
 } from 'doura'
 // @ts-expect-error — query helper is no longer exported
@@ -29,10 +30,11 @@ const userModel = defineModel(
       async updateUser(payload: { id: string; name: string }) {
         this.users[payload.id] = payload
         // query methods accessible from actions via this
-        this.fetchUser.invalidate()
-        this.fetchUser.invalidate(payload.id)
-        this.fetchUser.cancel(payload.id)
-        this.fetchUser.reset(payload.id)
+        expectType<User>(await this.fetchUser(payload.id))
+        this.$queries.fetchUser.invalidate()
+        this.$queries.fetchUser.invalidate(payload.id)
+        this.$queries.fetchUser.cancel(payload.id)
+        this.$queries.fetchUser.reset(payload.id)
         this.$invalidateQueries()
         this.$cancelQueries()
         this.$resetQueries()
@@ -104,6 +106,11 @@ expectType<QueryHandle<[], { id: string; name: string }[]>>(
 expectType<QueryHandle<[string], { id: string; name: string }>>(
   inst.$queries.fetchUser
 )
+expectType<QueryFetch<[], { id: string; name: string }[]>>(inst.fetchList)
+expectType<QueryFetch<[string], { id: string; name: string }>>(inst.fetchUser)
+expectType<Promise<{ id: string; name: string }>>(inst.fetchUser('1'))
+// @ts-expect-error — direct query fetch functions do not expose handle methods
+inst.fetchUser.fetch('1')
 
 // @ts-expect-error — non-existent query name is a type error
 inst.$queries.nonExistent
@@ -191,10 +198,13 @@ const composedModel = defineModel(
     models: [userModel],
     actions: {
       invalidateUsers() {
-        this.userModel.fetchUser.invalidate()
-        this.userModel.fetchUser.setData('1', { id: '1', name: 'Bob' })
+        this.userModel.$queries.fetchUser.invalidate()
+        this.userModel.$queries.fetchUser.setData('1', {
+          id: '1',
+          name: 'Bob',
+        })
         this.userModel.$cancelQueries()
-        this.userModel.fetchUser.reset()
+        this.userModel.$queries.fetchUser.reset()
       },
     },
     queries: {
@@ -207,7 +217,10 @@ const composedModel = defineModel(
   ({ model }) => {
     model.setQueryOptions('fetchReady', {
       onData({ api, args, data }) {
-        expectType<QueryHandle<[string], User>>(api.userModel.fetchUser)
+        expectType<QueryFetch<[string], User>>(api.userModel.fetchUser)
+        expectType<QueryHandle<[string], User>>(
+          api.userModel.$queries.fetchUser
+        )
         expectType<[]>(args)
         expectType<boolean>(data)
       },
@@ -250,7 +263,8 @@ const fullModel = defineModel(
         expectType<void>(api.$patch({ count: data }))
         expectType<void>(api.increment())
         expectType<number>(api.double)
-        expectType<QueryHandle<[], number>>(api.fetchCount)
+        expectType<QueryFetch<[], number>>(api.fetchCount)
+        expectType<QueryHandle<[], number>>(api.$queries.fetchCount)
         expectType<[]>(args)
         expectType<number>(data)
         api.count = data
@@ -286,9 +300,13 @@ const inferredModel = defineModel({
 })
 
 const inferredInst = store.getModel(inferredModel)
-expectType<QueryHandle<[], number>>(inferredInst.fetchCount)
-expectType<QueryHandle<[string], { id: string; value: number }>>(
+expectType<QueryFetch<[], number>>(inferredInst.fetchCount)
+expectType<QueryFetch<[string], { id: string; value: number }>>(
   inferredInst.fetchThing
+)
+expectType<QueryHandle<[], number>>(inferredInst.$queries.fetchCount)
+expectType<QueryHandle<[string], { id: string; value: number }>>(
+  inferredInst.$queries.fetchThing
 )
 
 // =============================================================

@@ -1,4 +1,4 @@
-import { AnyObjectModel, defineModel } from 'doura'
+import { ModelDefinition, QueryFetch, defineModel } from 'doura'
 import { expectType } from '../helper'
 
 // object model
@@ -18,17 +18,13 @@ const countModel = defineModel({
     },
   },
 })
+expectType<'test'>(countModel.$options.name)
+expectType<{ count: number }>(countModel.$options.state)
 
 // @ts-expect-error — model name is required in object model options
 defineModel({
   state: {},
 })
-
-// @ts-expect-error — function models were removed
-defineModel(() => ({
-  name: 'fn',
-  state: {},
-}))
 
 // models
 export const fooModel = defineModel({
@@ -92,9 +88,9 @@ defineModel({
   },
 })
 
-// @ts-expect-error - "refresh" in actions conflicts with queries
+// @ts-expect-error - "refresh" in queries conflicts with actions
 defineModel({
-  name: 'conflictActionQuery',
+  name: 'actionQuerySameName',
   state: {
     count: 0,
   },
@@ -105,6 +101,66 @@ defineModel({
   },
   queries: {
     refresh: (_ctx) => Promise.resolve(1),
+  },
+})
+
+const optionFieldQueryRef = defineModel({
+  name: 'optionFieldQueryRef',
+  state: {},
+  queries: {
+    state: (_ctx) => Promise.resolve(1),
+    name: (_ctx) => Promise.resolve(1),
+    actions: (_ctx) => Promise.resolve(1),
+    views: (_ctx) => Promise.resolve(1),
+    models: (_ctx) => Promise.resolve(1),
+    queries: (_ctx) => Promise.resolve(1),
+  },
+})
+expectType<QueryFetch<[], number>>(optionFieldQueryRef.state)
+expectType<QueryFetch<[], number>>(optionFieldQueryRef.name)
+expectType<QueryFetch<[], number>>(optionFieldQueryRef.actions)
+expectType<QueryFetch<[], number>>(optionFieldQueryRef.views)
+expectType<QueryFetch<[], number>>(optionFieldQueryRef.models)
+expectType<QueryFetch<[], number>>(optionFieldQueryRef.queries)
+expectType<'optionFieldQueryRef'>(optionFieldQueryRef.$options.name)
+expectType<{}>(optionFieldQueryRef.$options.state)
+
+const optionFieldActionRef = defineModel({
+  name: 'optionFieldActionRef',
+  state: {},
+  actions: {
+    state() {
+      return 1
+    },
+    name() {
+      return 1
+    },
+    queries() {
+      return 1
+    },
+  },
+})
+expectType<() => number>(optionFieldActionRef.state)
+expectType<() => number>(optionFieldActionRef.name)
+expectType<() => number>(optionFieldActionRef.queries)
+
+// @ts-expect-error - "$options" in queries conflicts with model definition fields
+defineModel({
+  name: 'reservedQueryRef',
+  state: {},
+  queries: {
+    $options: (_ctx) => Promise.resolve(1),
+  },
+})
+
+// @ts-expect-error - "$options" in actions conflicts with model definition fields
+defineModel({
+  name: 'reservedActionRef',
+  state: {},
+  actions: {
+    $options() {
+      return 1
+    },
   },
 })
 
@@ -129,7 +185,7 @@ defineModel({
   },
 })
 
-const dynamicChildren = [childConflictModel] as AnyObjectModel[]
+const dynamicChildren = [childConflictModel] as ModelDefinition[]
 
 // Widened model arrays are intentionally left to runtime validation.
 defineModel({

@@ -55,7 +55,7 @@ function makeLandingModel(fetchData: () => Promise<number>) {
       state: { value: 0 },
       actions: {
         async fetchThenBump() {
-          await this.fetchData.fetch()
+          await this.fetchData()
           this.value += 1
         },
       },
@@ -85,7 +85,7 @@ describe('render isolation — query landing coalescing', () => {
       actions: {
         async inner() {
           await Promise.resolve()
-          this.fetchData.setData(1)
+          this.$queries.fetchData.setData(1)
           this.value = 1
         },
         async test() {
@@ -362,7 +362,7 @@ describe('render isolation — cross-query cache updates', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleARef = api.qA
+      handleARef = api.$queries.qA
       rendersA++
       const { data } = useQuery(api.qA)
       return <span data-testid="a">{String(data ?? 'none')}</span>
@@ -423,7 +423,7 @@ describe('render isolation — cross-query cache updates', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleARef = api.qA
+      handleARef = api.$queries.qA
       rendersA++
       const { data } = useQuery(api.qA)
       return <span data-testid="a-data">{String(data ?? 'none')}</span>
@@ -477,7 +477,7 @@ describe('render isolation — cross-query cache updates', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleARef = api.qA
+      handleARef = api.$queries.qA
       rendersA++
       const { data } = useQuery(api.qA)
       return <span data-testid="a3-data">{String(data ?? 'none')}</span>
@@ -539,7 +539,7 @@ describe('render isolation — same query shared across components', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleRef = api.shared
+      handleRef = api.$queries.shared
       rendersA++
       const { data } = useQuery(api.shared)
       return <span data-testid="a">{String(data ?? 'none')}</span>

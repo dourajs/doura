@@ -160,26 +160,18 @@ describe('modelManager', () => {
     })
   })
 
-  it('should reject function models', () => {
-    const modelMgr = modelManager()
-
-    expect(() =>
-      modelMgr.getModel((() => ({ name: 'fn', state: { value: 0 } })) as any)
-    ).toThrow('invalid model')
-  })
-
-  it('should reject missing or empty object model names', () => {
+  it('should reject raw object model options', () => {
     const modelMgr = modelManager()
 
     expect(() => modelMgr.getModel({ state: { value: 0 } } as any)).toThrow(
-      'model name is required in model options'
+      'invalid model definition'
     )
     expect(() =>
       modelMgr.getModel({ name: '', state: { value: 0 } } as any)
-    ).toThrow('model name is required in model options')
+    ).toThrow('invalid model definition')
     expect(() =>
       modelMgr.getDetachedModel({ state: { value: 0 } } as any)
-    ).toThrow('model name is required in model options')
+    ).toThrow('invalid model definition')
   })
 
   it('should warn when the same name is requested with a different model options reference', () => {
@@ -336,7 +328,9 @@ describe('modelManager', () => {
         state: { value: '' },
       })
       modelMgr.getModel(model)
-      expect(onModel).toHaveBeenCalledWith('model', model, { doura: modelMgr })
+      expect(onModel).toHaveBeenCalledWith('model', model.$options, {
+        doura: modelMgr,
+      })
       expect(typeof onModelInstance.mock.calls[0][0].$name).toBe('string')
       expect(typeof onModelInstance.mock.calls[0][0].$state).toBe('object')
       expect(typeof onModelInstance.mock.calls[0][0].$subscribe).toBe(

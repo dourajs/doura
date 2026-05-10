@@ -20,7 +20,8 @@ module.exports = {
     '^.+\\.[tj]sx?$': ['ts-jest', tsJestConfig],
   },
   setupFilesAfterEnv: ['./scripts/setupJestEnv.ts'],
-  verbose: true,
+  verbose: false,
+  reporters: ['<rootDir>/scripts/failuresOnlyReporter.js', 'summary'],
   forceExit: false,
   bail: false,
   globals: {

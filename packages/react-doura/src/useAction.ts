@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { DOURA_ACTION_REF, type InternalActionDefinitionRef } from 'doura'
+import { useDouraContext } from './context'
+import { assertDouraContext } from './errors'
 
 export interface UseActionOptions<TData> {
   onSuccess?: (data: TData) => void
@@ -92,6 +95,19 @@ function noop(): void {
   /* swallow — error is already captured in state */
 }
 
+function resolveAction<TFn extends (...args: any[]) => any>(
+  action: TFn,
+  context: { store: any } | null
+): TFn {
+  const ref = (action as InternalActionDefinitionRef<TFn>)?.[DOURA_ACTION_REF]
+  if (!ref) {
+    return action
+  }
+  return assertDouraContext(context).store.getModel(ref.model)[
+    ref.actionName
+  ] as TFn
+}
+
 /**
  * Tracks the lifecycle of calling an action function from React.
  *
@@ -121,6 +137,8 @@ export function useAction<TFn extends (...args: any[]) => any>(
   action: TFn,
   options?: UseActionOptions<Awaited<ReturnType<TFn>>>
 ): UseActionResult<TFn> {
+  const context = useDouraContext({ optional: true })
+  const resolvedAction = resolveAction(action, context)
   const [state, dispatch] = useReducer(
     reducer as (
       s: ActionState<Awaited<ReturnType<TFn>>>,
@@ -131,8 +149,8 @@ export function useAction<TFn extends (...args: any[]) => any>(
 
   // Latest action/options captured via refs so the returned callbacks keep
   // stable identity across renders while still seeing current values.
-  const actionRef = useRef(action)
-  actionRef.current = action
+  const actionRef = useRef(resolvedAction)
+  actionRef.current = resolvedAction
   const optionsRef = useRef(options)
   optionsRef.current = options
 

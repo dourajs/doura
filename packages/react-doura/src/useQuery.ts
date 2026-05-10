@@ -5,9 +5,15 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react'
-import type { QueryHandle, QueryCacheEntry } from 'doura'
-import type { InternalQueryHandle } from '../../doura/src/core/internalQueryTypes'
+import {
+  type QueryFetch,
+  type QueryHandle,
+  type QueryCacheEntry,
+  type InternalQueryHandle,
+} from 'doura'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
+import { useDouraContext } from './context'
+import { resolveQueryHandle } from './resolveQueryHandle'
 
 function shallowArrayEqual(
   a: readonly unknown[] | undefined,
@@ -66,6 +72,11 @@ export function useQuery<TData, TSelected = TData>(
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
 
+export function useQuery<TData, TSelected = TData>(
+  queryFetch: QueryFetch<[], TData>,
+  options?: QueryOverrides<TData, TSelected>
+): UseQueryResult<TData, TSelected>
+
 // Overload: query with args
 export function useQuery<
   TArgs extends readonly unknown[],
@@ -77,12 +88,23 @@ export function useQuery<
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
 
+export function useQuery<
+  TArgs extends readonly unknown[],
+  TData,
+  TSelected = TData,
+>(
+  queryFetch: QueryFetch<TArgs, TData>,
+  args: NoInfer<TArgs>,
+  options?: QueryOverrides<TData, TSelected>
+): UseQueryResult<TData, TSelected>
+
 export function useQuery(
-  queryHandle: QueryHandle<any, any>,
+  queryHandle: QueryHandle<any, any> | QueryFetch<any, any>,
   argsOrOptions?: any,
   maybeOptions?: any
 ): UseQueryResult<any, any> {
-  const queryHandleInternal = queryHandle as InternalQueryHandle<any, any>
+  const context = useDouraContext({ optional: true })
+  const queryHandleInternal = resolveQueryHandle(queryHandle, context)
 
   // Resolve overloaded args using the runtime tag rather than key-scanning.
   let args: readonly unknown[]

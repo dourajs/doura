@@ -1,4 +1,4 @@
-import { AnyObjectModel } from '../modelOptions'
+import { Model } from '../modelOptions'
 import { ModelInternal, ActionType, ModelInternalOptions } from '../model'
 import { nextTick } from '../scheduler'
 import { defineModel } from '../defineModel'
@@ -12,7 +12,7 @@ afterAll(() => {
   process.env.NODE_ENV = oldEnv
 })
 
-type TestModelOptions = Omit<AnyObjectModel, 'name'> & { name?: string }
+type TestModelOptions = Record<string, any> & { name?: string }
 
 let modelId = 0
 const createModel = (
@@ -23,7 +23,7 @@ const createModel = (
     defineModel({
       name: model.name || `model-${++modelId}`,
       ...model,
-    }) as AnyObjectModel,
+    } as any).$options as Model,
     options
   )
 
@@ -89,14 +89,13 @@ describe('model', () => {
     })
   })
 
-  test('conflicted direct access prefers actions over queries', () => {
+  test('direct access resolves each model member kind', async () => {
     const makeChild = (name: string) =>
       createModel({
         name,
         state: { value: name },
       })
 
-    const stateKeyChild = makeChild('stateKey')
     const modelKeyChild = makeChild('modelKey')
 
     const model = createModel(
@@ -105,47 +104,24 @@ describe('model', () => {
           stateKey: 'state',
         },
         views: {
-          stateKey() {
-            return 'view-state'
-          },
-          modelKey() {
-            return 'view-model'
-          },
           viewKey() {
             return 'view'
           },
         },
         actions: {
-          stateKey() {
-            return 'action-state'
-          },
-          viewKey() {
-            return 'action-view'
-          },
-          modelKey() {
-            return 'action-model'
-          },
-          queryKey() {
-            return 'action-query'
-          },
           actionKey() {
             return 'action'
           },
         },
         queries: {
-          stateKey: async () => 'query-state',
-          modelKey: async () => 'query-model',
-          viewKey: async () => 'query-view',
           queryKey: async () => 'query',
         },
       },
       {
         models: {
-          stateKey: stateKeyChild.publicInst,
           modelKey: modelKeyChild.publicInst,
         },
         modelProxies: {
-          stateKey: stateKeyChild.proxy,
           modelKey: modelKeyChild.proxy,
         },
       }
@@ -155,18 +131,14 @@ describe('model', () => {
     expect(api.stateKey).toBe('state')
     expect(api.modelKey).toBe(modelKeyChild.proxy)
     expect(api.viewKey).toBe('view')
-    expect(api.queryKey()).toBe('action-query')
     expect(api.actionKey()).toBe('action')
+    await expect(api.queryKey()).resolves.toBeUndefined()
 
-    expect(api.$views.stateKey).toBe('view-state')
-    expect(api.$views.modelKey).toBe('view-model')
-    expect(api.$actions.stateKey()).toBe('action-state')
-    expect(api.$actions.modelKey()).toBe('action-model')
-    expect(api.$actions.queryKey()).toBe('action-query')
-    expect(api.$queries.stateKey).toBeDefined()
+    expect(api.$views.viewKey).toBe('view')
+    expect(api.$actions.actionKey()).toBe('action')
     expect(api.$queries.queryKey).toBeDefined()
     expect(api.$queries.queryKey).not.toBe(api.queryKey)
-    expect(api.$models.stateKey).toBe(stateKeyChild.publicInst)
+    expect(api.$models.modelKey).toBe(modelKeyChild.publicInst)
 
     expect(() => {
       api.viewKey = 'new'
@@ -179,7 +151,7 @@ describe('model', () => {
     expect('Attempting to mutate model "modelKey"').toHaveBeenWarned()
 
     model.replace({})
-    expect(api.stateKey).toBe(stateKeyChild.proxy)
+    expect(api.stateKey).toBeUndefined()
   })
 
   describe('isolate', () => {
@@ -523,24 +495,52 @@ describe('model', () => {
       expect(api4).toBe(api3)
     })
 
-    it('should prefer actions over queries with the same key in getApi()', () => {
+    it('should expose actions and query fetches in getApi()', async () => {
       const model = createModel({
         state: { value: 1 },
         actions: {
-          sameKey() {
+          actionKey() {
             return 'action'
           },
         },
         queries: {
-          sameKey: async () => 'query',
+          queryKey: async () => 'query',
         },
       })
 
       const api = model.getApi() as any
 
-      expect(api.sameKey()).toBe('action')
-      expect(api.sameKey).toBe((model.actions as any).sameKey)
-      expect(api.sameKey).not.toBe((model.queries as any).sameKey)
+      expect(api.actionKey()).toBe('action')
+      expect(api.actionKey).toBe((model.actions as any).actionKey)
+      expect(api.queryKey).not.toBe((model.queries as any).queryKey)
+      await expect(api.queryKey()).resolves.toBeUndefined()
+    })
+
+    it('should not expose child models in getApi()', () => {
+      const child = createModel({
+        name: 'child',
+        state: { value: 1 },
+      })
+      const model = createModel(
+        {
+          state: { value: 1 },
+        },
+        {
+          models: {
+            child: child.publicInst,
+          },
+          modelProxies: {
+            child: child.proxy,
+          },
+        }
+      )
+
+      const api = model.getApi() as any
+
+      expect(api.child).toBeUndefined()
+      expect(api.$models).toBeUndefined()
+      expect((model.publicInst as any).child).toBe(child.publicInst)
+      expect((model.publicInst as any).$models.child).toBe(child.publicInst)
     })
 
     it('should reuse action references across getApi() rebuilds', () => {

@@ -35,7 +35,7 @@ describe('useModel with queries', () => {
     expect(typeof apiRef.increment).toBe('function')
   })
 
-  test('query names appear on merged API as QueryHandle', () => {
+  test('query names appear on merged API as fetch functions with $queries handles', () => {
     let apiRef: any = null
     const App = () => {
       const counter = useModel(model)
@@ -50,12 +50,13 @@ describe('useModel with queries', () => {
     )
 
     expect(apiRef.fetchData).toBeDefined()
-    expect(apiRef.fetchData._queryName).toBe('fetchData')
-    expect(apiRef.fetchData._model).toBeDefined()
-    expect(apiRef.fetchData._spec).toBeDefined()
-    expect(apiRef.fetchData._spec.fn).toBeInstanceOf(Function)
+    expect(apiRef.fetchData).not.toBe(apiRef.$queries.fetchData)
+    expect(apiRef.$queries.fetchData._queryName).toBe('fetchData')
+    expect(apiRef.$queries.fetchData._model).toBeDefined()
+    expect(apiRef.$queries.fetchData._spec).toBeDefined()
+    expect(apiRef.$queries.fetchData._spec.fn).toBeInstanceOf(Function)
 
-    expect(apiRef.fetchUser._queryName).toBe('fetchUser')
+    expect(apiRef.$queries.fetchUser._queryName).toBe('fetchUser')
   })
 
   test('no queries — no QueryHandles in merged API', () => {
@@ -84,8 +85,9 @@ describe('useModel with queries', () => {
 
     expect(apiRef.count).toBe(0)
     expect(typeof apiRef.inc).toBe('function')
-    // No QueryHandle properties
+    // No query fetch or handle properties
     expect(apiRef.fetchData).toBeUndefined()
+    expect(apiRef.$queries.fetchData).toBeUndefined()
   })
 
   test('queries binding persists across state changes', () => {
@@ -93,7 +95,7 @@ describe('useModel with queries', () => {
     const App = () => {
       const counter = useModel(model)
       if (firstFetchData === null) firstFetchData = counter.fetchData
-      // Same reference should persist (QueryHandle is cached)
+      // Same reference should persist (bound fetch is cached)
       expect(counter.fetchData).toBe(firstFetchData)
       return <div>{counter.value}</div>
     }
@@ -105,10 +107,9 @@ describe('useModel with queries', () => {
     )
   })
 
-  test('action names win over query names in merged API', () => {
-    const conflictModel = defineModel(
-      // @ts-expect-error - intentional runtime conflict fixture
-      {
+  test('action/query name conflicts are rejected', () => {
+    expect(() =>
+      defineModel({
         name: 'query-action-conflict',
         state: { value: 0 },
         actions: {
@@ -119,25 +120,7 @@ describe('useModel with queries', () => {
         queries: {
           sameKey: (_ctx: any) => Promise.resolve('query'),
         },
-      }
-    )
-
-    let apiRef: any = null
-    const App = () => {
-      const inst = useModel(conflictModel)
-      apiRef = inst
-      return <div>{inst.value}</div>
-    }
-
-    render(
-      <DouraRoot>
-        <App />
-      </DouraRoot>
-    )
-
-    expect(
-      'key "sameKey" in "actions" is conflicted with the key in "queries"'
-    ).toHaveBeenWarned()
-    expect(apiRef.sameKey()).toBe('action')
+      } as any)
+    ).toThrow(/key "sameKey" in "queries".*key in "actions"/)
   })
 })

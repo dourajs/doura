@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import type { QueryHandle } from 'doura'
+import {
+  type QueryFetch,
+  type QueryHandle,
+  type InternalQueryHandle,
+} from 'doura'
+import { useDouraContext } from './context'
+import { resolveQueryHandle } from './resolveQueryHandle'
 
 export interface InfiniteQueryConfig<TArgs extends readonly unknown[], TData> {
   /** Args for the first page. */
@@ -31,6 +37,9 @@ export interface UseInfiniteQueryResult<
 }
 
 type FetchKind = 'none' | 'initial' | 'next' | 'prev' | 'refetch'
+type QueryInput<TArgs extends readonly unknown[], TData> =
+  | QueryHandle<TArgs, TData>
+  | QueryFetch<TArgs, TData>
 
 interface InfiniteState<TArgs, TData> {
   pages: TData[]
@@ -48,6 +57,7 @@ type InfiniteEvent<TArgs, TData> =
       position: 'append' | 'prepend' | 'replace'
     }
   | { type: 'error'; error: unknown }
+  | { type: 'reset' }
 
 function infiniteReducer<TArgs, TData>(
   state: InfiniteState<TArgs, TData>,
@@ -73,6 +83,13 @@ function infiniteReducer<TArgs, TData>(
     }
     case 'error':
       return { ...state, error: event.error, fetchingKind: 'none' }
+    case 'reset':
+      return {
+        pages: [],
+        pageArgs: [],
+        error: undefined,
+        fetchingKind: 'initial',
+      }
   }
 }
 
@@ -84,13 +101,13 @@ const INITIAL_STATE: InfiniteState<any, any> = {
 }
 
 /**
- * Paginated query hook that accumulates pages fetched from the same
- * `QueryHandle` across different args.
+ * Paginated query hook that accumulates pages fetched from the same query
+ * across different args.
  *
  * - Initial fetch runs once on mount (StrictMode-safe via a ref guard).
  * - `fetchNextPage` / `fetchPreviousPage` compute the next/previous args
- *   from the user-supplied `getNextArgs` / `getPreviousArgs` and call
- *   `queryHandle.fetch(...args)`, which dedupes through the store's
+ *   from the user-supplied `getNextArgs` / `getPreviousArgs` and fetch
+ *   through the query handle, which dedupes through the store's
  *   FetchManager so concurrent requesters of the same page share work.
  * - Race guard via runIdRef: only the latest page fetch writes state.
  *   Out-of-order resolves from superseded runs (e.g. refetch during a
@@ -103,9 +120,11 @@ const INITIAL_STATE: InfiniteState<any, any> = {
  * will read them back), but this hook does not subscribe to those caches.
  */
 export function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
-  queryHandle: QueryHandle<TArgs, TData>,
+  queryHandle: QueryInput<TArgs, TData>,
   config: InfiniteQueryConfig<NoInfer<TArgs>, TData>
 ): UseInfiniteQueryResult<TArgs, TData> {
+  const context = useDouraContext({ optional: true })
+  const resolvedQueryHandle = resolveQueryHandle(queryHandle, context)
   const [state, dispatch] = useReducer(
     infiniteReducer as (
       s: InfiniteState<TArgs, TData>,
@@ -119,8 +138,8 @@ export function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
   // current values across renders.
   const configRef = useRef(config)
   configRef.current = config
-  const handleRef = useRef(queryHandle)
-  handleRef.current = queryHandle
+  const handleRef = useRef(resolvedQueryHandle)
+  handleRef.current = resolvedQueryHandle
 
   // Race guard — every fetchPage call is given a unique runId; only the
   // latest run's result is allowed to land. Cleanup does NOT increment it,
@@ -140,10 +159,11 @@ export function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
     async (
       args: TArgs,
       position: 'append' | 'prepend' | 'replace',
-      kind: Exclude<FetchKind, 'none'>
+      kind: Exclude<FetchKind, 'none'>,
+      shouldDispatchFetching = true
     ): Promise<void> => {
       const runId = ++runIdRef.current
-      if (isMountedRef.current) {
+      if (shouldDispatchFetching && isMountedRef.current) {
         dispatch({ type: 'fetching', kind })
       }
       try {
@@ -162,13 +182,15 @@ export function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
     []
   )
 
-  // Kick off the initial fetch exactly once (StrictMode-safe).
-  const initialFetchedRef = useRef(false)
+  // Fetch the initial page for each resolved handle. The handle changes when a
+  // definition ref is rebound through a different Provider store.
+  const fetchedHandleRef = useRef<InternalQueryHandle<any, any> | null>(null)
   useEffect(() => {
-    if (initialFetchedRef.current) return
-    initialFetchedRef.current = true
-    void fetchPage(configRef.current.initialArgs, 'replace', 'initial')
-  }, [fetchPage])
+    if (fetchedHandleRef.current === resolvedQueryHandle) return
+    fetchedHandleRef.current = resolvedQueryHandle
+    dispatch({ type: 'reset' })
+    void fetchPage(configRef.current.initialArgs, 'replace', 'initial', false)
+  }, [fetchPage, resolvedQueryHandle])
 
   const fetchNextPage = useCallback(async (): Promise<void> => {
     if (pages.length === 0) return

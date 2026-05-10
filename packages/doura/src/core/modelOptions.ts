@@ -1,9 +1,15 @@
 import { warn } from '../warning'
 import { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn, isArray } from '../utils'
-import { QueryCtx, QueryHandle } from './queryTypes'
+import { QueryCtx, QueryFetch, QueryHandle } from './queryTypes'
 import { isQuerySpecLike } from './queryOptions'
 import type { ModelInstance } from './modelPublicInstance'
+
+type ModelDefinitionLike = {
+  readonly $options: any
+}
+
+declare const DOURA_MODEL_DEFINITION: unique symbol
 
 export type State = {
   [x: string]: any
@@ -47,79 +53,175 @@ type QueriesOnThis<Q> =
       }
     : {}
 
-type ModelName<M> = M extends { name: infer N }
+type ModelName<ModelDef> = ModelDef extends { readonly $options: infer M }
+  ? RawModelName<M>
+  : never
+
+export type ModelChildren<Models> = Models extends readonly unknown[]
+  ? {
+      readonly [ModelDef in Models[number] as ModelName<ModelDef>]: ModelDef extends ModelDefinition<Model>
+        ? ModelInstance<ModelDef>
+        : never
+    }
+  : {}
+
+type ModelViewState<ModelDef> = ModelDef extends { readonly $options: infer M }
+  ? M extends { state: infer S }
+    ? S extends State
+      ? S
+      : {}
+    : {}
+  : {}
+
+type ModelViewViews<ModelDef> = ModelDef extends { readonly $options: infer M }
+  ? M extends { views: infer V }
+    ? V extends ViewOptions
+      ? V
+      : {}
+    : {}
+  : {}
+
+type ModelViewModels<ModelDef> = ModelDef extends { readonly $options: infer M }
+  ? M extends { models: infer Models }
+    ? Models extends readonly unknown[]
+      ? Models
+      : []
+    : []
+  : []
+
+type ModelViewThis<ModelDef> = ViewThis<
+  ModelViewState<ModelDef>,
+  ModelViewViews<ModelDef>,
+  ModelViewModels<ModelDef>
+>
+
+export type ViewModelChildren<Models> = Models extends readonly unknown[]
+  ? {
+      readonly [ModelDef in Models[number] as ModelName<ModelDef>]: ModelViewThis<ModelDef>
+    }
+  : {}
+
+type RawModelName<M> = M extends { name: infer N }
   ? N extends string
     ? N
     : never
   : never
 
-export type ModelChildren<Models> = Models extends readonly AnyObjectModel[]
+type RawModelChildren<Models> = Models extends readonly unknown[]
   ? {
-      readonly [M in Models[number] as ModelName<M>]: ModelInstance<M>
+      readonly [ModelDef in Models[number] as ModelDef extends {
+        readonly $options: infer M
+      }
+        ? RawModelName<M>
+        : never]: ModelDef extends ModelDefinition<Model>
+        ? ModelInstance<ModelDef>
+        : never
     }
   : {}
 
-type ModelViewState<Model> = Model extends { state: infer S }
-  ? S extends State
-    ? S
-    : {}
+type RawViewModelChildren<Models> = Models extends readonly unknown[]
+  ? {
+      readonly [ModelDef in Models[number] as ModelDef extends {
+        readonly $options: infer M
+      }
+        ? RawModelName<M>
+        : never]: ModelViewThis<ModelDef>
+    }
   : {}
 
-type ModelViewViews<Model> = Model extends { views: infer V }
-  ? V extends ViewOptions
-    ? V
-    : {}
+export type ModelStateFromModel<M extends Model> = M extends { state: infer S }
+  ? { [K in keyof S]: S[K] }
+  : never
+
+export type ModelActionsFromModel<M extends Model> =
+  M extends Model<any, infer A, any, any> ? Actions<A> : never
+
+export type ModelViewsFromModel<M extends Model> =
+  M extends Model<any, any, infer V, any> ? Views<V> : never
+
+export type ModelModelsFromModel<M extends Model> = M extends {
+  models: infer Models
+}
+  ? RawModelChildren<Models>
   : {}
 
-type ModelViewModels<Model> = Model extends { models: infer Models }
-  ? Models extends readonly AnyObjectModel[]
-    ? Models
-    : []
-  : []
+type ModelQueriesFromEntries<Q> =
+  Q extends Record<string, any>
+    ? {
+        readonly [K in keyof StripIndexSignatureUnlessAny<Q>]: HandleFromEntry<
+          Q[K]
+        >
+      }
+    : {}
 
-type ModelViewThis<Model> = ViewThis<
-  ModelViewState<Model>,
-  ModelViewViews<Model>,
-  ModelViewModels<Model>
+export type ModelQueriesFromModel<M extends Model> = M extends {
+  queries: infer Q
+}
+  ? ModelQueriesFromEntries<Q>
+  : {}
+
+export type ModelQueryFetchesFromModel<M extends Model> = M extends {
+  queries: infer Q
+}
+  ? QueryFetchesFromEntries<Q>
+  : {}
+
+type UnwrapDef<ModelDef extends ModelDefinition> =
+  ModelDef extends ModelDefinition<infer M> ? M : never
+
+type ModelStateFromDef<ModelDef extends ModelDefinition> = ModelStateFromModel<
+  UnwrapDef<ModelDef>
 >
 
-export type ViewModelChildren<Models> = Models extends readonly AnyObjectModel[]
-  ? {
-      readonly [M in Models[number] as ModelName<M>]: ModelViewThis<M>
-    }
-  : {}
+type ModelActionsFromDef<ModelDef extends ModelDefinition> =
+  ModelActionsFromModel<UnwrapDef<ModelDef>>
+
+type ModelViewsFromDef<ModelDef extends ModelDefinition> = ModelViewsFromModel<
+  UnwrapDef<ModelDef>
+>
+
+type ModelModelsFromDef<ModelDef extends ModelDefinition> =
+  ModelModelsFromModel<UnwrapDef<ModelDef>>
+
+type ModelQueriesFromDef<ModelDef extends ModelDefinition> =
+  ModelQueriesFromModel<UnwrapDef<ModelDef>>
+
+type ModelQueryFetchesFromDef<ModelDef extends ModelDefinition> =
+  ModelQueryFetchesFromModel<UnwrapDef<ModelDef>>
 
 export type ModelThis<
   S extends State = {},
   A extends ActionOptions = {},
   V extends ViewOptions = {},
   Q = {},
-  Models extends readonly AnyObjectModel[] = [],
+  Models extends readonly ModelDefinition[] = [],
 > = {
   $state: S
   $patch: (s: AnyObject) => void
+  $queries: QueriesOnThis<Q>
 } & StripIndexSignatureUnlessAny<S> &
   StripIndexSignatureUnlessAny<Views<V>> &
   StripIndexSignatureUnlessAny<Actions<A>> &
-  StripIndexSignatureUnlessAny<QueriesOnThis<Q>> &
-  StripIndexSignatureUnlessAny<ModelChildren<Models>> &
+  StripIndexSignatureUnlessAny<QueryFetchesFromEntries<Q>> &
+  StripIndexSignatureUnlessAny<RawModelChildren<Models>> &
   ModelQueryMethods
 
 export type ViewThis<
   S extends State = {},
   V extends ViewOptions = {},
-  Models extends readonly AnyObjectModel[] = [],
+  Models extends readonly ModelDefinition[] = [],
 > = S & {
   $state: S
   $isolate: <T>(fn: (s: S) => T) => T
 } & Views<V> &
-  ViewModelChildren<Models>
+  RawViewModelChildren<Models>
 
-export type ObjectModel<
-  S extends State,
-  A extends ActionOptions,
-  V extends ViewOptions,
-  Models extends readonly AnyObjectModel[] = [],
+export type Model<
+  S extends State = State,
+  A extends ActionOptions = ActionOptions,
+  V extends ViewOptions = ViewOptions,
+  Models extends
+    readonly ModelDefinitionLike[] = readonly ModelDefinitionLike[],
   Q extends Record<
     string,
     (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
@@ -136,24 +238,6 @@ export type ObjectModel<
   models?: Models
 } & ThisType<ModelThis<S, A, V, Q, Models>>
 
-export type ModelOptions<
-  S extends State,
-  A extends ActionOptions,
-  V extends ViewOptions,
-  Models extends readonly AnyObjectModel[] = [],
-  Q extends Record<
-    string,
-    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
-  > = Record<
-    string,
-    (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
-  >,
-> = ObjectModel<S, A, V, Models, Q>
-
-export type AnyObjectModel = ObjectModel<any, any, any, any>
-
-export type AnyModel = AnyObjectModel
-
 /** Strip index signatures, keeping only known literal keys */
 export type StripIndexSignature<T> = {
   [K in keyof T as string extends K
@@ -169,19 +253,49 @@ type StripIndexSignatureUnlessAny<T> = 0 extends 1 & T
   ? T
   : StripIndexSignature<T>
 
-export type ModelState<Model> = Model extends { state: infer S }
-  ? { [K in keyof S]: S[K] }
-  : never
-
-export type ModelActions<Model> =
-  Model extends ModelOptions<any, infer A, any, any> ? Actions<A> : never
-
-export type ModelViews<Model> =
-  Model extends ModelOptions<any, any, infer V, any> ? Views<V> : never
-
-export type ModelModels<Model> = Model extends { models: infer Models }
-  ? ModelChildren<Models>
+type ModelDefinitionActionRefs<M extends Model> = M extends {
+  actions?: infer A
+}
+  ? A extends ActionOptions
+    ? StripIndexSignatureUnlessAny<A>
+    : {}
   : {}
+
+type ModelDefinitionQueryRefs<M extends Model> = M extends { queries?: infer Q }
+  ? Q extends Record<string, any>
+    ? {
+        readonly [K in keyof StripIndexSignatureUnlessAny<Q> as K extends keyof ModelDefinitionActionRefs<M>
+          ? never
+          : K]: QueryFetchFromEntry<Q[K]>
+      }
+    : {}
+  : {}
+
+export type ModelDefinition<
+  M extends Model = Model<any, any, any, readonly ModelDefinitionLike[], any>,
+> = {
+  readonly $options: M
+  readonly [DOURA_MODEL_DEFINITION]: true
+} & ModelDefinitionActionRefs<M> &
+  ModelDefinitionQueryRefs<M>
+
+export type ModelState<ModelDef extends ModelDefinition> =
+  ModelStateFromDef<ModelDef>
+
+export type ModelActions<ModelDef extends ModelDefinition> =
+  ModelActionsFromDef<ModelDef>
+
+export type ModelViews<ModelDef extends ModelDefinition> =
+  ModelViewsFromDef<ModelDef>
+
+export type ModelModels<ModelDef extends ModelDefinition> =
+  ModelModelsFromDef<ModelDef>
+
+export type ModelQueries<ModelDef extends ModelDefinition> =
+  ModelQueriesFromDef<ModelDef>
+
+export type ModelQueryFetches<ModelDef extends ModelDefinition> =
+  ModelQueryFetchesFromDef<ModelDef>
 
 /** Infer (TArgs, TData) from a user-provided query function, then surface
  *  them as a QueryHandle. */
@@ -193,25 +307,31 @@ type HandleFromEntry<T> = T extends (
   ? QueryHandle<A, D>
   : QueryHandle<any, any>
 
-/** Extract the queries type from a model definition as QueryHandle refs. */
-export type ModelQueries<Model> = Model extends { queries: infer Q }
-  ? Q extends Record<string, any>
+type QueryFetchFromEntry<T> = T extends (
+  this: any,
+  ctx: QueryCtx,
+  ...args: infer A
+) => Promise<infer D>
+  ? QueryFetch<A, D>
+  : QueryFetch<any, any>
+
+type QueryFetchesFromEntries<Q> =
+  Q extends Record<string, any>
     ? {
-        readonly [K in keyof StripIndexSignatureUnlessAny<Q>]: HandleFromEntry<
+        readonly [K in keyof StripIndexSignatureUnlessAny<Q>]: QueryFetchFromEntry<
           Q[K]
         >
       }
     : {}
-  : {}
 
-function validateObject(model: AnyObjectModel, prop: string) {
+function validateObject(model: Model, prop: string) {
   const target = (model as any)[prop] as any
   if (target) {
     invariant(isPlainObject(target), `model.${prop} should be object!`)
   }
 }
 
-function validateQueries(model: AnyObjectModel) {
+function validateQueries(model: Model) {
   const queries = (model as any).queries
   if (!queries) return
   invariant(isPlainObject(queries), `model.queries should be object!`)
@@ -226,68 +346,23 @@ function validateQueries(model: AnyObjectModel) {
   }
 }
 
-function validateModels(model: AnyObjectModel) {
+function validateModels(model: Model) {
   const models = (model as any).models
   if (!models) return
   invariant(isArray(models), `model.models should be array!`)
 
-  const names = new Set<string>()
   for (const child of models) {
+    const childOptions = child?.$options
     invariant(
-      child && typeof child.name === 'string' && child.name.length > 0,
+      childOptions &&
+        typeof childOptions.name === 'string' &&
+        childOptions.name.length > 0,
       'model name is required in model options'
     )
-    if (names.has(child.name)) {
-      warn(`model "${child.name}" is duplicated in "models"`)
-    }
-    names.add(child.name)
   }
 }
 
-function checkConflictedKey(
-  type: string,
-  obj: AnyObjectModel,
-  cache: Map<string, string>
-) {
-  if (!(obj as any)[type]) {
-    return
-  }
-
-  for (const key of Object.keys((obj as any)[type])) {
-    if (cache.has(key)) {
-      const conflictedType = cache.get(key)
-      warn(
-        `key "${key}" in "${type}" is conflicted with the key in "${conflictedType}"`
-      )
-    } else {
-      cache.set(key, type)
-    }
-  }
-}
-
-function checkConflictedModelKey(
-  obj: AnyObjectModel,
-  cache: Map<string, string>
-) {
-  const models = (obj as any).models
-  if (!models) {
-    return
-  }
-
-  for (const model of models) {
-    const key = model.name
-    if (cache.has(key)) {
-      const conflictedType = cache.get(key)
-      warn(
-        `key "${key}" in "models" is conflicted with the key in "${conflictedType}"`
-      )
-    } else {
-      cache.set(key, 'models')
-    }
-  }
-}
-
-export const validateModelOptions = (model: AnyObjectModel): void => {
+export const validateModelOptions = (model: Model): void => {
   invariant(
     typeof model.name === 'string' && model.name.length > 0,
     'model name is required in model options'
@@ -302,11 +377,4 @@ export const validateModelOptions = (model: AnyObjectModel): void => {
   validateObject(model, 'views')
   validateQueries(model)
   validateModels(model)
-
-  const keys = new Map<string, string>()
-  checkConflictedKey('state', model, keys)
-  checkConflictedModelKey(model, keys)
-  checkConflictedKey('views', model, keys)
-  checkConflictedKey('queries', model, keys)
-  checkConflictedKey('actions', model, keys)
 }

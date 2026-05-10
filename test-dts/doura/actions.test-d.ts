@@ -1,4 +1,4 @@
-import { defineModel, doura, QueryCtx, QueryHandle } from 'doura'
+import { defineModel, doura, QueryCtx, QueryFetch, QueryHandle } from 'doura'
 import { expectType } from '../helper'
 
 const douraStore = doura()
@@ -74,9 +74,8 @@ store.$replace(Symbol(1))
 // =============================================================
 //
 // Two type-level guarantees exercised below:
-//  - `this.someQuery` resolves to a typed QueryHandle (not `any`), so
-//    handle methods like .fetch() / .getData() carry TArgs / TData.
-//  - single-query cache operations live on QueryHandle, while
+//  - `this.someQuery` resolves to a typed query fetch function (not `any`).
+//  - single-query cache operations live on this.$queries.someQuery, while
 //    $invalidateQueries / $cancelQueries / $resetQueries are model-wide only.
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -86,27 +85,27 @@ export const modelWithQueries = defineModel({
   state: { count: 0 },
   actions: {
     async runBoth() {
-      // `this.fetchData` should carry the full handle type — NOT any.
+      // `this.fetchData` should carry the full fetch function type — NOT any.
       // If it were any, the bogus method call would silently pass and
       // the ts-expect-error directive would be flagged as unused.
-      // @ts-expect-error — fetchData is QueryHandle<[], number>, no .bogus()
+      // @ts-expect-error — fetchData is QueryFetch<[], number>, no .bogus()
       this.fetchData.bogus()
 
-      const data = await this.fetchData.fetch()
+      const data = await this.fetchData()
       expectType<number>(data)
 
       // void-args query: getData returns TData | undefined
-      expectType<number | undefined>(this.fetchData.getData())
+      expectType<number | undefined>(this.$queries.fetchData.getData())
 
       // Args query — args are required and typed.
-      const user = await this.fetchUser.fetch('1')
+      const user = await this.fetchUser('1')
       expectType<{ id: string; name: string }>(user)
 
       // @ts-expect-error — fetchUser requires args
-      this.fetchUser.fetch()
+      this.fetchUser()
 
       // @ts-expect-error — data for fetchUser must be {id,name}, not a number
-      this.fetchUser.setData('1', 42)
+      this.$queries.fetchUser.setData('1', 42)
     },
   },
   queries: {
@@ -122,13 +121,13 @@ export const modelWithInvalidation = defineModel({
   actions: {
     async mutate() {
       // Single-query operations use QueryHandle.
-      this.fetchX.invalidate()
-      this.fetchY.invalidate(1)
-      this.fetchX.cancel()
-      this.fetchY.reset(1)
-      this.fetchX.setData('value')
-      this.fetchX.getData()
-      this.fetchY.prefetch(1)
+      this.$queries.fetchX.invalidate()
+      this.$queries.fetchY.invalidate(1)
+      this.$queries.fetchX.cancel()
+      this.$queries.fetchY.reset(1)
+      this.$queries.fetchX.setData('value')
+      this.$queries.fetchX.getData()
+      this.$queries.fetchY.prefetch(1)
 
       // No-arg model-wide forms still work.
       this.$invalidateQueries()
@@ -136,17 +135,17 @@ export const modelWithInvalidation = defineModel({
       this.$resetQueries()
 
       // Public instance batch methods no longer accept query names.
-      // @ts-expect-error — use this.fetchX.invalidate()
+      // @ts-expect-error — use this.$queries.fetchX.invalidate()
       this.$invalidateQueries('fetchX')
-      // @ts-expect-error — use this.fetchX.cancel()
+      // @ts-expect-error — use this.$queries.fetchX.cancel()
       this.$cancelQueries('fetchX')
-      // @ts-expect-error — use this.fetchY.reset()
+      // @ts-expect-error — use this.$queries.fetchY.reset()
       this.$resetQueries('fetchY')
-      // @ts-expect-error — removed; use this.fetchX.setData(...)
+      // @ts-expect-error — removed; use this.$queries.fetchX.setData(...)
       this.$setQueryData('fetchX', [], 'value')
-      // @ts-expect-error — removed; use this.fetchX.getData()
+      // @ts-expect-error — removed; use this.$queries.fetchX.getData()
       this.$getQueryData('fetchX')
-      // @ts-expect-error — removed; use this.fetchY.prefetch(...)
+      // @ts-expect-error — removed; use this.$queries.fetchY.prefetch(...)
       this.$prefetchQuery('fetchY', [1])
     },
   },
@@ -162,7 +161,7 @@ export function ExternalInvalidation() {
   const inst = douraStore.getModel(modelWithInvalidation)
 
   inst.$invalidateQueries()
-  inst.fetchY.setData(1, 0)
+  inst.$queries.fetchY.setData(1, 0)
 
   // @ts-expect-error — public batch methods are model-wide only
   inst.$invalidateQueries('nope')
@@ -170,8 +169,10 @@ export function ExternalInvalidation() {
   inst.$setQueryData('nope', [], 0)
 
   // Handle typing on the instance (regression guard).
-  expectType<QueryHandle<[], string>>(inst.fetchX)
-  expectType<QueryHandle<[number], number>>(inst.fetchY)
+  expectType<QueryFetch<[], string>>(inst.fetchX)
+  expectType<QueryFetch<[number], number>>(inst.fetchY)
+  expectType<QueryHandle<[], string>>(inst.$queries.fetchX)
+  expectType<QueryHandle<[number], number>>(inst.$queries.fetchY)
 }
 
 // A model with no queries still exposes model-wide batch methods.
@@ -214,27 +215,27 @@ export const modelWithOwnQueriesAndChildren = defineModel({
   models: [child],
   actions: {
     async refresh() {
-      // Own query via this — typed as QueryHandle<[], number>
-      // @ts-expect-error — fetchData is QueryHandle, no .bogus()
+      // Own query via this — typed as QueryFetch<[], number>
+      // @ts-expect-error — fetchData is QueryFetch, no .bogus()
       this.fetchData.bogus()
 
-      const own = await this.fetchData.fetch()
+      const own = await this.fetchData()
       expectType<number>(own)
-      expectType<number | undefined>(this.fetchData.getData())
+      expectType<number | undefined>(this.$queries.fetchData.getData())
 
       // Own query with args
       // @ts-expect-error — fetchUser requires args
-      this.fetchUser.fetch()
-      const user = await this.fetchUser.fetch('1')
+      this.fetchUser()
+      const user = await this.fetchUser('1')
       expectType<{ id: string; name: string }>(user)
 
       // Composed child via this — ModelInstance<typeof child>
-      const ch = await this.child.fetchChild.fetch()
+      const ch = await this.child.fetchChild()
       expectType<string>(ch)
 
       // Query handles own single-query operations.
-      this.fetchData.invalidate()
-      this.fetchUser.invalidate('1')
+      this.$queries.fetchData.invalidate()
+      this.$queries.fetchUser.invalidate('1')
       // @ts-expect-error — public batch methods are model-wide only
       this.$invalidateQueries('fetchData')
     },

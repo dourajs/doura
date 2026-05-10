@@ -1,6 +1,7 @@
 import React, { StrictMode } from 'react'
 import { render, act, waitFor } from '@testing-library/react'
-import { defineModel } from 'doura'
+import { defineModel, doura } from 'doura'
+import { createContainer } from '../src/createContainer'
 import { DouraRoot, useModel } from '../src/useModel'
 import { useInfiniteQuery } from '../src/useInfiniteQuery'
 
@@ -34,6 +35,90 @@ const makeModel = (fetchFn?: (cursor: number) => Promise<Page>) =>
   })
 
 describe('useInfiniteQuery — initial fetch', () => {
+  test('loads the initial page from a definition query ref', async () => {
+    const store = doura()
+    const { Provider } = createContainer()
+    const model = makeModel()
+
+    const App = () => {
+      const r = useInfiniteQuery(model.fetchPage, {
+        initialArgs: [0],
+        getNextArgs,
+      })
+      return (
+        <div id="items">
+          {r.data ? r.data.pages[0].items.join(',') : 'none'}
+        </div>
+      )
+    }
+
+    const { container } = render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#items')?.textContent).toBe('a,b')
+    })
+  })
+
+  test('definition query refs refetch when Provider store changes', async () => {
+    const storeA = doura()
+    const storeB = doura()
+    const { Provider } = createContainer()
+    let source = 'store-a'
+    const calls: string[] = []
+    const model = defineModel({
+      name: 'definitionRefInfiniteStoreSwapModel',
+      state: {},
+      queries: {
+        fetchPage: async (_ctx: any, cursor: number): Promise<Page> => {
+          calls.push(source)
+          return { items: [`${source}-${cursor}`], nextCursor: null }
+        },
+      },
+    })
+
+    const App = () => {
+      const r = useInfiniteQuery(model.fetchPage, {
+        initialArgs: [0],
+        getNextArgs,
+      })
+      return (
+        <div>
+          <span id="items">
+            {r.data ? r.data.pages.flatMap((p) => p.items).join(',') : 'none'}
+          </span>
+          <span id="pages">{r.data ? r.data.pages.length : 0}</span>
+        </div>
+      )
+    }
+
+    const { container, rerender } = render(
+      <Provider store={storeA}>
+        <App />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#items')?.textContent).toBe('store-a-0')
+    })
+
+    source = 'store-b'
+    rerender(
+      <Provider store={storeB}>
+        <App />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#items')?.textContent).toBe('store-b-0')
+    })
+    expect(container.querySelector('#pages')?.textContent).toBe('1')
+    expect(calls).toEqual(['store-a', 'store-b'])
+  })
+
   test('loads the initial page on mount', async () => {
     const model = makeModel()
     const App = () => {

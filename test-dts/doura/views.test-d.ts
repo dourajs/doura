@@ -111,7 +111,7 @@ defineModel({
   actions: {
     actionAccess() {
       expectType<void>(this.child.someAction())
-      expectType<Promise<number>>(this.child.someQuery.fetch())
+      expectType<Promise<number>>(this.child.someQuery())
       expectType<void>(this.child.$patch({ count: 1 }))
       expectType<void>(this.child.grandChild.bump())
     },

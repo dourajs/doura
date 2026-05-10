@@ -1,14 +1,14 @@
 import { useMemo, useRef } from 'react'
-import { doura, AnyModel, Selector, Doura } from 'doura'
+import { doura, Model, ModelDefinition, Selector, Doura } from 'doura'
 import { createUseModel } from './createUseModel'
 import { UseDetachedModel, UseModel, UseStaticModel } from './types'
 import { DouraRoot, useRootModel, useRootStaticModel } from './global'
 
 const useDetachedModel: UseDetachedModel = <
-  IModel extends AnyModel,
-  S extends Selector<IModel>,
+  ModelDef extends ModelDefinition<Model>,
+  S extends Selector<ModelDef>,
 >(
-  model: IModel,
+  model: ModelDef,
   selector?: S,
   depends?: any[]
 ) => {

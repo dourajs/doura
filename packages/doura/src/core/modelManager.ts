@@ -1,4 +1,4 @@
-import { State, AnyModel, AnyObjectModel } from './modelOptions'
+import { State, ModelDefinition, Model } from './modelOptions'
 import { createModelInstance, ModelInternal, UnSubscribe } from './model'
 import { ModelInstance } from './modelPublicInstance'
 import { queueJob, SchedulerJob } from './scheduler'
@@ -14,14 +14,14 @@ export type ModelManagerOptions = {
   query?: Partial<QueryConfig>
 }
 
-export type Model = AnyModel
-
 export interface ModelManager {
   getState(): Record<string, State>
-  getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
-  getDetachedModel<IModel extends AnyModel>(
-    model: IModel
-  ): ModelInstance<IModel>
+  getModel<ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ): ModelInstance<ModelDef>
+  getDetachedModel<ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ): ModelInstance<ModelDef>
   subscribe(fn: DouraSubscriptionCallback): UnSubscribe
   destroy(): void
 }
@@ -34,7 +34,7 @@ class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>
   private _hooks: PluginHook[]
   private _models = new Map<string, ModelInternal>()
-  private _modelOptions = new Map<string, AnyModel>()
+  private _modelOptions = new Map<string, ModelDefinition<Model>>()
   private _subscribers: DouraSubscriptionCallback[] = []
   private _onModelChange: DouraSubscriptionCallback
   _queryCoordinator: QueryCoordinator
@@ -59,28 +59,32 @@ class ModelManagerInternal implements ModelManager {
     this._hooks.map((hook) => hook.onInit?.({ initialState }, { doura: this }))
   }
 
-  getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
+  getModel<ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ): ModelInstance<ModelDef>
   getModel(model: any): ModelInstance<any> {
     const instance = this.getModelInstance({ model })
     return instance.publicInst
   }
 
-  getDetachedModel<IModel extends AnyModel>(
-    model: IModel
-  ): ModelInstance<IModel> {
+  getDetachedModel<ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ): ModelInstance<ModelDef> {
     const instance = this.getModelInstance({ model, detached: true })
-    return instance.publicInst as ModelInstance<IModel>
+    return instance.publicInst as ModelInstance<ModelDef>
   }
 
   getModelInstance({
     model,
     detached = false,
   }: {
-    model: AnyModel
+    model: ModelDefinition<Model>
     detached?: boolean
   }) {
-    if (typeof model === 'object' && !detached) {
-      const name = getModelName(model)
+    const modelOptions = getModelOptions(model)
+    const name = getModelName(modelOptions)
+
+    if (!detached) {
       const cachedInstance = this._models.get(name)
       if (cachedInstance) {
         if (__DEV__ && this._modelOptions.get(name) !== model) {
@@ -92,19 +96,11 @@ class ModelManagerInternal implements ModelManager {
       }
     }
 
-    let instance: ModelInternal
-    if (typeof model === 'object') {
-      const name = getModelName(model)
-      instance = this._initModel({
-        name: detached ? undefined : name,
-        model,
-        sourceModel: model,
-      })
-    } else {
-      throw new Error('invalid model')
-    }
-
-    return instance
+    return this._initModel({
+      name: detached ? undefined : name,
+      model: modelOptions,
+      sourceModel: model,
+    })
   }
 
   getState() {
@@ -140,8 +136,8 @@ class ModelManagerInternal implements ModelManager {
     sourceModel,
   }: {
     name?: string
-    model: AnyObjectModel
-    sourceModel?: AnyModel
+    model: Model
+    sourceModel?: ModelDefinition<Model>
   }): ModelInternal {
     const childInstances = this._initChildModels(model)
     const childModels = Object.create(null)
@@ -178,22 +174,27 @@ class ModelManagerInternal implements ModelManager {
     modelInstance.subscribe(this._onModelChange)
 
     this._models.set(name, modelInstance)
-    this._modelOptions.set(name, sourceModel || model)
+    if (sourceModel) {
+      this._modelOptions.set(name, sourceModel)
+    }
     this._hooks.map((hook) => {
-      hook.onModelInstance?.(modelInstance.publicInst, { doura: this })
+      hook.onModelInstance?.(
+        modelInstance.publicInst as ModelInstance<ModelDefinition<Model>>,
+        { doura: this }
+      )
     })
 
     return modelInstance
   }
 
-  private _initChildModels(model: AnyObjectModel): ModelInternal[] {
+  private _initChildModels(model: Model): ModelInternal[] {
     const models = (model as any).models
     if (!models) {
       return []
     }
     invariant(isArray(models), `model.models should be array!`)
 
-    return models.map((child: AnyObjectModel) =>
+    return models.map((child: ModelDefinition<Model>) =>
       this.getModelInstance({ model: child })
     )
   }
@@ -211,10 +212,22 @@ export function modelManager({
   return new ModelManagerInternal(initialState, plugins, query)
 }
 
-function getModelName(model: AnyObjectModel): string {
+function getModelOptions(model: ModelDefinition<Model>): Model {
+  const modelOptions = model?.$options
   invariant(
-    typeof model.name === 'string' && model.name.length > 0,
+    model &&
+      typeof model === 'object' &&
+      modelOptions &&
+      typeof modelOptions === 'object',
+    'invalid model definition'
+  )
+  return modelOptions
+}
+
+function getModelName(modelOptions: Model): string {
+  invariant(
+    typeof modelOptions.name === 'string' && modelOptions.name.length > 0,
     'model name is required in model options'
   )
-  return model.name
+  return modelOptions.name
 }

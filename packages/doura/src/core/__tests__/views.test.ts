@@ -93,7 +93,7 @@ describe('defineModel/views', () => {
       },
       views: {
         view() {
-          void (this as any).fetchUser.fetch()
+          void (this as any).fetchUser()
           return this.a
         },
       },
@@ -119,7 +119,7 @@ describe('defineModel/views', () => {
       },
       views: {
         view() {
-          ;(this as any).fetchUser.setData({ id: 1 })
+          ;(this as any).$queries.fetchUser.setData({ id: 1 })
           return this.a
         },
       },
@@ -144,7 +144,7 @@ describe('defineModel/views', () => {
       },
       views: {
         view() {
-          return (this as any).fetchUser.getData()
+          return (this as any).$queries.fetchUser.getData()
         },
       },
     })

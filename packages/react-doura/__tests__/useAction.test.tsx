@@ -1,6 +1,7 @@
 import React, { StrictMode } from 'react'
 import { render, act, waitFor, renderHook } from '@testing-library/react'
-import { defineModel } from 'doura'
+import { defineModel, doura } from 'doura'
+import { createContainer } from '../src/createContainer'
 import { DouraRoot, useModel } from '../src/useModel'
 import { useAction } from '../src/useAction'
 
@@ -50,6 +51,100 @@ describe('useAction — initial state', () => {
 })
 
 describe('useAction — sync action', () => {
+  test('resolves definition action refs against the current provider store', async () => {
+    const store = doura()
+    const { Provider } = createContainer()
+    const model = defineModel({
+      name: 'definitionRefActionModel',
+      state: { value: 0 },
+      actions: {
+        views(x: number) {
+          this.value = x
+          return x * 2
+        },
+      },
+    })
+
+    const App = () => {
+      const r = useAction(model.views)
+      return (
+        <button id="btn" onClick={() => r.run(5)}>
+          {r.data ?? 'none'}
+        </button>
+      )
+    }
+
+    const { container } = render(
+      <Provider store={store}>
+        <App />
+      </Provider>
+    )
+
+    await act(async () => {
+      container
+        .querySelector('#btn')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(container.querySelector('#btn')?.textContent).toBe('10')
+    expect(store.getModel(model).value).toBe(5)
+  })
+
+  test('definition action refs rebind when Provider store changes', async () => {
+    const storeA = doura()
+    const storeB = doura()
+    const { Provider, useSharedModel } = createContainer()
+    const model = defineModel({
+      name: 'definitionRefStoreSwapActionModel',
+      state: { value: 'initial' },
+      actions: {
+        setValue(value: string) {
+          this.value = value
+        },
+      },
+    })
+
+    storeA.getModel(model).setValue('store-a')
+    storeB.getModel(model).setValue('store-b')
+
+    const App = () => {
+      const api = useSharedModel(model)
+      const action = useAction(model.setValue)
+      return (
+        <button id="btn" onClick={() => action.run('clicked')}>
+          {api.value}
+        </button>
+      )
+    }
+
+    const { container, rerender } = render(
+      <Provider store={storeA}>
+        <App />
+      </Provider>
+    )
+
+    expect(container.querySelector('#btn')?.textContent).toBe('store-a')
+
+    rerender(
+      <Provider store={storeB}>
+        <App />
+      </Provider>
+    )
+
+    await waitFor(() => {
+      expect(container.querySelector('#btn')?.textContent).toBe('store-b')
+    })
+
+    await act(async () => {
+      container
+        .querySelector('#btn')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(storeA.getModel(model).value).toBe('store-a')
+    expect(storeB.getModel(model).value).toBe('clicked')
+  })
+
   test('sync success: skips pending, jumps to success with return value', async () => {
     const model = defineModel({
       name: 'model',

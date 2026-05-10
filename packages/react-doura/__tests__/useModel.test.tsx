@@ -1,6 +1,13 @@
 import React, { StrictMode, useState } from 'react'
 import { render, act } from '@testing-library/react'
-import { doura, defineModel, nextTick, AnyModel, Selector } from 'doura'
+import {
+  doura,
+  defineModel,
+  nextTick,
+  Model,
+  ModelDefinition,
+  Selector,
+} from 'doura'
 import {
   DouraRoot,
   useDetachedModel,
@@ -325,8 +332,11 @@ describe('useDetachedModel', () => {
       // We simulate this by creating our own store + createUseModel, which is
       // the exact same code path useDetachedModel takes.
       function makeDetachedHook(store: ReturnType<typeof doura>) {
-        return <IModel extends AnyModel, S extends Selector<IModel>>(
-          model: IModel,
+        return <
+          ModelDef extends ModelDefinition<Model>,
+          S extends Selector<ModelDef>,
+        >(
+          model: ModelDef,
           selector?: S,
           depends?: any[]
         ) => {
@@ -364,7 +374,7 @@ describe('useDetachedModel', () => {
 
         // Pre-create model to capture baseline effects
         localStore.getModel(countModel)
-        const internal = getInternal(localStore, countModel.name)
+        const internal = getInternal(localStore, countModel.$options.name)
         const baseline = internal.effectScope.effects.length
 
         const { container } = render(<App />)
@@ -407,7 +417,7 @@ describe('useDetachedModel', () => {
         }
 
         localStore.getModel(countModel)
-        const internal = getInternal(localStore, countModel.name)
+        const internal = getInternal(localStore, countModel.$options.name)
         const baseline = internal.effectScope.effects.length
 
         const { container } = render(<App />)
@@ -762,7 +772,7 @@ describe('useModel (with name)', () => {
       // Instantiate the model before mounting the selector component
       // to capture the baseline effect count (model's own view effects).
       douraStore.getModel(countModel)
-      const internal = getInternal(douraStore, countModel.name)
+      const internal = getInternal(douraStore, countModel.$options.name)
       const baseline = internal.effectScope.effects.length
 
       const Child = () => {
@@ -810,7 +820,7 @@ describe('useModel (with name)', () => {
       const { Provider, useSharedModel } = createContainer()
 
       douraStore.getModel(countModel)
-      const internal = getInternal(douraStore, countModel.name)
+      const internal = getInternal(douraStore, countModel.$options.name)
       const baseline = internal.effectScope.effects.length
 
       const Child = () => {

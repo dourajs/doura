@@ -7,10 +7,19 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Doura, AnyModel, DouraOptions, Selector, doura, nextTick } from 'doura'
+import {
+  Doura,
+  Model,
+  ModelDefinition,
+  DouraOptions,
+  Selector,
+  doura,
+  nextTick,
+} from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
 import { UseSharedModel, UseStaticModel } from './types'
 import { DouraContext } from './context'
+import { MISSING_PROVIDER_MESSAGE } from './errors'
 
 const createContainer = function (options?: DouraOptions) {
   const Context = createContext<{
@@ -84,18 +93,16 @@ const createContainer = function (options?: DouraOptions) {
     const context = useContext(Context)
 
     if (__DEV__ && !context) {
-      throw new Error(
-        `[react-doura]: could not find react-doura context value; please ensure the component is wrapped in a <Provider>.`
-      )
+      throw new Error(MISSING_PROVIDER_MESSAGE)
     }
     return context
   }
 
   const useSharedModel: UseSharedModel = <
-    IModel extends AnyModel,
-    S extends Selector<IModel>,
+    ModelDef extends ModelDefinition<Model>,
+    S extends Selector<ModelDef>,
   >(
-    model: IModel,
+    model: ModelDef,
     selector?: S,
     depends?: any[]
   ) => {
@@ -107,8 +114,10 @@ const createContainer = function (options?: DouraOptions) {
     )
   }
 
-  const useStaticModel: UseStaticModel = <IModel extends AnyModel>(
-    model: IModel
+  const useStaticModel: UseStaticModel = <
+    ModelDef extends ModelDefinition<Model>,
+  >(
+    model: ModelDef
   ) => {
     const { store } = useDouraContext()
     return useMemo(() => createUseStaticModel(store), [store])(model)

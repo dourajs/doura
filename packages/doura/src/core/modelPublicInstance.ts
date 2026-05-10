@@ -12,7 +12,8 @@ import {
 } from './model'
 import {
   State,
-  AnyModel,
+  Model,
+  ModelDefinition,
   ModelState,
   ModelActions,
   ModelViews,
@@ -25,24 +26,26 @@ import { createView, Selector, ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
-export type ModelInstance<IModel extends AnyModel> = {
+export type ModelInstance<
+  ModelDef extends ModelDefinition<Model> = ModelDefinition<Model>,
+> = {
   $name: string
-  $rawState: ModelState<IModel>
-  $state: ModelState<IModel>
-  $actions: ModelActions<IModel>
-  $views: ModelViews<IModel>
-  $queries: ModelQueries<IModel>
-  $models: ModelModels<IModel>
+  $rawState: ModelState<ModelDef>
+  $state: ModelState<ModelDef>
+  $actions: ModelActions<ModelDef>
+  $views: ModelViews<ModelDef>
+  $queries: ModelQueries<ModelDef>
+  $models: ModelModels<ModelDef>
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
-  $isolate: <T>(fn: (s: ModelState<IModel>) => T) => T
-  $getApi(): ModelAPI<IModel>
+  $isolate: <T>(fn: (s: ModelState<ModelDef>) => T) => T
+  $getApi(): ModelAPI<ModelDef>
   $createView: <R>(
-    selector: Selector<IModel, R>
-  ) => ModelView<Selector<IModel, R>>
+    selector: Selector<ModelDef, R>
+  ) => ModelView<Selector<ModelDef, R>>
 } & ModelQueryMethods &
-  ModelPublicFields<IModel>
+  ModelPublicFields<ModelDef>
 
 const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
@@ -72,7 +75,8 @@ const publicPropertiesMap: PublicPropertiesMap =
 const createGetter =
   (isPublicInstance: boolean) =>
   ({ _: instance }: ProxyContext, key: string) => {
-    const { views, actions, queries, accessCache, ctx, models } = instance
+    const { views, actions, queries, queryFetches, accessCache, ctx, models } =
+      instance
 
     let state: any
     if (isPublicInstance) {
@@ -101,7 +105,7 @@ const createGetter =
           case AccessTypes.CONTEXT:
             return ctx[key]
           case AccessTypes.QUERY:
-            return queries[key]
+            return queryFetches[key]
           case AccessTypes.MODEL:
             return isPublicInstance ? models[key] : instance.modelProxies[key]
           // default: just fallthrough
@@ -117,7 +121,7 @@ const createGetter =
         return actions[key]
       } else if (hasOwn(queries, key)) {
         accessCache[key] = AccessTypes.QUERY
-        return queries[key]
+        return queryFetches[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]

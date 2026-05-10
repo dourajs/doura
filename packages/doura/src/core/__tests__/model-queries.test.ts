@@ -4,6 +4,7 @@ import {
   computeQueryHash,
   computeArgsKey,
   nextTick,
+  DOURA_QUERY_HANDLE,
 } from '../index'
 
 let modelMgr: ReturnType<typeof modelManager>
@@ -33,7 +34,7 @@ describe('model queries', () => {
       })
 
       const inst = modelMgr.getModel(model)
-      const spec = (model as any).queries.fetchUser
+      const spec = (model.$options as any).queries.fetchUser
       expect(typeof spec).toBe('object')
       expect(spec.fn).toBe(fetchUser)
       expect(inst.$queries.fetchUser).toBeDefined()
@@ -63,7 +64,7 @@ describe('model queries', () => {
 
       const inst = modelMgr.getModel(model)
       const handle = inst.$queries.fetchUser as any
-      expect(handle._spec).toBe((model as any).queries.fetchUser)
+      expect(handle._spec).toBe((model.$options as any).queries.fetchUser)
       expect(handle._spec.fn).toBe(fn)
       expect(handle._spec.staleTime).toBe(5000)
       expect(handle._spec.onData).toBe(onData)
@@ -96,20 +97,17 @@ describe('model queries', () => {
   })
 
   describe('query name conflict detection', () => {
-    it('should warn when query name conflicts with state key', () => {
-      // @ts-expect-error - intentional runtime validation fixture
-      const model = defineModel({
-        name: 'model',
-        state: { fetchUser: 'existing' },
-        queries: {
-          fetchUser: async () => ({ id: 1, name: '' }),
-        },
-      })
-
-      modelMgr.getModel(model)
-      expect(
-        'key "fetchUser" in "queries" is conflicted with the key in "state"'
-      ).toHaveBeenWarned()
+    it('should reject when query name conflicts with state key', () => {
+      expect(() =>
+        // @ts-expect-error - intentional runtime validation fixture
+        defineModel({
+          name: 'model',
+          state: { fetchUser: 'existing' },
+          queries: {
+            fetchUser: async () => ({ id: 1, name: '' }),
+          },
+        })
+      ).toThrow(/key "fetchUser" in "queries".*key in "state"/)
     })
   })
 
@@ -154,7 +152,8 @@ describe('model queries', () => {
 
       const store = modelMgr.getModel(model)
       expect((store as any).fetchUser).toBeDefined()
-      expect((store as any).fetchUser._spec.fn).toBe(fn)
+      expect((store as any).fetchUser).not.toBe(store.$queries.fetchUser)
+      expect((store.$queries.fetchUser as any)._spec.fn).toBe(fn)
     })
 
     it('should reject writes to queries', () => {
@@ -568,7 +567,7 @@ describe('model queries', () => {
         actions: {
           async inner() {
             await Promise.resolve()
-            this.fetchData.setData(1)
+            this.$queries.fetchData.setData(1)
             this.value = 1
           },
           async test() {
@@ -762,14 +761,18 @@ describe('model queries', () => {
       },
     })
 
-    it('handle identity matches $queries, proxy access, and getApi()', () => {
+    it('direct query fetch differs from $queries handle on proxy and getApi()', async () => {
       const inst = modelMgr.getModel(voidModel)
       const viaQueries = inst.$queries.fetchData
       const viaProxy = (inst as any).fetchData
       const viaApi = (inst.$getApi() as any).fetchData
 
-      expect(viaQueries).toBe(viaProxy)
-      expect(viaQueries).toBe(viaApi)
+      expect(viaProxy).toBe(viaApi)
+      expect(viaProxy).not.toBe(viaQueries)
+      expect(viaProxy).toBe((viaQueries as any).fetch)
+      expect((viaProxy as any)[DOURA_QUERY_HANDLE]).toBe(viaQueries)
+      expect(inst.$getApi().$queries.fetchData).toBe(viaQueries)
+      await expect(viaProxy()).resolves.toBe(42)
       const internalHandle = viaQueries as any
       expect(internalHandle._queryName).toBe('fetchData')
       expect(internalHandle._model).toBe(inst)
@@ -1004,13 +1007,13 @@ describe('model queries', () => {
         models: [argsModel],
         actions: {
           async prime() {
-            if (!this.argsModel.fetchUser.getData('p')) {
-              await this.argsModel.fetchUser.fetch('p')
+            if (!this.argsModel.$queries.fetchUser.getData('p')) {
+              await this.argsModel.fetchUser('p')
             }
             this.touched = 1
           },
           invalidateChild() {
-            this.argsModel.fetchUser.invalidate('p')
+            this.argsModel.$queries.fetchUser.invalidate('p')
           },
         },
       })
@@ -1054,8 +1057,8 @@ describe('model queries', () => {
         models: [userModel, postModel],
         actions: {
           invalidateAll() {
-            this.userModel.fetchUser.invalidate()
-            this.crossPosts.fetchPosts.invalidate()
+            this.userModel.$queries.fetchUser.invalidate()
+            this.crossPosts.$queries.fetchPosts.invalidate()
           },
         },
       })
@@ -1120,7 +1123,7 @@ describe('model queries', () => {
         models: [userModel],
         actions: {
           resetUsers() {
-            this.userModel.fetchUser.reset()
+            this.userModel.$queries.fetchUser.reset()
           },
         },
       })

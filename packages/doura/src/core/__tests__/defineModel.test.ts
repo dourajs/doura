@@ -16,7 +16,7 @@ afterAll(() => {
 })
 
 describe('defineModel', () => {
-  it('should return the model', () => {
+  it('should wrap model options under $options', () => {
     const model = {
       name: 'model',
       state: {},
@@ -25,7 +25,9 @@ describe('defineModel', () => {
 
     const modelA = defineModel(model)
 
-    expect(model).toBe(modelA)
+    expect(modelA).not.toBe(model)
+    expect(modelA.$options).toBe(model)
+    expect(Object.keys(modelA)).toEqual([])
   })
 
   it("should return snapshot of the model's state", () => {
@@ -41,6 +43,71 @@ describe('defineModel', () => {
     const storeA = modelMgr.getModel(modelA)
 
     expect(isDraft(storeA.foo)).toBeFalsy()
+  })
+
+  it('should allow definition refs named like model option fields', () => {
+    const model = defineModel({
+      name: 'optionFieldRefs',
+      state: {},
+      queries: {
+        state: async () => 'query-state',
+        name: async () => 'query-name',
+        actions: async () => 'query-actions',
+        views: async () => 'query-views',
+        models: async () => 'query-models',
+        queries: async () => 'query-queries',
+      },
+    })
+
+    expect(typeof model.state).toBe('function')
+    expect(typeof model.name).toBe('function')
+    expect(typeof model.actions).toBe('function')
+    expect(typeof model.views).toBe('function')
+    expect(typeof model.models).toBe('function')
+    expect(typeof model.queries).toBe('function')
+    expect(model.views).not.toBe(model.queries)
+    expect(model.$options.name).toBe('optionFieldRefs')
+  })
+
+  it('should reject definition refs named $options', () => {
+    expect(() =>
+      defineModel({
+        name: 'reservedQueryRef',
+        state: {},
+        queries: {
+          $options: async () => 1,
+        },
+      } as any)
+    ).toThrow(/key "\$options" in "queries".*reserved model definition/)
+
+    expect(() =>
+      defineModel({
+        name: 'reservedActionRef',
+        state: {},
+        actions: {
+          $options() {
+            return 1
+          },
+        },
+      } as any)
+    ).toThrow(/key "\$options" in "actions".*reserved model definition/)
+  })
+
+  it('should reject queries that conflict with action refs', () => {
+    expect(() =>
+      defineModel({
+        name: 'actionQueryConflict',
+        state: {},
+        actions: {
+          refresh() {
+            return 1
+          },
+        },
+        queries: {
+          refresh: async () => 1,
+        },
+      } as any)
+    ).toThrow(/key "refresh" in "queries".*key in "actions"/)
   })
 
   describe('composing models', () => {
@@ -160,32 +227,36 @@ describe('defineModel', () => {
       expect(store.all).toBe(v)
     })
 
-    it('should warn for duplicate and conflicted model keys', () => {
+    it('should reject duplicated model keys', () => {
       const child = defineModel({
         name: 'child',
         state: { value: 0 },
       })
 
-      modelMgr.getModel(
+      expect(() =>
+        defineModel({
+          name: 'parent',
+          state: {},
+          models: [child, child],
+        } as any)
+      ).toThrow(/model "child" is duplicated in "models"/)
+    })
+
+    it('should reject conflicted model keys', () => {
+      const child = defineModel({
+        name: 'child',
+        state: { value: 0 },
+      })
+
+      expect(() =>
         // @ts-expect-error - intentional runtime validation fixture
         defineModel({
           name: 'parent',
           state: { child: 1 },
-          models: [child, child],
+          models: [child],
         })
-      )
-
-      expect('model "child" is duplicated in "models"').toHaveBeenWarned()
-      expect(
-        'key "child" in "models" is conflicted with the key in "state"'
-      ).toHaveBeenWarned()
+      ).toThrow(/key "child" in "models".*key in "state"/)
     })
-  })
-
-  it('should reject function models', () => {
-    expect(() => modelMgr.getModel((() => ({ state: {} })) as any)).toThrow(
-      /invalid model/
-    )
   })
 
   it('should not trigger updates in nested action', async () => {

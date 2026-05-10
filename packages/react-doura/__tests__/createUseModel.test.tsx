@@ -3,7 +3,8 @@ import { render, act } from '@testing-library/react'
 import {
   defineModel,
   doura,
-  AnyModel,
+  Model,
+  ModelDefinition,
   Selector,
   ModelAPI,
   ModelActions,
@@ -21,8 +22,11 @@ beforeEach(() => {
   process.env.NODE_ENV === 'development'
   jest.useFakeTimers()
   douraStore = doura()
-  useTestModel = <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+  useTestModel = <
+    ModelDef extends ModelDefinition<Model>,
+    S extends Selector<ModelDef>,
+  >(
+    model: ModelDef,
     selector?: S,
     depends?: any[]
   ) => {
@@ -32,7 +36,9 @@ beforeEach(() => {
       depends
     )
   }
-  useTestStaticModel = <IModel extends AnyModel>(model: IModel) => {
+  useTestStaticModel = <ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ) => {
     return useMemo(() => createUseStaticModel(douraStore), [douraStore])(model)
   }
 })

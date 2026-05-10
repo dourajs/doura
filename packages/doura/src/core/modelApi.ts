@@ -1,19 +1,27 @@
 import type {
-  AnyModel,
+  ModelDefinition,
+  Model,
   ModelActions,
   ModelModels,
+  ModelQueryFetches,
   ModelQueries,
   ModelState,
   ModelViews,
   StripIndexSignature,
 } from './modelOptions'
 
+type ModelApiFields<ModelDef extends ModelDefinition<Model>> =
+  StripIndexSignature<ModelState<ModelDef>> &
+    StripIndexSignature<ModelViews<ModelDef>> &
+    StripIndexSignature<ModelActions<ModelDef>> &
+    StripIndexSignature<ModelQueryFetches<ModelDef>> & {
+      readonly $queries: ModelQueries<ModelDef>
+    }
+
 // Keep each section stripped independently so optional/absent model sections
 // don't leak broad index signatures into the merged public API shape.
-export type ModelPublicFields<IModel extends AnyModel> = StripIndexSignature<
-  ModelState<IModel>
-> &
-  StripIndexSignature<ModelViews<IModel>> &
-  StripIndexSignature<ModelActions<IModel>> &
-  StripIndexSignature<ModelQueries<IModel>> &
-  StripIndexSignature<ModelModels<IModel>>
+export type ModelPublicFields<ModelDef extends ModelDefinition<Model>> =
+  ModelApiFields<ModelDef> & StripIndexSignature<ModelModels<ModelDef>>
+
+export type ModelApiSnapshot<ModelDef extends ModelDefinition<Model>> =
+  ModelApiFields<ModelDef>

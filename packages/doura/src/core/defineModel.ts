@@ -2,13 +2,12 @@ import {
   State,
   ActionOptions,
   ViewOptions,
-  ObjectModel,
-  ModelOptions,
+  Model,
   ModelThis,
   ViewThis,
-  AnyObjectModel,
   StripIndexSignature,
   ModelChildren,
+  ModelDefinition,
 } from './modelOptions'
 import {
   decorateModelQueries,
@@ -17,12 +16,16 @@ import {
   setDecoratedQueryOptions,
 } from './queryOptions'
 import type { QueryCtx } from './queryTypes'
+import { DOURA_ACTION_REF, DOURA_QUERY_REF } from './internalQueryTypes'
+import { hasOwn } from '../utils'
 
+// Keep the empty intersection so TypeScript materializes the inferred model
+// options shape before it is wrapped in ModelDefinition.
 export type DefineModel<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
-  Models extends readonly AnyObjectModel[] = [],
+  Models extends readonly ModelDefinition[] = [],
   Q extends Record<
     string,
     (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
@@ -30,12 +33,14 @@ export type DefineModel<
     string,
     (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   >,
-> = ModelOptions<S, A, V, Models, Q> & {} // BUG: {} is required
+> = Model<S, A, V, Models, Q> & {}
 
 type IsAny<T> = 0 extends 1 & T ? true : false
 
 type KnownStringKeys<T> =
   IsAny<T> extends true ? never : Extract<keyof StripIndexSignature<T>, string>
+
+type ReservedDefinitionField = '$options'
 
 type ConflictMessage<
   Type extends string,
@@ -56,12 +61,18 @@ type KeyConflict<
   Extract<KnownStringKeys<T>, KnownStringKeys<Conflicted>>
 >
 
+type ReservedKeyConflict<Type extends string, T> = ConflictMessage<
+  Type,
+  'reserved model definition fields',
+  Extract<KnownStringKeys<T>, ReservedDefinitionField>
+>
+
 type ModelKeyConflicts<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
   Q,
-  Models extends readonly AnyObjectModel[],
+  Models extends readonly ModelDefinition[],
 > =
   | KeyConflict<'models', ModelChildren<Models>, 'state', S>
   | KeyConflict<'views', V, 'state', S>
@@ -69,17 +80,19 @@ type ModelKeyConflicts<
   | KeyConflict<'queries', Q, 'state', S>
   | KeyConflict<'queries', Q, 'models', ModelChildren<Models>>
   | KeyConflict<'queries', Q, 'views', V>
+  | KeyConflict<'queries', Q, 'actions', A>
   | KeyConflict<'actions', A, 'state', S>
   | KeyConflict<'actions', A, 'models', ModelChildren<Models>>
   | KeyConflict<'actions', A, 'views', V>
-  | KeyConflict<'actions', A, 'queries', Q>
+  | ReservedKeyConflict<'queries', Q>
+  | ReservedKeyConflict<'actions', A>
 
 type NoModelKeyConflicts<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions,
   Q,
-  Models extends readonly AnyObjectModel[],
+  Models extends readonly ModelDefinition[],
 > = [ModelKeyConflicts<S, A, V, Q, Models>] extends [never]
   ? {}
   : {
@@ -95,9 +108,9 @@ type NoModelKeyConflicts<
 //     reference it directly — going via QueriesOfModel<M> would evaluate
 //     too late for the contextual typing of `this` inside actions.
 //
-// The param shape is inlined (not reused from ObjectModel<S,A,V>) so only
+// The param shape is inlined (not reused from Model<S,A,V>) so only
 // ONE ThisType<...> is in the intersection — otherwise TS drops the
-// Q-aware ThisType in favor of ObjectModel's baked-in ThisType<S,A,V>.
+// Q-aware ThisType in favor of Model's baked-in ThisType<S,A,V>.
 //
 // Why `const Q` + self-referential constraint:
 //   - `const Q` (TS 5.0+) keeps Q's literal shape narrow at the call
@@ -118,14 +131,14 @@ export function defineModel<
   S extends State,
   A extends ActionOptions,
   V extends ViewOptions<S>,
-  const Models extends readonly AnyObjectModel[] = [],
+  const Models extends readonly ModelDefinition[] = [],
   const Q extends Record<
     string,
     (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   > & {
     [K in keyof Q]: (this: void, ctx: QueryCtx, ...args: any[]) => Promise<any>
   } = {},
-  M extends ObjectModel<S, A, V, Models> = ObjectModel<S, A, V, Models>,
+  M extends Model<S, A, V, Models, Q> = Model<S, A, V, Models, Q>,
 >(
   modelOptions: M & {
     name: N
@@ -148,11 +161,12 @@ export function defineModel<
       ): void
     }
   }) => void
-): M & { name: N }
+): ModelDefinition<M & { name: N }>
 
 // Implementation
 export function defineModel(modelOptions: any, setup?: any): any {
   decorateModelQueries(modelOptions)
+  assertNoModelKeyConflicts(modelOptions)
   if (setup) {
     setup({
       model: {
@@ -162,5 +176,124 @@ export function defineModel(modelOptions: any, setup?: any): any {
       },
     })
   }
-  return modelOptions
+  const modelDefinition = {}
+  Object.defineProperty(modelDefinition, '$options', {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: modelOptions,
+  })
+  defineModelReferences(modelDefinition, modelOptions)
+  return modelDefinition
+}
+
+function cacheKey(cache: Map<string, string>, type: string, key: string): void {
+  const conflictedType = cache.get(key)
+  if (conflictedType) {
+    throw new Error(
+      `[Doura] key "${key}" in "${type}" is conflicted with the key in "${conflictedType}"`
+    )
+  }
+  cache.set(key, type)
+}
+
+function cacheObjectKeys(
+  cache: Map<string, string>,
+  type: string,
+  obj: unknown
+): void {
+  if (!obj || typeof obj !== 'object') {
+    return
+  }
+  for (const key of Object.keys(obj)) {
+    cacheKey(cache, type, key)
+  }
+}
+
+function cacheModelKeys(cache: Map<string, string>, models: unknown): void {
+  if (!Array.isArray(models)) {
+    return
+  }
+
+  const names = new Set<string>()
+  for (const model of models) {
+    const name = (model as any)?.$options?.name
+    if (typeof name !== 'string') {
+      continue
+    }
+    if (names.has(name)) {
+      throw new Error(`[Doura] model "${name}" is duplicated in "models"`)
+    }
+    names.add(name)
+    cacheKey(cache, 'models', name)
+  }
+}
+
+function assertNoModelKeyConflicts(modelOptions: any): void {
+  const keys = new Map<string, string>()
+  cacheObjectKeys(keys, 'state', modelOptions?.state)
+  cacheModelKeys(keys, modelOptions?.models)
+  cacheObjectKeys(keys, 'views', modelOptions?.views)
+  cacheObjectKeys(keys, 'actions', modelOptions?.actions)
+  cacheObjectKeys(keys, 'queries', modelOptions?.queries)
+}
+
+function defineModelReferences(modelDefinition: any, modelOptions: any): void {
+  const actions = modelOptions?.actions
+  if (actions && typeof actions === 'object') {
+    for (const actionName of Object.keys(actions)) {
+      const actionRef = function () {
+        throw new Error(
+          `Action "${actionName}" must be used with a model instance.`
+        )
+      }
+      Object.defineProperty(actionRef, DOURA_ACTION_REF, {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: { model: modelDefinition, actionName },
+      })
+      defineReference(modelDefinition, 'actions', actionName, actionRef)
+    }
+  }
+
+  const queries = modelOptions?.queries
+  if (queries && typeof queries === 'object') {
+    for (const queryName of Object.keys(queries)) {
+      const queryRef = function () {
+        throw new Error(
+          `Query "${queryName}" must be used with a model instance.`
+        )
+      }
+      Object.defineProperty(queryRef, DOURA_QUERY_REF, {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: { model: modelDefinition, queryName },
+      })
+      defineReference(modelDefinition, 'queries', queryName, queryRef)
+    }
+  }
+}
+
+function defineReference(
+  modelDefinition: any,
+  type: 'actions' | 'queries',
+  key: string,
+  value: Function
+): void {
+  if (key === '$options') {
+    throw new Error(
+      `[Doura] key "$options" in "${type}" conflicts with reserved model definition field`
+    )
+  }
+  if (hasOwn(modelDefinition, key)) {
+    return
+  }
+  Object.defineProperty(modelDefinition, key, {
+    configurable: true,
+    enumerable: true,
+    writable: false,
+    value,
+  })
 }

@@ -7,7 +7,8 @@ import {
 } from 'react'
 import {
   Doura,
-  AnyModel,
+  Model,
+  ModelDefinition,
   Selector,
   ModelView,
   ModelInstance,
@@ -29,11 +30,16 @@ function shallowArrayEqual(
   return true
 }
 
-function readonlyModel(model: ModelInstance<AnyModel>) {
+function readonlyModel(model: ModelInstance<ModelDefinition<Model>>) {
   return new Proxy(model, {
-    get(target: ModelInstance<AnyModel>, key: string | symbol): any {
+    get(
+      target: ModelInstance<ModelDefinition<Model>>,
+      key: string | symbol
+    ): any {
       if (key === '$state') {
         return target.$state
+      } else if (key === '$queries') {
+        return target.$queries
       } else if (hasOwn(target.$state, key)) {
         return target.$state[key]
       } else if (hasOwn(target.$views, key)) {
@@ -41,9 +47,7 @@ function readonlyModel(model: ModelInstance<AnyModel>) {
       } else if (hasOwn(target.$actions, key)) {
         return target.$actions[key]
       } else if (hasOwn(target.$queries, key)) {
-        return target.$queries[key]
-      } else if (hasOwn(target.$models, key)) {
-        return target.$models[key]
+        return target[key as keyof typeof target]
       }
 
       return undefined
@@ -55,12 +59,12 @@ function readonlyModel(model: ModelInstance<AnyModel>) {
   })
 }
 
-function getModelCacheKey(model: AnyModel) {
-  return typeof model === 'object' ? model.name : model
+function getModelCacheKey(model: ModelDefinition<Model>) {
+  return model.$options.name
 }
 
-function useModel<IModel extends AnyModel>(
-  model: ModelInstance<IModel>,
+function useModel<ModelDef extends ModelDefinition<Model>>(
+  model: ModelInstance<ModelDef>,
   subscribe: SubscribeFn
 ) {
   const view = useMemo(() => () => model.$getApi(), [model])
@@ -73,10 +77,10 @@ function useModel<IModel extends AnyModel>(
 }
 
 function useModelWithSelector<
-  IModel extends AnyModel,
-  S extends Selector<IModel>,
+  ModelDef extends ModelDefinition<Model>,
+  S extends Selector<ModelDef>,
 >(
-  model: ModelInstance<IModel>,
+  model: ModelInstance<ModelDef>,
   subscribe: SubscribeFn,
   selector: S,
   depends?: any[]
@@ -86,7 +90,7 @@ function useModelWithSelector<
   const prevRef = useRef<{
     depends: any[] | undefined
     selector: S
-    model: ModelInstance<IModel>
+    model: ModelInstance<ModelDef>
   }>({ depends, selector, model })
 
   const prev = prevRef.current
@@ -135,8 +139,8 @@ function useModelWithSelector<
   return state
 }
 
-function useModelInstance<IModel extends AnyModel>(
-  model: IModel,
+function useModelInstance<ModelDef extends ModelDefinition<Model>>(
+  model: ModelDef,
   doura: Doura
 ) {
   const modelKey = getModelCacheKey(model)
@@ -158,8 +162,8 @@ function useModelInstance<IModel extends AnyModel>(
 
 export const createUseModel =
   (doura: Doura) =>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selector?: S,
     depends?: any[]
   ) => {
@@ -185,7 +189,7 @@ export const createUseModel =
 
 export const createUseStaticModel =
   (doura: Doura) =>
-  <IModel extends AnyModel>(model: IModel) => {
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef) => {
     const modelKey = getModelCacheKey(model)
     const modelInstance = useMemo(
       () => doura.getModel(model),
@@ -201,5 +205,5 @@ export const createUseStaticModel =
       }
     }, [modelInstance])
 
-    return store as any as ModelAPI<IModel>
+    return store as any as ModelAPI<ModelDef>
   }

@@ -39,10 +39,15 @@ expectType<ModelInstance<typeof model>>(
   store.getModel(parentModel).$models.test
 )
 expectType<number>(store.getModel(parentModel).test.value)
+expectType<number>(store.getModel(parentModel).$getApi().parentValue)
+// @ts-expect-error — child models are not exposed in ModelAPI snapshots
+store.getModel(parentModel).$getApi().test
+// @ts-expect-error — child models are only available on ModelInstance.$models
+store.getModel(parentModel).$getApi().$models
 // @ts-expect-error — explicit name overloads were removed
 store.getModel('test', model)
-// @ts-expect-error — function models were removed
-store.getModel(() => ({ name: 'functionModel', state: { value: 0 } }))
+// @ts-expect-error — raw model options are not accepted at public boundary
+store.getModel({ name: 'rawModel', state: { value: 0 } })
 expectType<void>(store.destroy())
 expectType<{ [modelName: string]: State }>(store.getState())
 expectType<() => void>(store.subscribe(() => {}))

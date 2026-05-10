@@ -106,3 +106,11 @@ export interface QueryHandle<
     ? (data: TData) => void
     : (...args: [...MutableTuple<TArgs>, data: TData]) => void
 }
+
+/** Public bound query fetch function exposed directly on model APIs.
+ *
+ * Query cache/handle operations intentionally live on `$queries.<name>`.
+ */
+export type QueryFetch<TArgs extends QueryArgsTuple = any[], TData = any> = (
+  ...args: MutableTuple<TArgs>
+) => Promise<TData>
