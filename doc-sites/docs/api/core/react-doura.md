@@ -43,15 +43,17 @@ import { doura } from 'doura'
 Reactive hook connected to the global `DouraRoot` store. The component re-renders when accessed state or views change.
 
 `useModel` accepts the model definition directly. It does not accept a separate
-name and returns the model API directly, not a tuple.
+name and returns `ModelAPI` directly, not a tuple. `ModelAPI` includes state,
+views, actions, direct query fetch functions, and `$queries`; it does not
+include child models or `$models`.
 
 ### Types
 
 ```ts
 declare interface UseModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selector: S,
     depends?: any[]
   ): ReturnType<S>
@@ -65,7 +67,7 @@ import { useModel } from 'react-doura'
 import { countModel } from './models/count'
 
 function Counter() {
-  // Without selector — full API
+  // Without selector — ModelAPI
   const counter = useModel(countModel)
   return <button onClick={() => counter.add(1)}>{counter.value}</button>
 }
@@ -89,9 +91,9 @@ Creates a component-scoped detached model instance. Each component instance gets
 
 ```ts
 declare interface UseDetachedModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selector: S,
     depends?: any[]
   ): ReturnType<S>
@@ -154,7 +156,7 @@ In development mode, the returned object is wrapped in a read-only Proxy — dir
 
 ```ts
 declare interface UseStaticModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
 }
 ```
 
@@ -187,20 +189,30 @@ const App = () => {
 
 ## useQuery
 
-Subscribes to a query's cache entry and triggers fetches based on staleness. Built on `useSyncExternalStore`.
+Subscribes to a query's cache entry and triggers fetches based on staleness.
+Built on `useSyncExternalStore`.
+
+The first argument can be:
+
+- a direct `QueryFetch`, such as `api.fetchById`
+- a `QueryHandle`, such as `api.$queries.fetchById`
+- a definition ref, such as `userModel.fetchById`
+
+Definition refs resolve through the nearest Provider store and rebind when the
+Provider `store` changes.
 
 ### Types
 
 ```ts
 // No-args query
 function useQuery<TData, TSelected = TData>(
-  queryHandle: QueryHandle<[], TData>,
+  query: QueryFetch<[], TData> | QueryHandle<[], TData>,
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
 
 // Query with args
 function useQuery<TArgs extends readonly unknown[], TData, TSelected = TData>(
-  queryHandle: QueryHandle<TArgs, TData>,
+  query: QueryFetch<TArgs, TData> | QueryHandle<TArgs, TData>,
   args: TArgs,
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
@@ -238,13 +250,11 @@ interface UseQueryResult<TData, TSelected = TData> {
 ### Example
 
 ```tsx
-import { useModel, useQuery } from 'react-doura'
+import { useQuery } from 'react-doura'
 import { userModel } from './models/user'
 
 function UserProfile({ userId }: { userId: string }) {
-  const user = useModel(userModel)
-
-  const { data, isLoading, error } = useQuery(user.fetchById, [userId], {
+  const { data, isLoading, error } = useQuery(userModel.fetchById, [userId], {
     staleTime: 60_000,
   })
 
@@ -256,7 +266,12 @@ function UserProfile({ userId }: { userId: string }) {
 
 ## useAction
 
-Tracks the lifecycle of calling an action function. Provides loading/success/error states with race-condition safety.
+Tracks the lifecycle of calling an action function. Provides
+loading/success/error states with race-condition safety.
+
+Pass either a bound action from `useModel()` or a definition ref such as
+`formModel.submit`. Definition refs resolve through the nearest Provider store
+and rebind when the Provider `store` changes.
 
 ### Types
 
@@ -303,12 +318,11 @@ interface UseActionResult<TFn extends (...args: any[]) => any> {
 ### Example
 
 ```tsx
-import { useModel, useAction } from 'react-doura'
+import { useAction } from 'react-doura'
 import { formModel } from './models/form'
 
 function SubmitButton() {
-  const form = useModel(formModel)
-  const { run, isPending, isError, error } = useAction(form.submit, {
+  const { run, isPending, isError, error } = useAction(formModel.submit, {
     onSuccess: () => alert('Saved!'),
   })
 
@@ -325,13 +339,16 @@ function SubmitButton() {
 
 ## useInfiniteQuery
 
-Paginated query hook that accumulates pages fetched from the same `QueryHandle` across different args.
+Paginated query hook that accumulates pages fetched from the same query across
+different args. Pass a `QueryFetch`, `QueryHandle`, or definition ref. If a
+definition ref resolves to a different handle after a Provider store switch,
+the local pages reset and the initial page loads again.
 
 ### Types
 
 ```ts
 function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
-  queryHandle: QueryHandle<TArgs, TData>,
+  query: QueryFetch<TArgs, TData> | QueryHandle<TArgs, TData>,
   config: InfiniteQueryConfig<TArgs, TData>
 ): UseInfiniteQueryResult<TArgs, TData>
 ```
@@ -369,14 +386,12 @@ interface UseInfiniteQueryResult<TArgs, TData> {
 ### Example
 
 ```tsx
-import { useModel, useInfiniteQuery } from 'react-doura'
+import { useInfiniteQuery } from 'react-doura'
 import { postsModel } from './models/posts'
 
 function PostList() {
-  const posts = useModel(postsModel)
-
   const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    useInfiniteQuery(posts.fetchPage, {
+    useInfiniteQuery(postsModel.fetchPage, {
       initialArgs: [1] as [number],
       getNextArgs: (lastPage, allPages) =>
         lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
@@ -432,9 +447,9 @@ const {
 ## Selector Types
 
 ```ts
-type Selector<Model extends AnyModel, TReturn = any> = (
-  api: ModelAPI<Model>,
-  actions: ModelActions<Model>
+type Selector<ModelDef extends ModelDefinition<Model>, TReturn = any> = (
+  api: ModelAPI<ModelDef>,
+  actions: ModelActions<ModelDef>
 ) => TReturn
 ```
 

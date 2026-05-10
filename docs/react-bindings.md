@@ -89,7 +89,7 @@ const useModel: UseModel = (model, selector?, depends?) => {
 }
 ```
 
-委托给全局 `DouraRoot` 的 `useSharedModel`。要求祖先组件树中有 `<DouraRoot>`。model 身份由 `model.name` 确定，不再需要单独传 name 参数。
+委托给全局 `DouraRoot` 的 `useSharedModel`。要求祖先组件树中有 `<DouraRoot>`。model 身份由 `model.$options.name` 确定，不需要单独传 name 参数。
 
 ### useDetachedModel
 
@@ -133,7 +133,7 @@ const useStaticModel: UseStaticModel = (model) => {
 ```ts
 // createUseModel.tsx
 function useModelInstance(model, doura) {
-  const modelKey = getModelCacheKey(model) // → model.name
+  const modelKey = getModelCacheKey(model) // → model.$options.name
   const { modelInstance, subscribe } = useMemo(() => {
     const modelInstance = doura.getModel(model)
     return {
@@ -147,13 +147,7 @@ function useModelInstance(model, doura) {
 }
 ```
 
-**与旧版的区别**：
-
-1. 不再接收 `name` 参数 — model 身份由 `model.name` 推导（`getModelCacheKey`）
-2. 订阅方式从 `batchManager.addSubscribe(model, cb)` 简化为 `modelInstance.$subscribe(() => cb())`
-3. memo deps 从 `[name, doura]` 变为 `[doura, modelKey]`
-
-**为什么 modelKey 而非 model 对象？** model 对象是 `defineModel()` 返回的常量引用，但 React 热更新可能导致新的引用。使用 `model.name` 作为 key 避免不必要的实例重建。
+**为什么 modelKey 而非 model 对象？** model definition 是 `defineModel()` 返回的常量引用，但 React 热更新可能导致新的引用。使用 `model.$options.name` 作为 key 避免不必要的实例重建，同时让 `store.getModel(model)` 仍按当前 definition 初始化。
 
 ### 无 selector 模式
 
@@ -164,7 +158,7 @@ function useModel(model, subscribe) {
 }
 ```
 
-`$getApi()` 返回 `{ ...state, ...views, ...actions, ...queries, ...models }`。每次 state 变更后 `_api` 被置空，下次调用重新构造。
+`$getApi()` 返回 `ModelAPI`：`{ ...state, ...views, ...actions, ...queryFetches }`，并通过 `$queries` 暴露 query handle map。`ModelAPI` 不包含 child models 或 `$models`；child models 只在 `store.getModel()` 返回的 `ModelInstance` 上直接可见。每次 state 变更后 `_api` 被置空，下次调用重新构造。
 
 ### 有 selector 模式
 
@@ -248,13 +242,13 @@ const createUseStaticModel = (doura) => (model) => {
 ```ts
 // 无参 query
 useQuery<TData, TSelected>(
-  queryHandle: QueryHandle<[], TData>,
+  query: QueryFetch<[], TData> | QueryHandle<[], TData>,
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
 
 // 有参 query
 useQuery<TArgs, TData, TSelected>(
-  queryHandle: QueryHandle<TArgs, TData>,
+  query: QueryFetch<TArgs, TData> | QueryHandle<TArgs, TData>,
   args: TArgs,
   options?: QueryOverrides<TData, TSelected>
 ): UseQueryResult<TData, TSelected>
@@ -262,7 +256,13 @@ useQuery<TArgs, TData, TSelected>(
 
 ### 重载消歧
 
-运行时通过 `queryHandleInternal._hasArgs` 标志（而非参数个数检测）区分两种重载。无参 query 的 `_hasArgs = false`，此时第二个参数解读为 `options`。
+运行时先用 `resolveQueryHandle(query, context)` 统一解析输入：
+
+- bound `QueryFetch`（例如 `api.fetchUser`）通过内部标记还原到它的 `QueryHandle`
+- `QueryHandle`（例如 `api.$queries.fetchUser`）直接使用
+- definition ref（例如 `userModel.fetchUser`）必须在 Provider context 下解析为当前 store 的 handle
+
+随后通过 `queryHandleInternal._hasArgs` 标志（而非参数个数检测）区分重载。无参 query 的 `_hasArgs = false`，此时第二个参数解读为 `options`。Provider 的 `store` prop 切换后，definition ref 会重新绑定到新 store。
 
 ### QueryOverrides
 
@@ -297,7 +297,7 @@ mount / args 变更
     ├── queryHandleInternal.observe(args)    ← 向 GCManager 注册观察者
     │
     ├── enabled && isStale(entry)?
-    │     └── yes → queryHandle.fetch(args)  ← 触发 fetch（FetchManager 去重）
+    │     └── yes → queryHandle 的 fetch 方法  ← 触发 fetch（FetchManager 去重）
     │
     └── return cleanup:
           unobserve(args, () => reset(args)) ← 解除观察，gcTime 后清理缓存
@@ -360,6 +360,10 @@ useAction<TFn>(
 
 4. **状态隔离**：state 通过 `useReducer` 维护在 hook 实例内。两个组件对同一 action 使用 `useAction` 互相独立。
 
+### Definition ref
+
+`useAction(model.actionName)` 可直接接收 definition ref。hook 会从当前 Provider context 读取 store，并解析为 `store.getModel(model).actionName`。因此同一个组件树切换 Provider store 时，action ref 会随之重新绑定。
+
 ---
 
 ## 8. useInfiniteQuery — 分页 query
@@ -370,7 +374,7 @@ useAction<TFn>(
 
 ```ts
 useInfiniteQuery<TArgs, TData>(
-  queryHandle: QueryHandle<TArgs, TData>,
+  query: QueryFetch<TArgs, TData> | QueryHandle<TArgs, TData>,
   config: InfiniteQueryConfig<TArgs, TData>
 ): UseInfiniteQueryResult<TArgs, TData>
 ```
@@ -399,11 +403,11 @@ useInfiniteQuery<TArgs, TData>(
 
 1. **页面累积在本地 state**：pages 存储在 `useReducer` 中，不订阅 query cache。这使得分页逻辑独立于全局缓存。
 
-2. **per-page cache 写入 model store**：虽然 hook 内部不订阅缓存，但 `queryHandle.fetch(args)` 仍然通过 model 的 QueryCoordinator 写入 cache entry。其他 `useQuery` 使用相同 args 时能直接命中。
+2. **per-page cache 写入 model store**：虽然 hook 内部不订阅缓存，但每页 fetch 仍然通过 model 的 QueryCoordinator 写入 cache entry。其他 `useQuery` 使用相同 args 时能直接命中。
 
 3. **runId 竞态保护**：与 `useAction` 相同策略，每次 `fetchPage` 递增 runId，乱序返回静默丢弃。
 
-4. **StrictMode 安全**：`initialFetchedRef` 确保首次 fetch 只执行一次。
+4. **Provider store 切换重置**：如果传入的是 definition ref，Provider store 切换会解析出新的 handle；hook 会清空本地 pages，并用 `initialArgs` 重新加载首页。
 
 5. **refetch 语义**：清空页面，只用 `initialArgs` 重新 fetch 一页。需要多页刷新时，调用者在 refetch 后再逐步 `fetchNextPage`。
 
@@ -432,12 +436,10 @@ _subscribers 通知
     │         → React re-render（如果 snapshot 引用变了）
     │
     └── useQuery 路径:
-          queryHandle.fetch(args)
+          queryFetch(args) 或 $queries.queryName 的 fetch 方法
               → QueryCoordinator.FetchManager 去重
               → fetch 完成 → setQueryState(entry)
               → _notifyQueryListeners
               → queryHandleInternal.subscribe callback
               → useSyncExternalStore → React re-render
 ```
-
-**与旧版的区别**：移除了 `batchManager` + `unstable_batchedUpdates` 中间层。React 18+ 默认在事件、setTimeout、Promise 中自动批量更新，不再需要手动批处理。

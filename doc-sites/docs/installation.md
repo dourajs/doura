@@ -17,7 +17,7 @@ npm install doura react-doura
 ```
 
 `react-doura` requires `react >=18` and a matching `doura` peer. Current Doura
-packages are `0.2.0-beta.0`.
+packages are `0.2.0-beta.1`.
 
 ## Core Usage
 
@@ -57,9 +57,9 @@ console.log(count.count) // 11
 console.log(count.isZero) // false
 ```
 
-`getModel(model)` uses `model.name` as the store key. Repeated calls with the
-same named model in one store return the same instance. Different stores keep
-independent instances.
+`getModel(model)` uses `model.$options.name` as the store key. Repeated calls
+with the same named model in one store return the same instance. Different
+stores keep independent instances.
 
 ## React Usage
 
@@ -83,5 +83,6 @@ export function App() {
 ```
 
 `useModel` does not take a separate name and does not return a tuple. It returns
-the model API directly: state, views, actions, query handles, and child models
-are flattened onto one object.
+the model API directly: state, views, actions, direct query fetch functions, and
+`$queries`. Child models remain available from `store.getModel()` instances and
+their `$models` namespace, not from the React `ModelAPI`.

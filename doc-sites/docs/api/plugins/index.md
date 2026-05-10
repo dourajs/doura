@@ -15,9 +15,9 @@ export type PluginHook = {
     options: { initialState: Record<string, State> },
     context: PluginContext
   ): void
-  onModel?(name: string, model: AnyObjectModel, context: PluginContext): void
+  onModel?(name: string, model: Model, context: PluginContext): void
   onModelInstance?(
-    instance: ModelInstance<AnyObjectModel>,
+    instance: ModelInstance<ModelDefinition<Model>>,
     context: PluginContext
   ): void
   onDestroy?(): void

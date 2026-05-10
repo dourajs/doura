@@ -59,6 +59,8 @@ Full details: [Installation](../doc-sites/docs/installation.md) | [Introduction]
 ## Defining Models
 
 `defineModel` is the central API for declaring state, logic, and derived data.
+It returns a `ModelDefinition` wrapper; the original options live on
+`definition.$options`. Pass the definition to stores and React hooks.
 
 ```ts
 import { defineModel } from 'doura'
@@ -83,7 +85,9 @@ const model = defineModel({
 })
 ```
 
-Key constraint: property names across `state`, `actions`, `views`, `queries`, and `models` must not conflict.
+Key constraint: property names across `state`, `actions`, `views`, `queries`,
+and child model names must not conflict. Conflicts are thrown during
+`defineModel()`.
 
 ### State
 
@@ -149,7 +153,8 @@ Full details: [Views](../doc-sites/docs/core-concepts/views.md) | [Optimize View
 
 ### Model Composition
 
-Compose child models via the `models` option. Children are accessed by their `name`:
+Compose child models via the `models` option. Children are keyed by each child
+definition's `$options.name`:
 
 ```ts
 const childModel = defineModel({
@@ -227,7 +232,20 @@ model.setQueryOptions('fetchById', {
 })
 ```
 
-**QueryHandle methods** (available on model instances as `instance.queryName`):
+Direct query access is a fetch function:
+
+```ts
+const user = await instance.fetchById('user-1')
+```
+
+Use `$queries` for cache reads and control methods:
+
+```ts
+instance.$queries.fetchById.invalidate('user-1')
+instance.$queries.fetchById.setData('user-1', user)
+```
+
+**QueryHandle methods** (available as `instance.$queries.queryName`):
 
 | Method                   | Description                       |
 | ------------------------ | --------------------------------- |
@@ -329,7 +347,7 @@ Non-reactive access (no re-renders). Use for stable references like action metho
 
 ```tsx
 const counter = useStaticModel(counterModel)
-// counter.increment is stable; counter.count won't trigger re-render
+// counter.increment is stable; counter.count reads won't trigger re-render
 ```
 
 ### createContainer (Multiple Stores)
@@ -352,16 +370,17 @@ Full details: [Component State](../doc-sites/docs/react/component-state.md) | [G
 
 ## useQuery
 
-Subscribe to a query's cache and auto-fetch when stale:
+Subscribe to a query's cache and auto-fetch when stale. Pass a direct
+`QueryFetch` (`api.fetchById`), a `QueryHandle` (`api.$queries.fetchById`), or
+a definition ref (`userModel.fetchById`). Definition refs resolve through the
+current Provider store.
 
 ```tsx
-import { useModel, useQuery } from 'react-doura'
+import { useQuery } from 'react-doura'
 
 function UserProfile({ userId }: { userId: string }) {
-  const user = useModel(userModel)
-
   const { data, isLoading, error, refetch } = useQuery(
-    user.fetchById,
+    userModel.fetchById,
     [userId],
     { staleTime: 60_000, enabled: !!userId }
   )
@@ -403,16 +422,16 @@ Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#usequery
 
 ## useInfiniteQuery
 
-Paginated query that accumulates pages:
+Paginated query that accumulates pages. If a definition ref is rebound through
+a different Provider store, accumulated pages reset and the initial page is
+loaded again.
 
 ```tsx
-import { useModel, useInfiniteQuery } from 'react-doura'
+import { useInfiniteQuery } from 'react-doura'
 
 function PostList() {
-  const posts = useModel(postsModel)
-
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    useInfiniteQuery(posts.fetchPage, {
+    useInfiniteQuery(postsModel.fetchPage, {
       initialArgs: [1] as [number],
       getNextArgs: (lastPage, allPages) =>
         lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
@@ -445,14 +464,15 @@ Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#useinfin
 
 ## useAction
 
-Track action lifecycle (loading/success/error) in React:
+Track action lifecycle (loading/success/error) in React. Pass a bound action
+from `useModel()` or a definition ref such as `formModel.submit`; definition
+refs resolve through the current Provider store.
 
 ```tsx
-import { useModel, useAction } from 'react-doura'
+import { useAction } from 'react-doura'
 
 function SaveButton() {
-  const form = useModel(formModel)
-  const { run, isPending, isError, error } = useAction(form.submit, {
+  const { run, isPending, isError, error } = useAction(formModel.submit, {
     onSuccess: () => alert('Saved!'),
     pendingDelay: 300, // ms before showing pending (avoids flash)
   })
@@ -677,14 +697,18 @@ Full details: [TypeScript Guide](../doc-sites/docs/guides/typescript.md)
 
 ## Model Instance API Summary
 
-Every model instance (from `store.getModel()`, `useModel()`, etc.) exposes:
+`store.getModel()` and `store.getDetachedModel()` return `ModelInstance`.
+`useModel()`, `useDetachedModel()`, `useStaticModel()`, and selectors expose
+`ModelAPI`, which omits child models and `$models`.
+
+Every `ModelInstance` exposes:
 
 | Access                           | Description                        |
 | -------------------------------- | ---------------------------------- |
 | `instance.stateKey`              | Direct state access                |
 | `instance.actionName()`          | Call action                        |
 | `instance.viewName`              | Read computed view                 |
-| `instance.queryName`             | QueryHandle object                 |
+| `instance.queryName`             | QueryFetch function                |
 | `instance.childName`             | Child model instance               |
 | `instance.$state`                | Full state (assignable to replace) |
 | `instance.$rawState`             | Raw unproxied state                |
@@ -703,3 +727,7 @@ Every model instance (from `store.getModel()`, `useModel()`, etc.) exposes:
 | `instance.$resetQueries()`       | Clear all query caches             |
 
 Full details: [ModelInstance API](../doc-sites/docs/api/core/doura.md#modelinstance)
+
+`ModelAPI` contains state, views, actions, direct query fetches, and `$queries`.
+It does not contain `childName` or `$models`; get child model instances from a
+store-owned `ModelInstance` when needed.

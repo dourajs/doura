@@ -2,7 +2,7 @@
 
 源码位置：`packages/doura/src/core/`
 
-Model 是 doura 的核心抽象单元。一个 model 定义了 state + actions + views，由 `ModelInternal` 实例化并管理运行时生命周期。
+Model 是 doura 的核心抽象单元。一个 model definition 定义了 state + actions + views + queries + child models，由 `ModelInternal` 实例化并管理运行时生命周期。
 
 ---
 
@@ -10,12 +10,15 @@ Model 是 doura 的核心抽象单元。一个 model 定义了 state + actions +
 
 > `core/defineModel.ts`
 
-`defineModel({ name, state, models?, actions?, views?, queries? }, setup?)` 主要作用是为 TypeScript 提供类型推断：action 中 `this` 的类型、view 的返回类型、组合 model 的实例类型、`useModel` 的结果类型。运行时做两件事：1) 调用 `decorateModelQueries` 将 query 函数规范化为 `{ fn }` 结构；2) 如果提供了 `setup` 回调则执行它（用于 `model.setQueryOptions`）。返回传入的 model options 对象本身。
+`defineModel({ name, state, models?, actions?, views?, queries? }, setup?)` 主要作用是为 TypeScript 提供类型推断：action 中 `this` 的类型、view 的返回类型、组合 model 的实例类型、query fetch/handle 的参数与返回值、`useModel` 的结果类型。运行时做三件事：1) 调用 `decorateModelQueries` 将 query 函数规范化为内部 `{ fn }` 结构；2) 在 define 阶段检查 state/models/views/actions/queries 的 key 冲突、重复 child model、`$options` definition ref 命名冲突；3) 如果提供了 `setup` 回调则执行它（用于 `model.setQueryOptions`）。返回 `ModelDefinition` wrapper，原始 model options 保存在非枚举的 `definition.$options`。
 
-Model 只支持对象形式：
+Store 只接受 `defineModel()` 返回的 `ModelDefinition`。原始 object/function model 不能直接传给 `store.getModel()` 或 `getDetachedModel()`：
 
-- **ObjectModel**: `defineModel({ name, state, models, actions, views, queries }, setup?)`
-- `models: [childModel]` 使用子 model 的 `name` 作为 key，暴露为 `this.childName`、`instance.childName` 和 `instance.$models.childName`
+- **Model**: `{ name, state, models, actions, views, queries }`
+- **ModelDefinition**: `defineModel(model, setup?)` 的返回值
+- **definition.$options**: 原始 options；`$options` 是 definition 的保留字段
+- `models: [childModel]` 使用子 model 的 `childModel.$options.name` 作为 key，暴露为 `this.childName`、`instance.childName` 和 `instance.$models.childName`
+- `definition.actionName` / `definition.queryName` 是 React hooks 可解析的 definition ref；必须在 Provider context 下绑定到当前 store
 
 ---
 
@@ -127,7 +130,7 @@ const createGetter = (isPublicInstance: boolean) =>
     // public 读 getState()（snapshot），internal 读 stateValue（draft）
     let state = isPublicInstance ? instance.getState() : instance.stateValue
 
-    // 按优先级查找：accessCache → state → queries → models → ctx → $ 属性
+    // 按优先级查找：state → accessCache → views/actions/queryFetches/models/ctx → $ 属性
     ...
   }
 ```
@@ -159,12 +162,16 @@ $cancelQueries     → () => instance.cancelQueries()       // 取消所有 infl
 $resetQueries      → () => instance.resetQueries()        // 清除所有 query 缓存
 ```
 
+`$getApi()` 构造的是 `ModelAPI` snapshot，用于 React `useModel()`、`useStaticModel()` 和 selectors。它只包含 state、views、actions、direct query fetches 与 `$queries`；不包含 child models 或 `$models`。`store.getModel()` 返回的 `ModelInstance` 仍然保留 `instance.childName` 与 `instance.$models.childName`。
+
 ### set handler
 
 `modelPublicInstance.ts` set handler：
 
 - `state` 属性 → 写入 draft（VIEW context 中禁止写入）
 - `actions/views/queries/models` → 只读，拒绝修改
+- 普通 `queryName` 访问 → 返回 `queryFetches[queryName]`，即直接 fetch 函数
+- `$queries.queryName` → 返回完整 `QueryHandle`
 - `$state` → 触发 `instance.replace(value)` 整体替换
 - 其他 `$` 属性 → 只读
 - 其余 → 写入 `ctx`
@@ -177,7 +184,7 @@ $resetQueries      → () => instance.resetQueries()        // 清除所有 quer
 
 ### 原理
 
-ObjectModel 允许通过 `models: [otherModel]` 组合其他 model。子 model 使用自己的 `name` 作为父实例上的 key：
+Model options 允许通过 `models: [otherModel]` 组合其他 model definition。子 model 使用自己的 `childModel.$options.name` 作为父实例上的 key：
 
 ```ts
 const childModel = defineModel({
@@ -232,10 +239,10 @@ depend(dep: ModelInternal) {
 
 > `core/modelManager.ts`
 
-ModelManager 是 model 实例的注册中心：
+ModelManager 是 model 实例的注册中心。公开 API 只接收 `ModelDefinition`：
 
-- `getModel(model)` — 按 model 的 `name` 缓存。相同 name 返回同一个实例
-- `getDetachedModel(model)` — 匿名实例，不缓存
+- `getModel(modelDefinition)` — 按 `definition.$options.name` 缓存。相同 name 返回同一个实例
+- `getDetachedModel(modelDefinition)` — 匿名实例，不缓存，也不进入 `getState()`
 - `subscribe(fn)` — 任何 model 变更时触发（通过 `queueJob` 合并）
 
 ### Plugin 生命周期
@@ -249,7 +256,7 @@ _initModel:   hooks.onModel(name, model, { doura })
 destroy:      hooks.onDestroy()
 ```
 
-Plugin 通过 `onModelInstance` 拿到 `ModelInstance`，可以调用 `$subscribe`、`$onAction` 等 API 扩展行为。
+Plugin 的 `onModel(name, modelOptions, ctx)` 接收原始 options；`onModelInstance(instance, ctx)` 接收 `ModelInstance`，可以调用 `$subscribe`、`$onAction`、`$queries` 等 API 扩展行为。
 
 ---
 
@@ -311,9 +318,26 @@ const userModel = defineModel(
 - `ctx.signal` 是 `AbortSignal`，fetch 被取消时会 abort
 - 如需在数据到达时修改 state，使用 `onData` 回调（它提供 `api` 代理可修改 state）
 
-### QueryHandle — 公共查询句柄
+### QueryFetch 与 QueryHandle
 
-每个 query 在 model 上对外暴露一个 `QueryHandle<TArgs, TData>`：
+每个 query 在运行时拆成两个公开入口：
+
+- `instance.queryName` / action 内 `this.queryName`：`QueryFetch<TArgs, TData>`，直接调用后返回 `Promise<TData>`
+- `instance.$queries.queryName` / action 内 `this.$queries.queryName`：`QueryHandle<TArgs, TData>`，用于读缓存、预取、取消、失效、重置、手动写入缓存
+
+```ts
+actions: {
+  async loadUser(id: string) {
+    const user = await this.fetchUser(id)
+    this.users[id] = user
+  },
+  refreshUser(id: string) {
+    this.$queries.fetchUser.invalidate(id)
+  },
+}
+```
+
+`QueryHandle<TArgs, TData>` 方法：
 
 | 方法                                       | 说明                                                        |
 | ------------------------------------------ | ----------------------------------------------------------- |
@@ -339,8 +363,9 @@ const userModel = defineModel(
 1. 跳过非 `isQuerySpecLike` 的 entry（`decorateModelQueries` 已将函数规范化为 `{ fn }` 结构）
 2. 调用 `_cacheAccess(queryName, QUERY)` 注册到 accessCache
 3. `_buildQueryHandle(queryName, spec)` 构造 handle 对象
-4. 注册到 `this.queries`（proxy 可访问）
-5. `Object.freeze(this.queries)`，不可运行时追加
+4. 注册到 `this.queries[queryName]`
+5. 将 `handle.fetch` 打上内部 handle 标记，注册到 `this.queryFetches[queryName]`
+6. `Object.freeze(this.queries)` 和 `Object.freeze(this.queryFetches)`，不可运行时追加
 
 **\_hasArgs 标志**：通过 `spec.fn.length > 1` 判断。有参 query 的 `setData` 签名为 `(...args, data)`；无参 query 的 `setData` 签名为 `(data)`。
 
@@ -370,7 +395,7 @@ QueryCoordinator
 computeQueryHash(scope, queryName, argsKey) → QueryHash (branded string)
 ```
 
-- `scope`：命名 model 为 `model.name`；detached model 为 `@@detached:<id>`（自增 id）
+- `scope`：命名 model 为 `definition.$options.name`；detached model 为 `@@detached:<id>`（自增 id）
 - `queryName`：query 在 model 中的 key
 - `argsKey`：`computeArgsKey(args)` 将 args tuple JSON 化为稳定字符串
 

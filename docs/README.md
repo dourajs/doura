@@ -30,7 +30,10 @@ doura-plugin-persist (peer: doura) 持久化 + 迁移
 defineModel({ name, state, actions, views, queries, models })
         │
         ▼
-  ModelInternal 构造
+  ModelDefinition（原始 options 位于 definition.$options）
+        │
+        ▼
+  store.getModel(definition) → ModelInternal 构造
         │
         ├── draft({ value: initState })          ← 创建可变 Proxy
         ├── watch(stateRef, () => queueJob(_update))  ← 监听 draft 变更
@@ -54,7 +57,8 @@ defineModel({ name, state, actions, views, queries, models })
 
   Query 路径（并行于 action 同步路径）
         │
-        ├── queryHandle.fetch(args) → QueryCoordinator → FetchManager 去重
+        ├── queryFetch(args) 或 $queries.queryName 的 fetch 方法
+        │     → QueryCoordinator → FetchManager 去重
         ├── fetch 完成 → 写入 query cache entry → notifyQueryListeners
         └── useQuery 订阅 → useSyncExternalStore → React re-render
 ```

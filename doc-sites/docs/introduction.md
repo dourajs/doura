@@ -12,8 +12,8 @@ Models keep state, actions, views, composed child models, and async queries in a
 single definition. A `doura()` store creates model instances, and React apps use
 `DouraRoot` plus hooks from `react-doura`.
 
-Current packages are published as `0.2.0-beta.0`. `react-doura` has peer
-dependencies on `doura@0.2.0-beta.0` and `react >=18`.
+Current packages are published as `0.2.0-beta.1`. `react-doura` has peer
+dependencies on `doura@0.2.0-beta.1` and `react >=18`.
 
 ## Example
 
@@ -98,9 +98,11 @@ export function App() {
 ## API Shape
 
 - `defineModel({ name, state, actions?, views?, models?, queries? }, setup?)`
-  defines a model.
+  returns a `ModelDefinition`; the raw options are available at
+  `definition.$options`.
 - `doura({ initialState?, plugins?, query? })` creates a store.
-- `store.getModel(model)` returns a named model instance cached by
-  `model.name` in that store.
+- `store.getModel(modelDefinition)` returns a named model instance cached by
+  `definition.$options.name` in that store.
 - React hooks accept the model definition directly:
-  `useModel(model, selector?, depends?)`.
+  `useModel(model, selector?, depends?)`. The returned `ModelAPI` includes
+  state, views, actions, direct query fetch functions, and `$queries`.

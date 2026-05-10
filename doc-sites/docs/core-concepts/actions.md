@@ -4,8 +4,8 @@ title: Actions
 ---
 
 Actions are methods declared under `actions` in `defineModel()`. They are bound
-to the model's internal proxy, so `this` can read state, views, actions, query
-handles, and child models.
+to the model's internal proxy, so `this` can read state, views, actions, direct
+query fetch functions, `$queries` handles, and child models.
 
 ```ts
 import { defineModel } from 'doura'
@@ -30,6 +30,20 @@ export const counterModel = defineModel({
 ```
 
 Do not use arrow functions for actions that need `this`.
+
+Queries split direct fetch from cache control:
+
+```ts
+actions: {
+  async loadUser(id: string) {
+    const user = await this.fetchUser(id)
+    this.userData = user
+  },
+  refreshUser(id: string) {
+    this.$queries.fetchUser.invalidate(id)
+  },
+}
+```
 
 ## Async Actions
 

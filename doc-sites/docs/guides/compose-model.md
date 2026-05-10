@@ -4,7 +4,8 @@ title: Composing Models
 ---
 
 Use the `models` option to compose models. Each child model is mounted by its
-own `name`, and is available on the parent instance and on `$models`.
+own `$options.name`, and is available on the parent `ModelInstance` and on
+`$models`.
 
 ```ts
 const countModel = defineModel({
@@ -40,8 +41,8 @@ const userModel = defineModel({
 })
 ```
 
-Outside the model, the same child is available through both flattened access
-and `$models`:
+Outside the model, `store.getModel()` returns a `ModelInstance`; the same child
+is available through both direct instance access and `$models`:
 
 ```ts
 const user = douraStore.getModel(userModel)
@@ -51,8 +52,9 @@ user.$models.counter.inc()
 ```
 
 :::caution
-Child model keys come from `childModel.name`. Avoid reusing a child name that
-conflicts with parent state, action, view, or query keys.
+Child model keys come from `childModel.$options.name`. Reusing a child name
+that conflicts with parent state, action, view, or query keys throws during
+`defineModel()`.
 :::
 
 ## Shared Instances
@@ -74,5 +76,6 @@ const modelTwo = defineModel({
 })
 ```
 
-`modelOne.counter` and `modelTwo.counter` refer to the same `counter` instance
-when both parents are created from the same doura store.
+`store.getModel(modelOne).counter` and `store.getModel(modelTwo).counter`
+refer to the same `counter` instance when both parents are created from the
+same doura store.

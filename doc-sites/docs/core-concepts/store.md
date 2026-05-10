@@ -51,7 +51,7 @@ const store = doura({
 
 | Method                    | Description                                                                                  |
 | ------------------------- | -------------------------------------------------------------------------------------------- |
-| `getModel(model)`         | Get or create a named model instance. The instance is cached by `model.name`.                |
+| `getModel(model)`         | Get or create a named model instance. The instance is cached by `model.$options.name`.       |
 | `getDetachedModel(model)` | Create an independent model instance that is not cached and is not included in `getState()`. |
 | `getState()`              | Return a snapshot of all named models' state, keyed by model name.                           |
 | `subscribe(fn)`           | Listen to any named model state change. Returns an unsubscribe function.                     |

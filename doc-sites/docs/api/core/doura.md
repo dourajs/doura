@@ -128,12 +128,13 @@ function defineModel<N, S, A, V, Models, Q>(
       setQueryOptions<K extends keyof Q>(name: K, options: QueryOptions): void
     }
   }) => void
-): DefineModel<S, A, V, Models, Q>
+): ModelDefinition<Model<S, A, V, Models, Q> & { name: N }>
 ```
 
-Keys across `state`, `actions`, `views`, `queries`, and `models` must not
-conflict. TypeScript reports conflicts for literal keys, and runtime
-validation warns for dynamic shapes that cannot be checked statically.
+Keys across `state`, `actions`, `views`, `queries`, and child model names must
+not conflict. TypeScript reports conflicts for literal keys, and `defineModel()`
+throws at runtime for dynamic conflicts, duplicated child model names, and
+`$options` action/query definition-ref names.
 
 ### Example
 
@@ -154,9 +155,32 @@ const countModel = defineModel({
 })
 ```
 
+## `ModelDefinition`
+
+`defineModel()` returns a `ModelDefinition`. A definition is the only model
+value accepted by `store.getModel()`, `store.getDetachedModel()`, and React
+model hooks.
+
+### Types
+
+```ts
+type ModelDefinition<M extends Model = Model> = {
+  readonly $options: M
+} & ActionDefinitionRefs<M> &
+  QueryDefinitionRefs<M>
+```
+
+- `$options` contains the raw model options object.
+- `$options` is a reserved field and cannot be used as an action or query name.
+- `definition.actionName` and `definition.queryName` are lightweight refs used
+  by React hooks. They are not bound to a store until a hook resolves them from
+  the current Provider context.
+
 ### Model Composition
 
-Use the `models` option to compose child models. Child models are accessed via `this.childName` (the child model's `name` field) inside actions and views.
+Use the `models` option to compose child models. Child models are accessed via
+`this.childName` inside actions and views. The key comes from the child
+definition's `$options.name`.
 
 ```ts
 const countModel = defineModel({
@@ -265,9 +289,37 @@ Query functions do NOT have `this` bound to the model — `this` is `undefined` 
 
 The advantage of `onData` is that it runs both when `fetch()` completes AND when `setData()` is called manually, ensuring state stays in sync regardless of how data enters the cache.
 
+## `QueryFetch`
+
+Direct query access on `ModelInstance`, `ModelAPI`, and action `this` is a
+fetch function.
+
+### Types
+
+```ts
+type QueryFetch<TArgs extends readonly unknown[] = any[], TData = any> = (
+  ...args: TArgs
+) => Promise<TData>
+```
+
+### Example
+
+```ts
+const users = store.getModel(userModel)
+
+const user = await users.fetchById('user-1')
+
+const api = users.$getApi()
+await api.fetchById('user-2')
+```
+
+Use `$queries.queryName` when you need cache state or control methods.
+
 ## `QueryHandle`
 
-The runtime query object available on model instances for each query entry. Accessed as `instance.queryName` or `instance.$queries.queryName`.
+The runtime query object for cache reads and control methods. Access it through
+`instance.$queries.queryName`, `api.$queries.queryName`, or action
+`this.$queries.queryName`.
 
 ### Methods
 
@@ -338,13 +390,25 @@ const modelInstance = store.getModel(counterModel)
 console.log(modelInstance.count) // 100
 ```
 
+## `ModelAPI`
+
+The snapshot returned by `instance.$getApi()` and by React hooks such as
+`useModel()` without a selector. It contains state, views, actions, direct query
+fetch functions, and `$queries`.
+
+`ModelAPI` intentionally does not include child models or `$models`. Use the
+`ModelInstance` returned by `store.getModel()` when direct child model access is
+needed.
+
 ## `ModelInstance`
 
-The runtime model instance returned by `store.getModel(model)`. Provides direct access to state, actions, views, queries, and child models.
+The runtime model instance returned by `store.getModel(model)`. Provides direct
+access to state, actions, views, direct query fetch functions, and child models.
 
 ### Flat Access
 
-All state keys, action methods, view properties, query handles, and child model instances are accessible directly:
+All state keys, action methods, view properties, direct query fetch functions,
+and child model instances are accessible directly:
 
 ```ts
 const store = doura()
@@ -369,6 +433,13 @@ instance.actionOne() // call action
 instance.double // 0 (view)
 ```
 
+For queries:
+
+```ts
+await instance.fetchUser('user-1') // QueryFetch
+instance.$queries.fetchUser.invalidate('user-1') // QueryHandle
+```
+
 ### `$`-prefixed API
 
 | Property / Method       | Description                                                                 |
@@ -384,7 +455,7 @@ instance.double // 0 (view)
 | `$onAction(listener)`   | Subscribe to action calls. Returns unsubscribe.                             |
 | `$subscribe(listener)`  | Subscribe to state changes. Returns unsubscribe.                            |
 | `$isolate(fn)`          | Read state without tracking (for view optimization)                         |
-| `$getApi()`             | Get a snapshot of the full API (state + views + actions + queries + models) |
+| `$getApi()`             | Get a `ModelAPI` snapshot (state + views + actions + query fetches + `$queries`) |
 | `$createView(selector)` | Create a reactive derived view. Returns `{ (): T, destroy(): void }`.       |
 | `$invalidateQueries()`  | Mark all query cache entries stale                                          |
 | `$cancelQueries()`      | Cancel all inflight query requests                                          |
@@ -399,10 +470,12 @@ The store object returned by `doura()`. Manages named and detached model instanc
 ```ts
 interface Doura {
   getState(): Record<string, State>
-  getModel<IModel extends AnyModel>(model: IModel): ModelInstance<IModel>
-  getDetachedModel<IModel extends AnyModel>(
-    model: IModel
-  ): ModelInstance<IModel>
+  getModel<ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ): ModelInstance<ModelDef>
+  getDetachedModel<ModelDef extends ModelDefinition<Model>>(
+    model: ModelDef
+  ): ModelInstance<ModelDef>
   subscribe(fn: () => any): () => void
   destroy(): void
 }
@@ -411,7 +484,7 @@ interface Doura {
 ### Methods
 
 - **`getState()`** — Returns a snapshot of all named models' state, keyed by model name.
-- **`getModel(model)`** — Retrieves or creates a named model instance. Repeated calls with the same model return the same instance.
+- **`getModel(model)`** — Retrieves or creates a named model instance. The input must be a `ModelDefinition`; the cache key is `model.$options.name`.
 - **`getDetachedModel(model)`** — Creates a detached model instance that is not registered in the store and not included in `getState()`.
 - **`subscribe(fn)`** — Registers a listener that fires whenever any named model's state changes (batched via microtask). Returns an unsubscribe function.
 - **`destroy()`** — Destroys the store: calls `onDestroy` on all plugin hooks, destroys all model instances, and clears subscribers.
@@ -434,6 +507,37 @@ unsubscribe()
 store.destroy()
 ```
 
+## `Plugin`
+
+Plugins are functions that return lifecycle hooks. They are registered with
+`doura({ plugins: [[plugin, option]] })`.
+
+### Types
+
+```ts
+interface PluginContext {
+  doura: ModelManager
+}
+
+type PluginHook = {
+  onInit?(
+    options: { initialState: Record<string, State> },
+    context: PluginContext
+  ): void
+  onModel?(name: string, model: Model, context: PluginContext): void
+  onModelInstance?(
+    instance: ModelInstance<ModelDefinition<Model>>,
+    context: PluginContext
+  ): void
+  onDestroy?(): void
+}
+
+type Plugin<Option = any> = (option: Option) => PluginHook
+```
+
+`onModel` receives the model name and raw model options. `onModelInstance`
+receives the public `ModelInstance`.
+
 ## `$isolate`
 
 Executes the given function in a scope where reactive values can be read, but they cannot cause the caller's reactive scope to re-evaluate when they change. Useful for optimizing views that read nested objects.
@@ -441,7 +545,7 @@ Executes the given function in a scope where reactive values can be read, but th
 ### Types
 
 ```ts
-$isolate: <T>(fn: (state: ModelState<IModel>) => T) => T
+$isolate: <T>(fn: (state: ModelState<ModelDef>) => T) => T
 ```
 
 ### Example
@@ -557,7 +661,7 @@ function computeQueryHash(
 function computeArgsKey(args: readonly unknown[] | void): unknown[]
 ```
 
-- `modelName` — for named models this is `model.name`; for detached models it's an internal `@@detached:<id>` string.
+- `modelName` — for named models this is `model.$options.name`; for detached models it's an internal `@@detached:<id>` string.
 - `queryName` — the key in `queries`.
 - `key` — the args tuple (produced by `computeArgsKey`). The hash function internally serializes it to a stable string.
 

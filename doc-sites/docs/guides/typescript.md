@@ -3,9 +3,9 @@ id: typescript
 title: TypeScript
 ---
 
-Doura infers state, actions, views, child models, and query handles from
-`defineModel()`. Use `strict` or at least `noImplicitThis` so action and view
-`this` types are checked.
+Doura infers state, actions, views, child models, direct query fetch functions,
+and `$queries` handles from `defineModel()`. Use `strict` or at least
+`noImplicitThis` so action and view `this` types are checked.
 
 ## State Shape
 
@@ -52,7 +52,9 @@ import type {
   ModelViews,
   ModelQueries,
   ModelModels,
+  ModelQueryFetches,
   ModelInstance,
+  QueryFetch,
   QueryHandle,
   Selector,
 } from 'doura'
@@ -65,6 +67,7 @@ type UserState = ModelState<typeof userModel>
 type UserActions = ModelActions<typeof userModel>
 type UserViews = ModelViews<typeof userModel>
 type UserQueries = ModelQueries<typeof userModel>
+type UserQueryFetches = ModelQueryFetches<typeof userModel>
 type UserInstance = ModelInstance<typeof userModel>
 ```
 
@@ -86,11 +89,16 @@ const userModel = defineModel({
 
 type Queries = ModelQueries<typeof userModel>
 type FetchUser = Queries['fetchUser'] // QueryHandle<[string], User>
+
+type Fetches = ModelQueryFetches<typeof userModel>
+type FetchUserDirect = Fetches['fetchUser'] // QueryFetch<[string], User>
 ```
 
 ## Selectors
 
-React selectors receive the flattened model API and the actions namespace:
+React selectors receive `ModelAPI` and the actions namespace. `ModelAPI`
+contains state, views, actions, direct query fetches, and `$queries`; it does
+not contain child models or `$models`.
 
 ```ts
 import type { Selector } from 'react-doura'

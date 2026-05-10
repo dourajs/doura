@@ -49,11 +49,11 @@ function is needed: the args tuple determines cache identity automatically.
 
 ```ts
 // These are different cache entries:
-instance.fetchById.fetch('user-1')
-instance.fetchById.fetch('user-2')
+instance.fetchById('user-1')
+instance.fetchById('user-2')
 
 // Same args tuple values = same cache entry (deduped):
-instance.fetchById.fetch('user-1') // returns cached or dedupes inflight
+instance.fetchById('user-1') // returns cached or dedupes inflight
 ```
 
 ## QueryCtx and Cancellation
@@ -77,26 +77,28 @@ Query functions do NOT have `this` bound to the model — `this` is `undefined`.
 
 ## Using Queries in Actions
 
-Inside actions, query handles are available as `this.queryName`:
+Inside actions, direct query fetch functions are available as `this.queryName`.
+Use `this.$queries.queryName` for cache control:
 
 ```ts
 actions: {
   async loadUser(id: string) {
-    const user = await this.fetchById.fetch(id)
+    const user = await this.fetchById(id)
     this.currentUser = user
   },
   refreshAll() {
-    this.fetchAll.invalidate()  // mark stale, next observer will refetch
+    this.$queries.fetchAll.invalidate()  // mark stale, next observer will refetch
   },
   cancelPending() {
-    this.fetchById.cancel()     // cancel all inflight fetchById requests
+    this.$queries.fetchById.cancel()     // cancel all inflight fetchById requests
   },
 }
 ```
 
 ## QueryHandle Methods
 
-Each query handle provides these methods:
+Each query handle is available at `$queries.queryName` and provides these
+methods:
 
 | Method                   | Description                           |
 | ------------------------ | ------------------------------------- |
@@ -223,13 +225,11 @@ instance.$resetQueries() // clear all cache entries
 Subscribe to a query's cache and auto-fetch when data is stale:
 
 ```tsx
-import { useModel, useQuery } from 'react-doura'
+import { useQuery } from 'react-doura'
 
 function UserProfile({ userId }: { userId: string }) {
-  const user = useModel(userModel)
-
   const { data, isLoading, error, refetch } = useQuery(
-    user.fetchById,
+    userModel.fetchById,
     [userId],
     { staleTime: 60_000, enabled: !!userId }
   )
@@ -244,11 +244,10 @@ function UserProfile({ userId }: { userId: string }) {
 }
 ```
 
-No-arg queries pass the handle and options directly:
+No-arg queries pass the ref/fetch/handle and options directly:
 
 ```tsx
-const user = useModel(userModel)
-const result = useQuery(user.fetchAll, { staleTime: 60_000 })
+const result = useQuery(userModel.fetchAll, { staleTime: 60_000 })
 ```
 
 ### useInfiniteQuery
@@ -256,13 +255,11 @@ const result = useQuery(user.fetchAll, { staleTime: 60_000 })
 For paginated data that accumulates pages:
 
 ```tsx
-import { useModel, useInfiniteQuery } from 'react-doura'
+import { useInfiniteQuery } from 'react-doura'
 
 function PostList() {
-  const posts = useModel(postsModel)
-
   const { data, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    useInfiniteQuery(posts.fetchPage, {
+    useInfiniteQuery(postsModel.fetchPage, {
       initialArgs: [1] as [number],
       getNextArgs: (lastPage, allPages) =>
         lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
@@ -288,11 +285,10 @@ function PostList() {
 Track action lifecycle (loading, success, error) in your component:
 
 ```tsx
-import { useModel, useAction } from 'react-doura'
+import { useAction } from 'react-doura'
 
 function SaveButton() {
-  const form = useModel(formModel)
-  const { run, isPending } = useAction(form.save)
+  const { run, isPending } = useAction(formModel.save)
 
   return (
     <button onClick={() => run()} disabled={isPending}>
