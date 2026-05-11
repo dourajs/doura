@@ -1,6 +1,6 @@
-# Doura + React-Doura Usage Manual
+# Doura
 
-> Agent-facing reference. Each section provides enough context to use the feature, with links to full documentation.
+> A lightweight, intuitive and reactive state management library for React. This is the complete agent-facing reference — each section provides enough context to use the feature, with links to full documentation.
 
 ## Quick Start
 
@@ -52,7 +52,7 @@ function App() {
 }
 ```
 
-Full details: [Installation](../doc-sites/docs/installation.md) | [Introduction](../doc-sites/docs/introduction.md)
+Full details: [Installation](https://dourajs.github.io/doura/docs/installation.md) | [Introduction](https://dourajs.github.io/doura/docs/introduction.md)
 
 ---
 
@@ -100,7 +100,7 @@ state: {
 }
 ```
 
-Full details: [State](../doc-sites/docs/core-concepts/state.md)
+Full details: [State](https://dourajs.github.io/doura/docs/core-concepts/state.md)
 
 ### Actions
 
@@ -130,7 +130,7 @@ actions: {
 
 Inside actions, `this` provides access to all state, views, queries, and child models.
 
-Full details: [Actions](../doc-sites/docs/core-concepts/actions.md) | [API Reference](../doc-sites/docs/api/core/doura.md#action)
+Full details: [Actions](https://dourajs.github.io/doura/docs/core-concepts/actions.md) | [API Reference](https://dourajs.github.io/doura/docs/api/core/doura.md#action)
 
 ### Views
 
@@ -149,7 +149,7 @@ views: {
 }
 ```
 
-Full details: [Views](../doc-sites/docs/core-concepts/views.md) | [Optimize Views](../doc-sites/docs/guides/optimize-views.md)
+Full details: [Views](https://dourajs.github.io/doura/docs/core-concepts/views.md) | [Optimize Views](https://dourajs.github.io/doura/docs/guides/optimize-views.md)
 
 ### Model Composition
 
@@ -181,7 +181,7 @@ const parentModel = defineModel({
 
 Named models are shared: if multiple parents compose the same child, they point to the same instance within a store.
 
-Full details: [Composing Models](../doc-sites/docs/guides/compose-model.md)
+Full details: [Composing Models](https://dourajs.github.io/doura/docs/guides/compose-model.md)
 
 ### Queries
 
@@ -260,7 +260,7 @@ instance.$queries.fetchById.setData('user-1', user)
 | `reset(...args?)`        | Clear entry/entries entirely      |
 | `setData(...args, data)` | Write data into cache manually    |
 
-Full details: [Queries Guide](../doc-sites/docs/guides/queries.md) | [QueryHandle API](../doc-sites/docs/api/core/doura.md#queryhandle)
+Full details: [Queries Guide](https://dourajs.github.io/doura/docs/guides/queries.md) | [QueryHandle API](https://dourajs.github.io/doura/docs/api/core/doura.md#queryhandle)
 
 ---
 
@@ -297,7 +297,7 @@ unsub()
 store.destroy()
 ```
 
-Full details: [Store](../doc-sites/docs/core-concepts/store.md) | [API Reference](../doc-sites/docs/api/core/doura.md#doura)
+Full details: [Store](https://dourajs.github.io/doura/docs/core-concepts/store.md) | [API Reference](https://dourajs.github.io/doura/docs/api/core/doura.md#doura)
 
 ---
 
@@ -364,7 +364,7 @@ const { Provider, useSharedModel, useStaticModel } = createContainer()
 </Provider>
 ```
 
-Full details: [Component State](../doc-sites/docs/react/component-state.md) | [Global Store](../doc-sites/docs/react/global-store.md) | [Multiple Stores](../doc-sites/docs/react/multiple-stores.md) | [API Reference](../doc-sites/docs/api/core/react-doura.md)
+Full details: [Component State](https://dourajs.github.io/doura/docs/react/component-state.md) | [Global Store](https://dourajs.github.io/doura/docs/react/global-store.md) | [Multiple Stores](https://dourajs.github.io/doura/docs/react/multiple-stores.md) | [API Reference](https://dourajs.github.io/doura/docs/api/core/react-doura.md)
 
 ---
 
@@ -416,7 +416,7 @@ function UserProfile({ userId }: { userId: string }) {
 | `isPlaceholderData` | Showing placeholder data                 |
 | `refetch()`         | Manually trigger a refetch               |
 
-Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#usequery)
+Full details: [API Reference](https://dourajs.github.io/doura/docs/api/core/react-doura.md#usequery)
 
 ---
 
@@ -458,7 +458,7 @@ function PostList() {
 - `getNextArgs(lastPage, allPages)` — return next args or `undefined` to stop
 - `getPreviousArgs?(firstPage, allPages)` — optional reverse pagination
 
-Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#useinfinitequery)
+Full details: [API Reference](https://dourajs.github.io/doura/docs/api/core/react-doura.md#useinfinitequery)
 
 ---
 
@@ -504,7 +504,7 @@ Semantics:
 - Async actions use `pendingDelay` to prevent loading flash for fast operations
 - Race-safe: only the most recent call can write state
 
-Full details: [API Reference](../doc-sites/docs/api/core/react-doura.md#useaction)
+Full details: [API Reference](https://dourajs.github.io/doura/docs/api/core/react-doura.md#useaction)
 
 ---
 
@@ -523,7 +523,7 @@ views: {
 }
 ```
 
-Full details: [Optimize Views](../doc-sites/docs/guides/optimize-views.md) | [API Reference](../doc-sites/docs/api/core/doura.md#isolate)
+Full details: [Optimize Views](https://dourajs.github.io/doura/docs/guides/optimize-views.md) | [API Reference](https://dourajs.github.io/doura/docs/api/core/doura.md#isolate)
 
 ### $patch
 
@@ -591,7 +591,7 @@ state: {
 }
 ```
 
-Full details: [API Reference](../doc-sites/docs/api/core/doura.md#markraw)
+Full details: [API Reference](https://dourajs.github.io/doura/docs/api/core/doura.md#markraw)
 
 ---
 
@@ -661,7 +661,7 @@ import { doura, devtool } from 'doura'
 doura({ plugins: [[devtool]] })
 ```
 
-Full details: [Plugins](../doc-sites/docs/core-concepts/plugins.md) | [Plugin API](../doc-sites/docs/api/plugins/index.md) | [Persist Guide](../doc-sites/docs/guides/persist-plugin.md)
+Full details: [Plugins](https://dourajs.github.io/doura/docs/core-concepts/plugins.md) | [Plugin API](https://dourajs.github.io/doura/docs/api/plugins.md) | [Persist Guide](https://dourajs.github.io/doura/docs/guides/persist-plugin.md)
 
 ---
 
@@ -691,7 +691,7 @@ state: {
 
 Requires `strict: true` or `noImplicitThis: true` in `tsconfig.json`.
 
-Full details: [TypeScript Guide](../doc-sites/docs/guides/typescript.md)
+Full details: [TypeScript Guide](https://dourajs.github.io/doura/docs/guides/typescript.md)
 
 ---
 
@@ -726,7 +726,7 @@ Every `ModelInstance` exposes:
 | `instance.$cancelQueries()`      | Cancel all inflight queries        |
 | `instance.$resetQueries()`       | Clear all query caches             |
 
-Full details: [ModelInstance API](../doc-sites/docs/api/core/doura.md#modelinstance)
+Full details: [ModelInstance API](https://dourajs.github.io/doura/docs/api/core/doura.md#modelinstance)
 
 `ModelAPI` contains state, views, actions, direct query fetches, and `$queries`.
 It does not contain `childName` or `$models`; get child model instances from a
