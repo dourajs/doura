@@ -44,7 +44,7 @@ export class EffectScope {
     }
   }
 
-  run<T>(fn: () => T): T | void {
+  run<T>(fn: () => T): T | undefined {
     if (this.active) {
       const currentEffectScope = activeEffectScope
       try {
@@ -56,6 +56,7 @@ export class EffectScope {
     } else if (__DEV__) {
       warn(`cannot run an inactive effect scope.`)
     }
+    return undefined
   }
 
   /**
@@ -110,7 +111,7 @@ export function recordEffectScope(
   effect: ReactiveEffect,
   scope: EffectScope | undefined = activeEffectScope
 ) {
-  if (scope && scope.active) {
+  if (scope?.active) {
     scope.effects.push(effect)
   }
 }

@@ -18,7 +18,7 @@ export function stableStringify(value: unknown): string {
   return '{' + parts.join(',') + '}'
 }
 
-export function computeArgsKey(args: readonly unknown[] | void): unknown[] {
+export function computeArgsKey(args?: readonly unknown[]): unknown[] {
   return args ? [...args] : []
 }
 

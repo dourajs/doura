@@ -146,7 +146,7 @@ function createGetter(): ProxyGetter {
       // Check childDrafts first — a previous read may have already created
       // a draft for this key without triggering prepareCopy.
       // draft() auto-writes to parent.childDrafts when key is provided.
-      let childDraft = state.childDrafts && state.childDrafts.get(prop)
+      let childDraft = state.childDrafts?.get(prop)
       if (!childDraft) {
         childDraft = draft(value, state, prop)
       }

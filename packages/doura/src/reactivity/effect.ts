@@ -167,7 +167,7 @@ export function effect<T = any>(
     assign(_effect, options)
     if (options.scope) recordEffectScope(_effect, options.scope)
   }
-  if (!options || !options.lazy) {
+  if (!options?.lazy) {
     _effect.run()
   }
   const runner = _effect.run.bind(_effect) as ReactiveEffectRunner
@@ -192,7 +192,7 @@ export function resetTracking() {
   shouldTrack = last === undefined ? true : last
 }
 
-export function track(target: object, type: TrackOpTypes, key: unknown) {
+export function track(target: object, _type: TrackOpTypes, key: unknown) {
   if (shouldTrack && activeEffect) {
     let depsMap = targetMap.get(target)
     if (!depsMap) {
@@ -286,7 +286,7 @@ export function trigger(
   const depsMap = targetMap.get(state)
 
   // Fast path: no deps tracked and no listeners registered
-  if (!depsMap && (!listeners || !listeners.length)) {
+  if (!depsMap && !listeners?.length) {
     return
   }
 
@@ -354,7 +354,7 @@ export function trigger(
   }
 
   // trigger draft listeners
-  if (listeners && listeners.length) {
+  if (listeners?.length) {
     listeners.forEach((listener) => {
       listener()
     })
