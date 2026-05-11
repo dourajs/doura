@@ -1,11 +1,15 @@
-import { State, ModelDefinition, Model } from './modelOptions'
-import { createModelInstance, ModelInternal, UnSubscribe } from './model'
-import { ModelInstance } from './modelPublicInstance'
-import { queueJob, SchedulerJob } from './scheduler'
-import { Plugin, PluginHook } from './plugins'
+import type { State, ModelDefinition, Model } from './modelOptions'
+import {
+  createModelInstance,
+  type ModelInternal,
+  type UnSubscribe,
+} from './model'
+import type { ModelInstance } from './modelPublicInstance'
+import { queueJob, type SchedulerJob } from './scheduler'
+import type { Plugin, PluginHook } from './plugins'
 import { emptyObject, invariant, isArray, removeUnordered } from '../utils'
 import { warn } from '../warning'
-import { QueryConfig } from './queryTypes'
+import type { QueryConfig } from './queryTypes'
 import { QueryCoordinator } from './queryCoordinator'
 
 export type ModelManagerOptions = {
@@ -26,9 +30,7 @@ export interface ModelManager {
   destroy(): void
 }
 
-export interface DouraSubscriptionCallback {
-  (): any
-}
+export type DouraSubscriptionCallback = () => any
 
 class ModelManagerInternal implements ModelManager {
   private _initialState: Record<string, State>

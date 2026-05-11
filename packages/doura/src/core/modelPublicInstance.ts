@@ -1,16 +1,16 @@
 import { hasOwn, assign } from '../utils'
 import { warn } from '../warning'
 import {
-  PublicPropertiesMap,
-  ProxyContext,
+  type PublicPropertiesMap,
+  type ProxyContext,
   AccessContext,
-  ActionListener,
-  SubscriptionCallback,
-  UnSubscribe,
-  ModelAPI,
+  type ActionListener,
+  type SubscriptionCallback,
+  type UnSubscribe,
+  type ModelAPI,
   AccessTypes,
 } from './model'
-import {
+import type {
   State,
   Model,
   ModelDefinition,
@@ -22,7 +22,7 @@ import {
   ModelQueryMethods,
 } from './modelOptions'
 import type { ModelPublicFields } from './modelApi'
-import { createView, Selector, ModelView } from './view'
+import { createView, type Selector, type ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
 

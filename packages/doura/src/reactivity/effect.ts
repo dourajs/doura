@@ -1,11 +1,11 @@
-import { TrackOpTypes, TriggerOpTypes } from './operations'
+import { type TrackOpTypes, TriggerOpTypes } from './operations'
 import { assign, isArray, isMap, isIntegerKey } from '../utils'
-import { DraftState } from './draft'
-import { ViewImpl, View } from './view'
+import type { DraftState } from './draft'
+import type { ViewImpl, View } from './view'
 import { ReactiveFlags, toBase } from './common'
-import { EffectScope, recordEffectScope } from './effectScope'
+import { type EffectScope, recordEffectScope } from './effectScope'
 import {
-  Dep,
+  type Dep,
   createDep,
   initDepMarkers,
   finalizeDepMarkers,

@@ -1,27 +1,27 @@
 import React, {
   createContext,
   useContext,
-  PropsWithChildren,
+  type PropsWithChildren,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
 import {
-  Doura,
-  Model,
-  ModelDefinition,
-  DouraOptions,
-  Selector,
+  type Doura,
+  type Model,
+  type ModelDefinition,
+  type DouraOptions,
+  type Selector,
   doura,
   nextTick,
 } from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
-import { UseSharedModel, UseStaticModel } from './types'
+import type { UseSharedModel, UseStaticModel } from './types'
 import { DouraContext } from './context'
 import { MISSING_PROVIDER_MESSAGE } from './errors'
 
-const createContainer = function (options?: DouraOptions) {
+const createContainer = (options?: DouraOptions) => {
   const Context = createContext<{
     store: Doura
   }>(null as any)
@@ -30,61 +30,52 @@ const createContainer = function (options?: DouraOptions) {
     const internalStoreRef = useRef<Doura | null>(null)
     const pendingDestroyStoreRef = useRef<Doura | null>(null)
 
-    const memoContext = useMemo(
-      function () {
-        let store: Doura
-        if (propsStore) {
-          store = propsStore
-        } else {
-          if (!internalStoreRef.current) {
-            internalStoreRef.current = doura(options)
-          }
-          store = internalStoreRef.current
+    const memoContext = useMemo(() => {
+      let store: Doura
+      if (propsStore) {
+        store = propsStore
+      } else {
+        if (!internalStoreRef.current) {
+          internalStoreRef.current = doura(options)
         }
-        return {
-          store,
-          ownsStore: !propsStore,
-        }
-      },
-      [propsStore]
-    )
+        store = internalStoreRef.current
+      }
+      return {
+        store,
+        ownsStore: !propsStore,
+      }
+    }, [propsStore])
 
     const [contextValue, setContextValue] = useState(memoContext) // for hmr keep contextValue
 
-    useEffect(
-      function () {
-        setContextValue(memoContext)
-      },
-      [memoContext]
-    )
+    useEffect(() => {
+      setContextValue(memoContext)
+    }, [memoContext])
 
-    useEffect(
-      function () {
-        if (pendingDestroyStoreRef.current === memoContext.store) {
-          pendingDestroyStoreRef.current = null
-        }
+    useEffect(() => {
+      if (pendingDestroyStoreRef.current === memoContext.store) {
+        pendingDestroyStoreRef.current = null
+      }
 
-        return function () {
-          if (
-            memoContext.ownsStore &&
-            internalStoreRef.current === memoContext.store
-          ) {
-            pendingDestroyStoreRef.current = memoContext.store
-            nextTick(() => {
-              if (
-                pendingDestroyStoreRef.current === memoContext.store &&
-                internalStoreRef.current === memoContext.store
-              ) {
-                memoContext.store.destroy()
-                internalStoreRef.current = null
-                pendingDestroyStoreRef.current = null
-              }
-            })
-          }
+      return () => {
+        if (
+          memoContext.ownsStore &&
+          internalStoreRef.current === memoContext.store
+        ) {
+          pendingDestroyStoreRef.current = memoContext.store
+          nextTick(() => {
+            if (
+              pendingDestroyStoreRef.current === memoContext.store &&
+              internalStoreRef.current === memoContext.store
+            ) {
+              memoContext.store.destroy()
+              internalStoreRef.current = null
+              pendingDestroyStoreRef.current = null
+            }
+          })
         }
-      },
-      [memoContext]
-    )
+      }
+    }, [memoContext])
 
     return (
       <DouraContext.Provider value={contextValue}>

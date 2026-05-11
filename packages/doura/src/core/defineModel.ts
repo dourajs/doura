@@ -1,4 +1,4 @@
-import {
+import type {
   State,
   ActionOptions,
   ViewOptions,
@@ -11,8 +11,8 @@ import {
 } from './modelOptions'
 import {
   decorateModelQueries,
-  QueryOptions,
-  QueryOptionsForEntry,
+  type QueryOptions,
+  type QueryOptionsForEntry,
   setDecoratedQueryOptions,
 } from './queryOptions'
 import type { QueryCtx } from './queryTypes'
@@ -242,7 +242,7 @@ function defineModelReferences(modelDefinition: any, modelOptions: any): void {
   const actions = modelOptions?.actions
   if (actions && typeof actions === 'object') {
     for (const actionName of Object.keys(actions)) {
-      const actionRef = function () {
+      const actionRef = () => {
         throw new Error(
           `Action "${actionName}" must be used with a model instance.`
         )
@@ -260,7 +260,7 @@ function defineModelReferences(modelDefinition: any, modelOptions: any): void {
   const queries = modelOptions?.queries
   if (queries && typeof queries === 'object') {
     for (const queryName of Object.keys(queries)) {
-      const queryRef = function () {
+      const queryRef = () => {
         throw new Error(
           `Query "${queryName}" must be used with a model instance.`
         )

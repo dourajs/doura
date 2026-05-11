@@ -1,6 +1,6 @@
 import { warn } from './warning'
 
-export const enum ErrorCodes {
+export enum ErrorCodes {
   SCHEDULER,
 }
 

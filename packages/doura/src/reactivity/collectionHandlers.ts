@@ -1,11 +1,17 @@
 import {
   draft,
-  MapDraftState,
-  SetDraftState,
+  type MapDraftState,
+  type SetDraftState,
   DraftType,
-  DraftState,
+  type DraftState,
 } from './draft'
-import { ReactiveFlags, latest, markChanged, isDraft, Drafted } from './common'
+import {
+  ReactiveFlags,
+  latest,
+  markChanged,
+  isDraft,
+  type Drafted,
+} from './common'
 import {
   track,
   trackDraft,
@@ -15,7 +21,13 @@ import {
 } from './effect'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { hasOwn, is, isObject } from '../utils'
-import { AnyMap, AnySet, CollectionTypes, Iterable, Iterator } from '../types'
+import type {
+  AnyMap,
+  AnySet,
+  CollectionTypes,
+  Iterable,
+  Iterator,
+} from '../types'
 
 export type CollectionState = MapDraftState | SetDraftState
 

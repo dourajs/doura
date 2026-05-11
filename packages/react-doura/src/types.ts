@@ -1,4 +1,4 @@
-import { Model, ModelDefinition, Selector, ModelAPI } from 'doura'
+import type { Model, ModelDefinition, Selector, ModelAPI } from 'doura'
 
 export interface UseDetachedModel {
   <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
@@ -20,10 +20,10 @@ export interface UseModel {
 
 export interface UseSharedModel extends UseModel {}
 
-export interface UseDetachedStaticModel {
-  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
-}
+export type UseDetachedStaticModel = <ModelDef extends ModelDefinition<Model>>(
+  model: ModelDef
+) => ModelAPI<ModelDef>
 
-export interface UseStaticModel {
-  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
-}
+export type UseStaticModel = <ModelDef extends ModelDefinition<Model>>(
+  model: ModelDef
+) => ModelAPI<ModelDef>

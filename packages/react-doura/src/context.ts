@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import { Doura } from 'doura'
+import type { Doura } from 'doura'
 import { MISSING_PROVIDER_MESSAGE } from './errors'
 
 export const DouraContext = createContext<{ store: Doura }>(null as any)

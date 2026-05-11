@@ -1,6 +1,6 @@
 import { serialize } from './utils'
 import type { PersistOptions } from './types'
-import { IStorageState } from './types'
+import type { IStorageState } from './types'
 
 export default function createPersist(config: PersistOptions) {
   // defaults

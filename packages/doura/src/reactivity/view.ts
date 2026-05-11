@@ -1,7 +1,7 @@
 import { warn } from '../warning'
 import { ReactiveEffect, trackView, triggerView } from './effect'
 import { toBase } from './common'
-import { Dep } from './dep'
+import type { Dep } from './dep'
 
 export interface View<T = any> {
   dep?: Dep

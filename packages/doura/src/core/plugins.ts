@@ -1,6 +1,6 @@
-import { State, Model, ModelDefinition } from './modelOptions'
-import { ModelInstance } from './modelPublicInstance'
-import { ModelManager } from './modelManager'
+import type { State, Model, ModelDefinition } from './modelOptions'
+import type { ModelInstance } from './modelPublicInstance'
+import type { ModelManager } from './modelManager'
 
 export interface PluginContext {
   doura: ModelManager

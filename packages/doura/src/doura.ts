@@ -1,4 +1,8 @@
-import { modelManager, ModelManager, ModelManagerOptions } from './core/index'
+import {
+  modelManager,
+  type ModelManager,
+  type ModelManagerOptions,
+} from './core/index'
 
 export interface Doura extends ModelManager {}
 export interface DouraOptions extends ModelManagerOptions {}

@@ -1,8 +1,12 @@
 import { emptyArray } from '../utils'
 import { FetchManager } from './fetchManager'
 import { GCManager } from './gcManager'
-import { QueryConfig, DEFAULT_QUERY_CONFIG, QueryHash } from './queryTypes'
-import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
+import {
+  type QueryConfig,
+  DEFAULT_QUERY_CONFIG,
+  type QueryHash,
+} from './queryTypes'
+import { QueryHashIndex, type QueryHashPrefixKey } from './queryHashIndex'
 import type { ModelInternal } from './model'
 
 export class QueryCoordinator {

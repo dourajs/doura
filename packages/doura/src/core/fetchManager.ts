@@ -1,5 +1,5 @@
 import { NOOP } from '../utils'
-import { QueryHash } from './queryTypes'
+import type { QueryHash } from './queryTypes'
 
 interface InflightEntry {
   controller: AbortController

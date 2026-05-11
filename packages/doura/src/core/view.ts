@@ -1,6 +1,6 @@
-import { Model, ModelActions, ModelDefinition } from './modelOptions'
-import { ModelInternal, ModelAPI } from './model'
-import { ModelInstance } from './modelPublicInstance'
+import type { Model, ModelActions, ModelDefinition } from './modelOptions'
+import type { ModelInternal, ModelAPI } from './model'
+import type { ModelInstance } from './modelPublicInstance'
 import { removeUnordered } from '../utils'
 
 export type Selector<ModelDef extends ModelDefinition<Model>, TReturn = any> = (
@@ -29,7 +29,7 @@ export function createView<M extends Model, TReturn>(
   const res = view.getSnapshot as ModelView<
     Selector<ModelDefinition<M>, TReturn>
   >
-  res.destroy = function () {
+  res.destroy = () => {
     view.effect.stop()
     removeUnordered(instance.effectScope.effects, view.effect)
     removeUnordered(instance.viewInstances, view as any)

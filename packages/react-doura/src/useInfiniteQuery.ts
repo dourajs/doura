@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import {
-  type QueryFetch,
-  type QueryHandle,
-  type InternalQueryHandle,
-} from 'doura'
+import type { QueryFetch, QueryHandle, InternalQueryHandle } from 'doura'
 import { useDouraContext } from './context'
 import { resolveQueryHandle } from './resolveQueryHandle'
 

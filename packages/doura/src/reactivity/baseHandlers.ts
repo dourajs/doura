@@ -1,8 +1,8 @@
-import { ObjectDraftState, DraftState, draft } from './draft'
+import { type ObjectDraftState, type DraftState, draft } from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import {
   ReactiveFlags,
-  Drafted,
+  type Drafted,
   toBase,
   toState,
   latest,

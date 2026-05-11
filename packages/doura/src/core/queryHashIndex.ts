@@ -1,4 +1,4 @@
-import { QueryHash } from './queryTypes'
+import type { QueryHash } from './queryTypes'
 
 export type QueryHashPrefixKey =
   | readonly [scope: string]

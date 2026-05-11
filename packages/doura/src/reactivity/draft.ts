@@ -1,17 +1,17 @@
 import {
-  Target,
+  type Target,
   TargetType,
   ReactiveFlags,
   isDraft,
-  Drafted,
+  type Drafted,
   getTargetType,
 } from './common'
 import { mutableHandlers } from './baseHandlers'
 import { mutableCollectionHandlers } from './collectionHandlers'
 import { isObject, isArray, shallowCopy, removeUnordered } from '../utils'
-import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
+import type { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
-export const enum DraftType {
+export enum DraftType {
   Object,
   Map,
   Set,

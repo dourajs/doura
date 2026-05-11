@@ -8,7 +8,7 @@
   "files": {
     "ignoreUnknown": true,
     // BIOME_MIGRATION_IGNORE: SSR HTML template placeholders
-    "includes": ["**", "!examples/**"]
+    "includes": ["**", "!examples", "!rollup.config.mjs"]
   },
   "formatter": {
     "enabled": true,
@@ -87,10 +87,7 @@
   "overrides": [
     {
       // BIOME_MIGRATION_IGNORE: CommonJS entry/config files
-      "includes": [
-        "jest.config.js",
-        "packages/*/index.js"
-      ],
+      "includes": ["jest.config.js", "packages/*/index.js"],
       "linter": {
         "rules": {
           "style": {

@@ -1,7 +1,7 @@
 import { invariant } from './utils'
 import type { Plugin } from './core'
 
-const reduxDevTools: Plugin = function () {
+const reduxDevTools: Plugin = () => {
   if (
     !__DEV__ ||
     typeof window === 'undefined' ||

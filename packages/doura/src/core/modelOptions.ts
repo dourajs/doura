@@ -1,7 +1,7 @@
 import { warn } from '../warning'
-import { AnyObject } from '../types'
+import type { AnyObject } from '../types'
 import { invariant, isPlainObject, hasOwn, isArray } from '../utils'
-import { QueryCtx, QueryFetch, QueryHandle } from './queryTypes'
+import type { QueryCtx, QueryFetch, QueryHandle } from './queryTypes'
 import { isQuerySpecLike } from './queryOptions'
 import type { ModelInstance } from './modelPublicInstance'
 
@@ -341,7 +341,6 @@ function validateQueries(model: Model) {
       warn(
         `query "${key}" must be a function. Configure query options with defineModel(..., setup).`
       )
-      continue
     }
   }
 }

@@ -10,9 +10,9 @@ import {
 import { warn } from '../warning'
 import {
   view as reactiveView,
-  View,
+  type View,
   effectScope,
-  EffectScope,
+  type EffectScope,
   draft,
   watch,
   snapshot,
@@ -23,34 +23,34 @@ import {
   resetDraftChildren,
 } from '../reactivity'
 import {
-  Views,
-  State,
-  ModelDefinition,
-  Model,
-  ModelStateFromModel,
-  ModelActionsFromModel,
-  ModelViewsFromModel,
+  type Views,
+  type State,
+  type ModelDefinition,
+  type Model,
+  type ModelStateFromModel,
+  type ModelActionsFromModel,
+  type ModelViewsFromModel,
   validateModelOptions,
 } from './modelOptions'
 import {
-  ModelInstance,
+  type ModelInstance,
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
 import type { ModelApiSnapshot } from './modelApi'
 import { queueJob, queuePostJob, invalidateJob } from './scheduler'
-import { AnyObject } from '../types'
-import {
+import type { AnyObject } from '../types'
+import type {
   FetchStatus,
   IQueryCoordinator,
   QueryCacheEntry,
   QueryHash,
 } from './queryTypes'
-import { isQuerySpecLike, NormalizedQuerySpec } from './queryOptions'
+import { isQuerySpecLike, type NormalizedQuerySpec } from './queryOptions'
 import type { InternalQueryHandle } from './internalQueryTypes'
 import { DOURA_QUERY_HANDLE } from './internalQueryTypes'
 import { computeQueryHash, computeArgsKey } from './queryUtils'
-import { QueryHashIndex, QueryHashPrefixKey } from './queryHashIndex'
+import { QueryHashIndex, type QueryHashPrefixKey } from './queryHashIndex'
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -71,13 +71,9 @@ export interface ModelAction {
   args: any[]
 }
 
-export interface ActionListener {
-  (action: ModelAction): any
-}
+export type ActionListener = (action: ModelAction) => any
 
-export interface SubscriptionCallback {
-  (event: ModelChangeEvent): any
-}
+export type SubscriptionCallback = (event: ModelChangeEvent) => any
 
 export interface ActionBase<T = any> {
   type: string
@@ -130,12 +126,12 @@ export type ModelChangeEvent =
   | ModelPatchEvent
   | ModelReplaceEvent
 
-export const enum AccessContext {
+export enum AccessContext {
   DEFAULT,
   VIEW,
 }
 
-export const enum AccessTypes {
+export enum AccessTypes {
   STATE,
   ACTION,
   VIEW,
