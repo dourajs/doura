@@ -56,7 +56,10 @@ function createWebpackCompat(webpack) {
     return webpack(sanitizeConfig(config), callback)
   }
 
-  Object.defineProperties(webpackCompat, Object.getOwnPropertyDescriptors(webpack))
+  Object.defineProperties(
+    webpackCompat,
+    Object.getOwnPropertyDescriptors(webpack)
+  )
   webpackCompat.__douraWebpack5Compat = true
 
   return webpackCompat

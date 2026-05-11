@@ -20,6 +20,6 @@
     "declarationMap": true,
     "jsx": "react",
     "lib": ["dom", "esnext"],
-    "outDir": "dist",
+    "outDir": "dist"
   }
 }

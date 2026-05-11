@@ -355,7 +355,9 @@ export function trigger(
 
   // trigger draft listeners
   if (listeners && listeners.length) {
-    listeners.forEach((listener) => listener())
+    listeners.forEach((listener) => {
+      listener()
+    })
   }
 }
 

@@ -265,7 +265,7 @@ function mapForEach(
     // important: make sure the callback is
     // 1. invoked with the reactive map as `this` and 3rd arg
     // 2. the value received should be a corresponding draft.
-    return callback.call(thisArg, (state.proxy as AnyMap).get(key), key, self)
+    callback.call(thisArg, (state.proxy as AnyMap).get(key), key, self)
   })
 }
 

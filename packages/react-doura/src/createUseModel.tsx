@@ -12,7 +12,6 @@ import {
   Selector,
   ModelView,
   ModelInstance,
-  hasOwn,
   ModelAPI,
 } from 'doura'
 
@@ -30,27 +29,13 @@ function shallowArrayEqual(
   return true
 }
 
-function readonlyModel(model: ModelInstance<ModelDefinition<Model>>) {
-  return new Proxy(model, {
+function readonlyModel<T>(model: T): T {
+  return new Proxy(model as any, {
     get(
-      target: ModelInstance<ModelDefinition<Model>>,
+      target: ModelInstance<ModelDefinition>,
       key: string | symbol
     ): any {
-      if (key === '$state') {
-        return target.$state
-      } else if (key === '$queries') {
-        return target.$queries
-      } else if (hasOwn(target.$state, key)) {
-        return target.$state[key]
-      } else if (hasOwn(target.$views, key)) {
-        return target.$views[key]
-      } else if (hasOwn(target.$actions, key)) {
-        return target.$actions[key]
-      } else if (hasOwn(target.$queries, key)) {
-        return target[key as keyof typeof target]
-      }
-
-      return undefined
+    	return target[key as keyof typeof target]
     },
     set() {
       console.warn(`try to change state which is not allowed!`)
@@ -112,7 +97,7 @@ function useModelWithSelector<
 
   // Stable wrapper so useSyncExternalStore always calls the live view,
   // even if the underlying ModelView is recreated after StrictMode cleanup.
-  const getSnapshot = useMemo(() => () => selectorRef.current!(), [model])
+  const getSnapshot = useMemo(() => () => selectorRef.current!(), [])
 
   // StrictMode runs effects as setup→cleanup→setup with no render in between.
   // Cleanup synchronously destroys the view and nulls the ref. The subsequent
@@ -120,7 +105,8 @@ function useModelWithSelector<
   // model. On real unmount only cleanup runs, which is the desired behavior.
   useEffect(() => {
     if (!selectorRef.current) {
-      selectorRef.current = model.$createView(selector)
+      const prev = prevRef.current
+      selectorRef.current = prev.model.$createView(prev.selector)
     }
     return () => {
       selectorRef.current?.destroy()
@@ -144,15 +130,33 @@ function useModelInstance<ModelDef extends ModelDefinition<Model>>(
   doura: Doura
 ) {
   const modelKey = getModelCacheKey(model)
-  const { modelInstance, subscribe } = useMemo(() => {
+  const modelInstanceRef = useRef<{
+    doura: Doura
+    modelKey: string
+    modelInstance: ModelInstance<ModelDef>
+  }>()
+
+  if (
+    !modelInstanceRef.current ||
+    modelInstanceRef.current.doura !== doura ||
+    modelInstanceRef.current.modelKey !== modelKey
+	) {
+
     const modelInstance = doura.getModel(model)
-    return {
-      modelInstance,
-      subscribe: (onModelChange: () => void) => {
-        return modelInstance.$subscribe(onModelChange)
-      },
+    modelInstanceRef.current = {
+      doura,
+      modelKey,
+      modelInstance: __DEV__ ? readonlyModel(modelInstance) : modelInstance,
     }
-  }, [doura, modelKey])
+  }
+
+  const modelInstance = modelInstanceRef.current.modelInstance
+  const subscribe = useMemo(
+    () => (onModelChange: () => void) => {
+      return modelInstance.$subscribe(onModelChange)
+    },
+    [modelInstance]
+  )
 
   return {
     modelInstance,
@@ -189,21 +193,8 @@ export const createUseModel =
 
 export const createUseStaticModel =
   (doura: Doura) =>
-  <ModelDef extends ModelDefinition<Model>>(model: ModelDef) => {
-    const modelKey = getModelCacheKey(model)
-    const modelInstance = useMemo(
-      () => doura.getModel(model),
-      [doura, modelKey]
-    )
+		<ModelDef extends ModelDefinition<Model>>(model: ModelDef) => {
+		const { modelInstance } = useModelInstance(model, doura)
 
-    // only run this once against a model
-    const store = useMemo(() => {
-      if (__DEV__) {
-        return readonlyModel(modelInstance as any)
-      } else {
-        return modelInstance
-      }
-    }, [modelInstance])
-
-    return store as any as ModelAPI<ModelDef>
+    return modelInstance as any as ModelAPI<ModelDef>
   }

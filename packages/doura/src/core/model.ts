@@ -530,7 +530,7 @@ export class ModelInternal<M extends Model = Model> {
       return action
     }
 
-    let nextState
+    let nextState: any
 
     try {
       this._isDispatching = true

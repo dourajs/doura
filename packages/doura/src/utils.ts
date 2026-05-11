@@ -9,11 +9,11 @@ export const emptyArray = [] as const
 
 export const assign = Object.assign
 
-const hasOwnProperty = Object.prototype.hasOwnProperty
+const hasOwnPropertyFn = Object.prototype.hasOwnProperty
 export const hasOwn = (
   val: object,
   key: PropertyKey
-): key is keyof typeof val => hasOwnProperty.call(val, key)
+): key is keyof typeof val => hasOwnPropertyFn.call(val, key)
 
 export const objectToString = Object.prototype.toString
 const toTypeString = (value: unknown): string => objectToString.call(value)
@@ -145,8 +145,8 @@ const ownKeys: (target: object) => PropertyKey[] =
   typeof Reflect !== 'undefined' && Reflect.ownKeys
     ? Reflect.ownKeys
     : typeof Object.getOwnPropertySymbols !== 'undefined'
-    ? (obj) =>
-        Object.getOwnPropertyNames(obj).concat(
-          Object.getOwnPropertySymbols(obj) as any
-        )
-    : /* istanbul ignore next */ Object.getOwnPropertyNames
+      ? (obj) =>
+          Object.getOwnPropertyNames(obj).concat(
+            Object.getOwnPropertySymbols(obj) as any
+          )
+      : /* istanbul ignore next */ Object.getOwnPropertyNames

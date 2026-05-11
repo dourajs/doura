@@ -5,14 +5,9 @@
   "main": "index.js",
   "module": "dist/react-doura.esm-bundler.js",
   "types": "dist/react-doura.d.ts",
-  "files": [
-    "index.js",
-    "dist"
-  ],
+  "files": ["index.js", "dist"],
   "sideEffects": false,
-  "authors": [
-    "liximomo"
-  ],
+  "authors": ["liximomo"],
   "keywords": [
     "doura",
     "reactive",
@@ -32,10 +27,7 @@
   },
   "buildOptions": {
     "name": "ReactDoura",
-    "formats": [
-      "esm-bundler",
-      "cjs"
-    ]
+    "formats": ["esm-bundler", "cjs"]
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",

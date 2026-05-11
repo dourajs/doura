@@ -16,8 +16,8 @@ export function error(err: unknown, type: ErrorCodes, ...args: any[]) {
     const info = !e
       ? 'unknown error nr: ' + err
       : typeof e === 'function'
-      ? e.apply(null, args as any)
-      : e
+        ? e.apply(null, args as any)
+        : e
     warn(`Unhandled error${info ? ` during execution of ${info}` : ``}`)
 
     // crash in dev by default so it's more noticeable

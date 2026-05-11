@@ -122,7 +122,9 @@ class ModelManagerInternal implements ModelManager {
 
   destroy() {
     this._hooks.map((hook) => hook.onDestroy?.())
-    this._models.forEach((m) => m.destroy())
+    this._models.forEach((m) => {
+      m.destroy()
+    })
     this._models.clear()
     this._modelOptions.clear()
     this._subscribers.length = 0
@@ -177,7 +179,7 @@ class ModelManagerInternal implements ModelManager {
     if (sourceModel) {
       this._modelOptions.set(name, sourceModel)
     }
-    this._hooks.map((hook) => {
+    this._hooks.forEach((hook) => {
       hook.onModelInstance?.(
         modelInstance.publicInst as ModelInstance<ModelDefinition<Model>>,
         { doura: this }

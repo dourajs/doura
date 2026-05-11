@@ -4,20 +4,10 @@
   "main": "index.js",
   "module": "dist/doura-plugin-log.esm-bundler.js",
   "types": "dist/doura-plugin-log.d.ts",
-  "files": [
-    "index.js",
-    "dist"
-  ],
+  "files": ["index.js", "dist"],
   "sideEffects": false,
-  "authors": [
-    "liximomo"
-  ],
-  "keywords": [
-    "doura",
-    "state management",
-    "javascript",
-    "typescript"
-  ],
+  "authors": ["liximomo"],
+  "keywords": ["doura", "state management", "javascript", "typescript"],
   "homepage": "https://dourajs.github.io/doura",
   "license": "MIT",
   "repository": {

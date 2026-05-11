@@ -1,9 +1,0 @@
-/.git
-**/node_modules
-packages/*/dist
-benchmark
-doc-sites
-test-dts
-commitlint.config.js
-scripts
-**/__tests__

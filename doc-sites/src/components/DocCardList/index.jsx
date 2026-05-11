@@ -1,54 +1,54 @@
-import React, { useState, useMemo } from 'react';
-import Link from '@docusaurus/Link';
+import React, { useState, useMemo } from 'react'
+import Link from '@docusaurus/Link'
 
-import styles from './styles.module.css';
+import styles from './styles.module.css'
 
-export function DocCardList({title, sections }) {
-  const [filterString, setFilterString] = useState('');
+export function DocCardList({ title, sections }) {
+  const [filterString, setFilterString] = useState('')
 
-  const normalize = s => s?.toLowerCase().replace(/-/g, ' ');
-  const matches = text => normalize(text)?.includes(filterString);
+  const normalize = (s) => s?.toLowerCase().replace(/-/g, ' ')
+  const matches = (text) => normalize(text)?.includes(filterString)
 
-  const handleFilterChange = event => {
-    setFilterString(normalize(event.target.value));
-  };
+  const handleFilterChange = (event) => {
+    setFilterString(normalize(event.target.value))
+  }
 
   const filteredLists = useMemo(
     () =>
       sections
-        .map(section => {
+        .map((section) => {
           // section title match
           if (matches(section.label)) {
-            return section;
+            return section
           }
           // filter groups
           const matchedGroups = section.items
-            .map(item => {
+            .map((item) => {
               // group title match
               if (matches(item.label)) {
-                return item;
+                return item
               }
               // filter headers
               const matchedHeaders = item.customProps.headers.filter(
                 ({ value }) => matches(value)
-              );
+              )
               return matchedHeaders.length
                 ? {
                     label: item.label,
                     href: item.href,
                     customProps: { headers: matchedHeaders },
                   }
-                : null;
+                : null
             })
-            .filter(i => i);
+            .filter((i) => i)
 
           return matchedGroups.length
             ? { label: section.label, items: matchedGroups }
-            : null;
+            : null
         })
-        .filter(i => i),
+        .filter((i) => i),
     [sections, filterString]
-  );
+  )
 
   return (
     <div className={styles.root}>
@@ -84,15 +84,15 @@ export function DocCardList({title, sections }) {
                             <li key={anchor}>
                               <Link to={`${href}#${anchor}`}>{value}</Link>
                             </li>
-                          );
+                          )
                         })}
                       </ul>
                     </div>
-                  );
+                  )
                 })}
               </div>
             </div>
-          );
+          )
         })
       ) : (
         <div className={styles.noMatch}>
@@ -100,5 +100,5 @@ export function DocCardList({title, sections }) {
         </div>
       )}
     </div>
-  );
+  )
 }

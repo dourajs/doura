@@ -76,7 +76,7 @@ export class EffectScope {
 
   stop(fromParent?: boolean) {
     if (this.active) {
-      let i, l
+      let i: number, l: number
       for (i = 0, l = this.effects.length; i < l; i++) {
         this.effects[i].stop()
       }

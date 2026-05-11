@@ -91,10 +91,10 @@ export function latest<T extends DraftState>(
 ): T extends MapDraftState
   ? AnyMap
   : T extends SetDraftState
-  ? AnySet
-  : T extends ObjectDraftState
-  ? AnyObject
-  : AnyObject {
+    ? AnySet
+    : T extends ObjectDraftState
+      ? AnyObject
+      : AnyObject {
   return state.copy || (state.base as any)
 }
 

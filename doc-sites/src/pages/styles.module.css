@@ -7,7 +7,7 @@
 
 .header {
   height: 400px;
-  background: url('/img/bg.jpg');
+  background: url("/img/bg.jpg");
   text-align: center;
   background-size: cover;
   display: flex;
@@ -118,7 +118,7 @@
 
 .header {
   height: 400px;
-  background: url('/img/bg.jpg');
+  background: url("/img/bg.jpg");
   text-align: center;
   background-size: cover;
   display: flex;

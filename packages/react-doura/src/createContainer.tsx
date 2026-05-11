@@ -43,6 +43,7 @@ const createContainer = function (options?: DouraOptions) {
         }
         return {
           store,
+          ownsStore: !propsStore,
         }
       },
       [propsStore]
@@ -54,7 +55,7 @@ const createContainer = function (options?: DouraOptions) {
       function () {
         setContextValue(memoContext)
       },
-      [propsStore]
+      [memoContext]
     )
 
     useEffect(
@@ -64,7 +65,10 @@ const createContainer = function (options?: DouraOptions) {
         }
 
         return function () {
-          if (!propsStore && internalStoreRef.current === memoContext.store) {
+          if (
+            memoContext.ownsStore &&
+            internalStoreRef.current === memoContext.store
+          ) {
             pendingDestroyStoreRef.current = memoContext.store
             nextTick(() => {
               if (
