@@ -18,7 +18,7 @@
     "declaration": true,
     "sourceMap": true,
     "declarationMap": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "lib": ["dom", "esnext"],
     "outDir": "dist"
   }

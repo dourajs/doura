@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const tsJestConfig = {
   tsconfig: {
-    jsx: 'react',
+    jsx: 'react-jsx',
     allowJs: true,
     target: 'es6',
     lib: ['dom', 'esnext'],
