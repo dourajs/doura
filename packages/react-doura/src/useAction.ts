@@ -171,6 +171,7 @@ export function useAction<TFn extends (...args: any[]) => any>(
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clearPendingTimer only reads and writes refs.
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -179,6 +180,7 @@ export function useAction<TFn extends (...args: any[]) => any>(
     }
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: callback reads latest action/options through refs.
   const runAsync = useCallback(
     async (...args: Parameters<TFn>): Promise<Awaited<ReturnType<TFn>>> => {
       const runId = ++runIdRef.current
@@ -259,6 +261,7 @@ export function useAction<TFn extends (...args: any[]) => any>(
     [runAsync]
   )
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clearPendingTimer only reads and writes refs.
   const reset = useCallback(() => {
     // Invalidate any in-flight run so its eventual resolution cannot leak
     // into state or callbacks.

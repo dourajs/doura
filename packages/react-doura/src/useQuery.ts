@@ -5,11 +5,11 @@ import {
   useRef,
   useSyncExternalStore,
 } from 'react'
-import {
-  type QueryFetch,
-  type QueryHandle,
-  type QueryCacheEntry,
-  type InternalQueryHandle,
+import type {
+  QueryFetch,
+  QueryHandle,
+  QueryCacheEntry,
+  InternalQueryHandle,
 } from 'doura'
 import type { QueryOverrides, UseQueryResult } from './queryTypes'
 import { useDouraContext } from './context'
@@ -126,6 +126,7 @@ export function useQuery(
   const argsRef = useRef(args)
   argsRef.current = args
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hash intentionally keys args changes through queryHandle.computeHash.
   const subscribe = useCallback(
     (cb: () => void) => {
       return queryHandleInternal.subscribe(argsRef.current, cb)
@@ -133,6 +134,7 @@ export function useQuery(
     [queryHandleInternal, hash]
   )
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hash intentionally keys args changes through queryHandle.computeHash.
   const getSnapshot = useCallback(
     () =>
       queryHandleInternal.getState(...(argsRef.current as any[])) as
@@ -160,6 +162,7 @@ export function useQuery(
     options?.staleTime ?? queryHandleInternal._spec.staleTime ?? 0
 
   // Fetch + GC lifecycle
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hash intentionally keys args changes through queryHandle.computeHash.
   useEffect(() => {
     const effectArgs = args
     queryHandleInternal.observe(effectArgs)
@@ -207,6 +210,7 @@ export function useQuery(
   const isLoading = !hasData && !hasError && enabled
   const isPending = !hasData
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hash intentionally keys args changes through queryHandle.computeHash.
   const refetch = useCallback((): Promise<any> => {
     return queryHandleInternal.fetch(...(argsRef.current as any[]))
   }, [queryHandleInternal, hash])

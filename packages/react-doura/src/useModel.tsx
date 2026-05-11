@@ -1,7 +1,13 @@
 import { useMemo, useRef } from 'react'
-import { doura, Model, ModelDefinition, Selector, Doura } from 'doura'
+import {
+  doura,
+  type Model,
+  type ModelDefinition,
+  type Selector,
+  type Doura,
+} from 'doura'
 import { createUseModel } from './createUseModel'
-import { UseDetachedModel, UseModel, UseStaticModel } from './types'
+import type { UseDetachedModel, UseModel, UseStaticModel } from './types'
 import { DouraRoot, useRootModel, useRootStaticModel } from './global'
 
 const useDetachedModel: UseDetachedModel = <
@@ -30,12 +36,11 @@ const useDetachedModel: UseDetachedModel = <
   // this useRef and will be GC'd when the component unmounts.
   // View cleanup is handled by useModelWithSelector's own useEffect.
 
-  return useMemo(
-    function () {
-      return createUseModel(context.current!.douraStore)
-    },
-    [context.current.douraStore]
-  )(model, selector, depends)
+  return useMemo(() => createUseModel(context.current!.douraStore), [])(
+    model,
+    selector,
+    depends
+  )
 }
 
 const useModel = ((model: any, selector?: any, depends?: any) => {
