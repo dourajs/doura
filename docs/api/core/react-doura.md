@@ -416,7 +416,7 @@ function PostList() {
 
 ## createContainer
 
-Creates an isolated store scope with its own `Provider`, `useSharedModel`, and `useStaticModel`. Useful for independent state contexts within the same app.
+Creates an isolated store scope with its own `Provider` and scoped hooks. Useful for independent state contexts within the same app.
 
 ### Types
 
@@ -429,6 +429,9 @@ declare const createContainer: (options?: DouraOptions) => {
   ) => JSX.Element
   useSharedModel: UseModel
   useStaticModel: UseStaticModel
+  useQuery: UseQuery
+  useAction: UseAction
+  useInfiniteQuery: UseInfiniteQuery
 }
 ```
 
@@ -441,6 +444,9 @@ const {
   Provider, // scoped context provider
   useSharedModel, // reactive hook scoped to this container
   useStaticModel, // non-reactive hook scoped to this container
+  useQuery, // query hook scoped to this container
+  useAction, // action lifecycle hook scoped to this container
+  useInfiniteQuery, // paginated query hook scoped to this container
 } = createContainer()
 ```
 

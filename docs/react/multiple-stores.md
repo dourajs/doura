@@ -4,7 +4,7 @@ title: Multiple Stores
 ---
 
 Use `createContainer(options?)` when part of the React tree needs an isolated
-store. It returns `{ Provider, useSharedModel, useStaticModel }`.
+store. It returns `{ Provider, useSharedModel, useStaticModel, useQuery, useAction, useInfiniteQuery }`.
 
 ```tsx
 import { createContainer } from 'react-doura'
@@ -13,6 +13,7 @@ const {
   Provider: SettingsProvider,
   useSharedModel: useSettingsModel,
   useStaticModel: useSettingsStaticModel,
+  useQuery: useSettingsQuery,
 } = createContainer()
 
 const { Provider: DashboardProvider, useSharedModel: useDashboardModel } =
