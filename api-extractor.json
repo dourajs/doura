@@ -4,7 +4,8 @@
 
   "apiReport": {
     "enabled": true,
-    "reportFolder": "<projectFolder>/temp/"
+    "reportFolder": "<projectFolder>/node_modules/.tmp/api-extractor",
+    "reportTempFolder": "<projectFolder>/node_modules/.tmp/api-extractor"
   },
 
   "docModel": {
