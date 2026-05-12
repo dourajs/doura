@@ -14,8 +14,7 @@ import React from 'react'
 import { render, act, waitFor } from '@testing-library/react'
 import { flushSync } from 'react-dom'
 import { defineModel, doura, nextTick } from 'doura'
-import { DouraRoot, useModel, useStaticModel } from '../src/useModel'
-import { useQuery } from '../src/useQuery'
+import { DouraRoot, useModel, useStaticModel, useQuery } from '../src/index'
 
 beforeEach(() => {
   jest.useRealTimers()

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import type { QueryFetch, QueryHandle, InternalQueryHandle } from 'doura'
-import { useDouraContext } from './context'
+import type { Doura, QueryFetch, QueryHandle, InternalQueryHandle } from 'doura'
 import { resolveQueryHandle } from './resolveQueryHandle'
 
 export interface InfiniteQueryConfig<TArgs extends readonly unknown[], TData> {
@@ -31,6 +30,11 @@ export interface UseInfiniteQueryResult<
   fetchPreviousPage: () => Promise<void>
   refetch: () => Promise<void>
 }
+
+export type UseInfiniteQuery = <TArgs extends readonly unknown[], TData>(
+  queryHandle: QueryInput<TArgs, TData>,
+  config: InfiniteQueryConfig<NoInfer<TArgs>, TData>
+) => UseInfiniteQueryResult<TArgs, TData>
 
 type FetchKind = 'none' | 'initial' | 'next' | 'prev' | 'refetch'
 type QueryInput<TArgs extends readonly unknown[], TData> =
@@ -115,11 +119,11 @@ const INITIAL_STATE: InfiniteState<any, any> = {
  * are still populated in the model (so another useQuery on the same args
  * will read them back), but this hook does not subscribe to those caches.
  */
-export function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
+export function useInfiniteQueryImpl<TArgs extends readonly unknown[], TData>(
+  context: { store: Doura } | null,
   queryHandle: QueryInput<TArgs, TData>,
   config: InfiniteQueryConfig<NoInfer<TArgs>, TData>
 ): UseInfiniteQueryResult<TArgs, TData> {
-  const context = useDouraContext({ optional: true })
   const resolvedQueryHandle = resolveQueryHandle(queryHandle, context)
   const [state, dispatch] = useReducer(
     infiniteReducer as (

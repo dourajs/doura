@@ -3,9 +3,8 @@ import {
   useContext,
   type PropsWithChildren,
   useEffect,
-  useMemo,
   useRef,
-  useState,
+  useMemo,
 } from 'react'
 import {
   type Doura,
@@ -16,10 +15,16 @@ import {
   doura,
   nextTick,
 } from 'doura'
-import { createUseModel, createUseStaticModel } from './createUseModel'
+import { useModelImpl, useStaticModelImpl } from './useModel'
+import { useQueryImpl } from './useQuery'
+import { useActionImpl } from './useAction'
+import { useInfiniteQueryImpl } from './useInfiniteQuery'
 import type { UseSharedModel, UseStaticModel } from './types'
+import type { UseQuery } from './queryTypes'
+import type { UseAction } from './useAction'
+import type { UseInfiniteQuery } from './useInfiniteQuery'
 import { DouraContext } from './context'
-import { MISSING_PROVIDER_MESSAGE } from './errors'
+import { assertDouraContext } from './errors'
 
 const createContainer = (options?: DouraOptions) => {
   const Context = createContext<{
@@ -41,34 +46,26 @@ const createContainer = (options?: DouraOptions) => {
         store = internalStoreRef.current
       }
       return {
-        store,
+        doura: { store },
         ownsStore: !propsStore,
       }
     }, [propsStore])
 
-    const [contextValue, setContextValue] = useState(memoContext) // for hmr keep contextValue
-
     useEffect(() => {
-      setContextValue(memoContext)
-    }, [memoContext])
-
-    useEffect(() => {
-      if (pendingDestroyStoreRef.current === memoContext.store) {
+      const store = memoContext.doura.store
+      if (pendingDestroyStoreRef.current === store) {
         pendingDestroyStoreRef.current = null
       }
 
       return () => {
-        if (
-          memoContext.ownsStore &&
-          internalStoreRef.current === memoContext.store
-        ) {
-          pendingDestroyStoreRef.current = memoContext.store
+        if (memoContext.ownsStore && internalStoreRef.current === store) {
+          pendingDestroyStoreRef.current = store
           nextTick(() => {
             if (
-              pendingDestroyStoreRef.current === memoContext.store &&
-              internalStoreRef.current === memoContext.store
+              pendingDestroyStoreRef.current === store &&
+              internalStoreRef.current === store
             ) {
-              memoContext.store.destroy()
+              store.destroy()
               internalStoreRef.current = null
               pendingDestroyStoreRef.current = null
             }
@@ -78,18 +75,17 @@ const createContainer = (options?: DouraOptions) => {
     }, [memoContext])
 
     return (
-      <DouraContext.Provider value={contextValue}>
-        <Context.Provider value={contextValue}>{children}</Context.Provider>
+      <DouraContext.Provider value={memoContext.doura}>
+        <Context.Provider value={memoContext.doura}>
+          {children}
+        </Context.Provider>
       </DouraContext.Provider>
     )
   }
 
   const useDouraContext = () => {
     const context = useContext(Context)
-
-    if (__DEV__ && !context) {
-      throw new Error(MISSING_PROVIDER_MESSAGE)
-    }
+    assertDouraContext(context)
     return context
   }
 
@@ -101,12 +97,8 @@ const createContainer = (options?: DouraOptions) => {
     selector?: S,
     depends?: any[]
   ) => {
-    const { store } = useDouraContext()
-    return useMemo(() => createUseModel(store), [store])(
-      model,
-      selector,
-      depends
-    )
+    const context = useDouraContext()
+    return useModelImpl(context, model, selector, depends)
   }
 
   const useStaticModel: UseStaticModel = <
@@ -114,14 +106,39 @@ const createContainer = (options?: DouraOptions) => {
   >(
     model: ModelDef
   ) => {
-    const { store } = useDouraContext()
-    return useMemo(() => createUseStaticModel(store), [store])(model)
+    const context = useDouraContext()
+    return useStaticModelImpl(context, model)
+  }
+
+  const useQuery: UseQuery = (
+    queryHandle: any,
+    argsOrOptions?: any,
+    maybeOptions?: any
+  ) => {
+    const context = useDouraContext()
+    return useQueryImpl(context, queryHandle, argsOrOptions, maybeOptions)
+  }
+
+  const useAction: UseAction = (action: any, options?: any) => {
+    const context = useDouraContext()
+    return useActionImpl(context, action, options)
+  }
+
+  const useInfiniteQuery: UseInfiniteQuery = (
+    queryHandle: any,
+    config: any
+  ) => {
+    const context = useDouraContext()
+    return useInfiniteQueryImpl(context, queryHandle, config)
   }
 
   return {
     Provider,
     useSharedModel,
     useStaticModel,
+    useQuery,
+    useAction,
+    useInfiniteQuery,
   }
 }
 

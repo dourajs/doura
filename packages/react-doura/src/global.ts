@@ -5,8 +5,18 @@ const {
   Provider: DouraRoot,
   useSharedModel: useRootModel,
   useStaticModel: useRootStaticModel,
+  useQuery: useRootQuery,
+  useAction: useRootAction,
+  useInfiniteQuery: useRootInfiniteQuery,
 } = createContainer({
   plugins: __DEV__ ? [[devtool]] : [],
 })
 
-export { DouraRoot, useRootModel, useRootStaticModel }
+export {
+  DouraRoot,
+  useRootModel,
+  useRootStaticModel,
+  useRootQuery,
+  useRootAction,
+  useRootInfiniteQuery,
+}

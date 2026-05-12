@@ -2,8 +2,11 @@ import React, { StrictMode } from 'react'
 import { render, act, waitFor, renderHook } from '@testing-library/react'
 import { defineModel, doura } from 'doura'
 import { createContainer } from '../src/createContainer'
-import { DouraRoot, useModel } from '../src/useModel'
-import { useAction } from '../src/useAction'
+import { DouraRoot, useModel, useAction } from '../src/index'
+
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <DouraRoot>{children}</DouraRoot>
+)
 
 beforeEach(() => {
   jest.useRealTimers()
@@ -53,7 +56,7 @@ describe('useAction — initial state', () => {
 describe('useAction — sync action', () => {
   test('resolves definition action refs against the current provider store', async () => {
     const store = doura()
-    const { Provider } = createContainer()
+    const { Provider, useAction } = createContainer()
     const model = defineModel({
       name: 'definitionRefActionModel',
       state: { value: 0 },
@@ -93,7 +96,7 @@ describe('useAction — sync action', () => {
   test('definition action refs rebind when Provider store changes', async () => {
     const storeA = doura()
     const storeB = doura()
-    const { Provider, useSharedModel } = createContainer()
+    const { Provider, useSharedModel, useAction } = createContainer()
     const model = defineModel({
       name: 'definitionRefStoreSwapActionModel',
       state: { value: 'initial' },
@@ -1063,8 +1066,9 @@ describe('useAction — reset cancels in-flight', () => {
 
 describe('useAction — run return and unhandled rejection', () => {
   test('run() returns undefined (void semantic)', () => {
-    const { result } = renderHook(() =>
-      useAction(async () => 'ok', { pendingDelay: 0 })
+    const { result } = renderHook(
+      () => useAction(async () => 'ok', { pendingDelay: 0 }),
+      { wrapper }
     )
     let ret: unknown = 'sentinel'
     act(() => {
@@ -1080,13 +1084,15 @@ describe('useAction — run return and unhandled rejection', () => {
     }
     window.addEventListener('unhandledrejection', onUnhandled)
     try {
-      const { result } = renderHook(() =>
-        useAction(
-          async () => {
-            throw new Error('boom')
-          },
-          { pendingDelay: 0 }
-        )
+      const { result } = renderHook(
+        () =>
+          useAction(
+            async () => {
+              throw new Error('boom')
+            },
+            { pendingDelay: 0 }
+          ),
+        { wrapper }
       )
       act(() => {
         result.current.run()
@@ -1111,7 +1117,9 @@ describe('useAction — runAsync Promise identity', () => {
         resolvers.push(resolve)
       })
 
-    const { result } = renderHook(() => useAction(fn, { pendingDelay: 0 }))
+    const { result } = renderHook(() => useAction(fn, { pendingDelay: 0 }), {
+      wrapper,
+    })
 
     let p1!: Promise<string>
     let p2!: Promise<string>
@@ -1145,8 +1153,9 @@ describe('useAction — unmount behavior', () => {
         resolveFn = resolve
       })
 
-    const { result, unmount } = renderHook(() =>
-      useAction(fn, { pendingDelay: 0, onSuccess })
+    const { result, unmount } = renderHook(
+      () => useAction(fn, { pendingDelay: 0, onSuccess }),
+      { wrapper }
     )
 
     let runPromise!: Promise<string>
@@ -1168,8 +1177,9 @@ describe('useAction — unmount behavior', () => {
     try {
       // fn that never resolves — only the timer matters here.
       const fn = () => new Promise<string>(() => {})
-      const { result, unmount } = renderHook(() =>
-        useAction(fn, { pendingDelay: 300 })
+      const { result, unmount } = renderHook(
+        () => useAction(fn, { pendingDelay: 300 }),
+        { wrapper }
       )
 
       act(() => {
@@ -1199,7 +1209,10 @@ describe('useAction — reset with pendingDelay > 0', () => {
           resolveFn = resolve
         })
 
-      const { result } = renderHook(() => useAction(fn, { pendingDelay: 300 }))
+      const { result } = renderHook(
+        () => useAction(fn, { pendingDelay: 300 }),
+        { wrapper }
+      )
 
       act(() => {
         void result.current.runAsync()
@@ -1236,7 +1249,9 @@ describe('useAction — mutation semantics on new run', () => {
     const fn = () =>
       shouldError ? Promise.reject(new Error('boom')) : Promise.resolve('first')
 
-    const { result } = renderHook(() => useAction(fn, { pendingDelay: 0 }))
+    const { result } = renderHook(() => useAction(fn, { pendingDelay: 0 }), {
+      wrapper,
+    })
 
     await act(async () => {
       await result.current.runAsync()
@@ -1264,7 +1279,10 @@ describe('useAction — mutation semantics on new run', () => {
         })
       }
 
-      const { result } = renderHook(() => useAction(fn, { pendingDelay: 300 }))
+      const { result } = renderHook(
+        () => useAction(fn, { pendingDelay: 300 }),
+        { wrapper }
+      )
 
       await act(async () => {
         await expect(result.current.runAsync()).rejects.toThrow('boom')
@@ -1309,7 +1327,10 @@ describe('useAction — mutation semantics on new run', () => {
           resolvers.push(resolve)
         })
 
-      const { result } = renderHook(() => useAction(fn, { pendingDelay: 300 }))
+      const { result } = renderHook(
+        () => useAction(fn, { pendingDelay: 300 }),
+        { wrapper }
+      )
 
       // First run → success 'first'
       let p1!: Promise<string>

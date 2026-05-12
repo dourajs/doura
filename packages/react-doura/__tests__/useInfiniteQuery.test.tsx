@@ -2,8 +2,7 @@ import React, { StrictMode } from 'react'
 import { render, act, waitFor } from '@testing-library/react'
 import { defineModel, doura } from 'doura'
 import { createContainer } from '../src/createContainer'
-import { DouraRoot, useModel } from '../src/useModel'
-import { useInfiniteQuery } from '../src/useInfiniteQuery'
+import { DouraRoot, useModel, useInfiniteQuery } from '../src/index'
 
 beforeEach(() => {
   jest.useRealTimers()
@@ -37,7 +36,7 @@ const makeModel = (fetchFn?: (cursor: number) => Promise<Page>) =>
 describe('useInfiniteQuery — initial fetch', () => {
   test('loads the initial page from a definition query ref', async () => {
     const store = doura()
-    const { Provider } = createContainer()
+    const { Provider, useInfiniteQuery } = createContainer()
     const model = makeModel()
 
     const App = () => {
@@ -66,7 +65,7 @@ describe('useInfiniteQuery — initial fetch', () => {
   test('definition query refs refetch when Provider store changes', async () => {
     const storeA = doura()
     const storeB = doura()
-    const { Provider } = createContainer()
+    const { Provider, useInfiniteQuery } = createContainer()
     let source = 'store-a'
     const calls: string[] = []
     const model = defineModel({

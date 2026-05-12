@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import { DOURA_ACTION_REF, type InternalActionDefinitionRef } from 'doura'
-import { useDouraContext } from './context'
+import {
+  DOURA_ACTION_REF,
+  type Doura,
+  type InternalActionDefinitionRef,
+} from 'doura'
 import { assertDouraContext } from './errors'
 
 export interface UseActionOptions<TData> {
@@ -20,6 +23,11 @@ export interface UseActionOptions<TData> {
    */
   pendingDelay?: number
 }
+
+export type UseAction = <TFn extends (...args: any[]) => any>(
+  action: TFn,
+  options?: UseActionOptions<Awaited<ReturnType<TFn>>>
+) => UseActionResult<TFn>
 
 type ActionStatus = 'idle' | 'pending' | 'success' | 'error'
 
@@ -133,11 +141,11 @@ function resolveAction<TFn extends (...args: any[]) => any>(
  * on the same action track independently. For cross-component
  * coordination put the state in the model itself.
  */
-export function useAction<TFn extends (...args: any[]) => any>(
+export function useActionImpl<TFn extends (...args: any[]) => any>(
+  context: { store: Doura } | null,
   action: TFn,
   options?: UseActionOptions<Awaited<ReturnType<TFn>>>
 ): UseActionResult<TFn> {
-  const context = useDouraContext({ optional: true })
   const resolvedAction = resolveAction(action, context)
   const [state, dispatch] = useReducer(
     reducer as (

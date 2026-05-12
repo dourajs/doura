@@ -2,8 +2,7 @@ import React, { StrictMode } from 'react'
 import { render, act, waitFor } from '@testing-library/react'
 import { defineModel, doura } from 'doura'
 import { createContainer } from '../src/createContainer'
-import { DouraRoot, useModel } from '../src/useModel'
-import { useQuery } from '../src/useQuery'
+import { DouraRoot, useModel, useQuery } from '../src/index'
 
 // Use real timers — our tests rely on real Promise microtask flush.
 // Existing react-doura tests default to fake timers, so we override here.
@@ -80,7 +79,7 @@ describe('useQuery', () => {
 
   test('should resolve definition query refs without subscribing to model state', async () => {
     const store = doura()
-    const { Provider } = createContainer()
+    const { Provider, useQuery } = createContainer()
     const model = defineModel({
       name: 'definitionRefQueryModel',
       state: { count: 0 },
@@ -135,7 +134,7 @@ describe('useQuery', () => {
   test('definition query refs rebind when Provider store changes', async () => {
     const storeA = doura()
     const storeB = doura()
-    const { Provider } = createContainer()
+    const { Provider, useQuery } = createContainer()
     const model = defineModel({
       name: 'definitionRefStoreSwapQueryModel',
       state: {},
@@ -460,7 +459,7 @@ describe('useQuery', () => {
 
   test('should unobserve the previous args slot when args change', async () => {
     const store = doura({ query: { gcTime: 0 } })
-    const { Provider, useSharedModel } = createContainer()
+    const { Provider, useSharedModel, useQuery } = createContainer()
     const model = defineModel({
       name: 'model',
       state: {},

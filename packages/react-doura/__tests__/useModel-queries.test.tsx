@@ -1,7 +1,7 @@
 import React from 'react'
 import { render } from '@testing-library/react'
 import { defineModel } from 'doura'
-import { DouraRoot, useModel } from '../src/useModel'
+import { DouraRoot, useModel } from '../src/index'
 
 const model = defineModel({
   name: 'model',
