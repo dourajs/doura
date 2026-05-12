@@ -1,8 +1,14 @@
 export { createContainer } from './createContainer'
 export type { Doura, Selector } from 'doura'
 export { useDetachedModel } from './useModel'
-export * from './context'
-export * from './types'
+export { useDouraContext } from './context'
+export type {
+  UseDetachedModel,
+  UseModel,
+  UseSharedModel,
+  UseDetachedStaticModel,
+  UseStaticModel,
+} from './types'
 export type {
   QueryHandle,
   QueryOverrides,
