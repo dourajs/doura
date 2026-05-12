@@ -384,7 +384,6 @@ export class ModelInternal<M extends Model = Model> {
         ...this._currentState,
         ...this.views,
       })
-      def(data, '$queries', this.queries)
 
       // Actions and queries are immutable over the model's lifetime —
       // iterate pre-cached keys (built during _initActions/_initQueries).

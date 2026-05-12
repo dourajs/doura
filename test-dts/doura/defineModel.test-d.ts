@@ -88,7 +88,7 @@ defineModel({
   },
 })
 
-// @ts-expect-error - "refresh" in queries conflicts with actions
+// @ts-expect-error - "refresh" in actions conflicts with queries
 defineModel({
   name: 'actionQuerySameName',
   state: {

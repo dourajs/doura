@@ -175,7 +175,7 @@ function useModel(model, subscribe) {
 }
 ```
 
-`$getApi()` 返回 `ModelAPI`：`{ ...state, ...views, ...actions, ...queryFetches }`，并通过 `$queries` 暴露 query handle map。`ModelAPI` 不包含 child models 或 `$models`；child models 只在 `store.getModel()` 返回的 `ModelInstance` 上直接可见。每次 state 变更后 `_api` 被置空，下次调用重新构造。
+`$getApi()` 返回 `ModelAPI`：`{ ...state, ...views, ...actions, ...queryFetches }`。`ModelAPI` 不包含 query handle map、child models 或 `$models`；query handles 和 child models 只在 `store.getModel()` 返回的 `ModelInstance` 上直接可见。每次 state 变更后 `_api` 被置空，下次调用重新构造。
 
 ### 有 selector 模式
 
@@ -269,7 +269,7 @@ useQuery<TArgs, TData, TSelected>(
 运行时先用 `resolveQueryHandle(query, context)` 统一解析输入：
 
 - bound `QueryFetch`（例如 `api.fetchUser`）通过内部标记还原到它的 `QueryHandle`
-- `QueryHandle`（例如 `api.$queries.fetchUser`）直接使用
+- `QueryHandle`（例如 model instance 上的 `instance.$queries.fetchUser`）直接使用
 - definition ref（例如 `userModel.fetchUser`）必须在 Provider context 下解析为当前 store 的 handle
 
 随后通过 `queryHandleInternal._hasArgs` 标志（而非参数个数检测）区分重载。无参 query 的 `_hasArgs = false`，此时第二个参数解读为 `options`。Provider 的 `store` prop 切换后，definition ref 会重新绑定到新 store。

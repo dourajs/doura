@@ -771,7 +771,7 @@ describe('model queries', () => {
       expect(viaProxy).not.toBe(viaQueries)
       expect(viaProxy).toBe((viaQueries as any).fetch)
       expect((viaProxy as any)[DOURA_QUERY_HANDLE]).toBe(viaQueries)
-      expect(inst.$getApi().$queries.fetchData).toBe(viaQueries)
+      expect((inst.$getApi() as any).$queries).toBeUndefined()
       await expect(viaProxy()).resolves.toBe(42)
       const internalHandle = viaQueries as any
       expect(internalHandle._queryName).toBe('fetchData')

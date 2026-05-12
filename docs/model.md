@@ -162,7 +162,7 @@ $cancelQueries     → () => instance.cancelQueries()       // 取消所有 infl
 $resetQueries      → () => instance.resetQueries()        // 清除所有 query 缓存
 ```
 
-`$getApi()` 构造的是 `ModelAPI` snapshot，用于 React `useModel()`、`useStaticModel()` 和 selectors。它只包含 state、views、actions、direct query fetches 与 `$queries`；不包含 child models 或 `$models`。`store.getModel()` 返回的 `ModelInstance` 仍然保留 `instance.childName` 与 `instance.$models.childName`。
+`$getApi()` 构造的是 `ModelAPI` snapshot，用于 React `useModel()`、`useStaticModel()` 和 selectors。它只包含 state、views、actions 与 direct query fetches；不包含 query handle map、child models 或 `$models`。`store.getModel()` 返回的 `ModelInstance` 仍然保留 `instance.$queries.queryName`、`instance.childName` 与 `instance.$models.childName`。
 
 ### set handler
 

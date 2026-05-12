@@ -194,7 +194,7 @@ export type ModelThis<
   A extends ActionOptions = {},
   V extends ViewOptions = {},
   Q = {},
-  Models extends readonly ModelDefinition[] = [],
+  Models extends readonly ModelDefinitionLike[] = [],
 > = {
   $state: S
   $patch: (s: AnyObject) => void
@@ -209,7 +209,7 @@ export type ModelThis<
 export type ViewThis<
   S extends State = {},
   V extends ViewOptions = {},
-  Models extends readonly ModelDefinition[] = [],
+  Models extends readonly ModelDefinitionLike[] = [],
 > = S & {
   $state: S
   $isolate: <T>(fn: (s: S) => T) => T
@@ -253,20 +253,28 @@ type StripIndexSignatureUnlessAny<T> = 0 extends 1 & T
   ? T
   : StripIndexSignature<T>
 
+type ModelDefinitionQueryRefs<M extends Model> = M extends { queries?: infer Q }
+  ? Q extends Record<string, any>
+    ? {
+        readonly [K in keyof StripIndexSignatureUnlessAny<Q>]: QueryFetchFromEntry<
+          Q[K]
+        >
+      }
+    : {}
+  : {}
+
 type ModelDefinitionActionRefs<M extends Model> = M extends {
   actions?: infer A
 }
   ? A extends ActionOptions
-    ? StripIndexSignatureUnlessAny<A>
-    : {}
-  : {}
-
-type ModelDefinitionQueryRefs<M extends Model> = M extends { queries?: infer Q }
-  ? Q extends Record<string, any>
     ? {
-        readonly [K in keyof StripIndexSignatureUnlessAny<Q> as K extends keyof ModelDefinitionActionRefs<M>
-          ? never
-          : K]: QueryFetchFromEntry<Q[K]>
+        readonly [K in keyof StripIndexSignatureUnlessAny<A> as M extends {
+          queries?: infer Q
+        }
+          ? K extends keyof StripIndexSignatureUnlessAny<Q>
+            ? never
+            : K
+          : K]: A[K]
       }
     : {}
   : {}
@@ -276,8 +284,8 @@ export type ModelDefinition<
 > = {
   readonly $options: M
   readonly [DOURA_MODEL_DEFINITION]: true
-} & ModelDefinitionActionRefs<M> &
-  ModelDefinitionQueryRefs<M>
+} & ModelDefinitionQueryRefs<M> &
+  ModelDefinitionActionRefs<M>
 
 export type ModelState<ModelDef extends ModelDefinition> =
   ModelStateFromDef<ModelDef>

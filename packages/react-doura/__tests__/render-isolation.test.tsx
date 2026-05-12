@@ -14,7 +14,13 @@ import React from 'react'
 import { render, act, waitFor } from '@testing-library/react'
 import { flushSync } from 'react-dom'
 import { defineModel, doura, nextTick } from 'doura'
-import { DouraRoot, useModel, useStaticModel, useQuery } from '../src/index'
+import {
+  DouraRoot,
+  useDouraContext,
+  useModel,
+  useStaticModel,
+  useQuery,
+} from '../src/index'
 
 beforeEach(() => {
   jest.useRealTimers()
@@ -361,7 +367,8 @@ describe('render isolation — cross-query cache updates', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleARef = api.$queries.qA
+      const context = useDouraContext()
+      handleARef = context.store.getModel(model).$queries.qA
       rendersA++
       const { data } = useQuery(api.qA)
       return <span data-testid="a">{String(data ?? 'none')}</span>
@@ -422,7 +429,8 @@ describe('render isolation — cross-query cache updates', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleARef = api.$queries.qA
+      const context = useDouraContext()
+      handleARef = context.store.getModel(model).$queries.qA
       rendersA++
       const { data } = useQuery(api.qA)
       return <span data-testid="a-data">{String(data ?? 'none')}</span>
@@ -476,7 +484,8 @@ describe('render isolation — cross-query cache updates', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleARef = api.$queries.qA
+      const context = useDouraContext()
+      handleARef = context.store.getModel(model).$queries.qA
       rendersA++
       const { data } = useQuery(api.qA)
       return <span data-testid="a3-data">{String(data ?? 'none')}</span>
@@ -538,7 +547,8 @@ describe('render isolation — same query shared across components', () => {
 
     const CompA = () => {
       const api = useModel(model)
-      handleRef = api.$queries.shared
+      const context = useDouraContext()
+      handleRef = context.store.getModel(model).$queries.shared
       rendersA++
       const { data } = useQuery(api.shared)
       return <span data-testid="a">{String(data ?? 'none')}</span>

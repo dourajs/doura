@@ -4,7 +4,6 @@ import type {
   ModelActions,
   ModelModels,
   ModelQueryFetches,
-  ModelQueries,
   ModelState,
   ModelViews,
   StripIndexSignature,
@@ -14,9 +13,7 @@ type ModelApiFields<ModelDef extends ModelDefinition<Model>> =
   StripIndexSignature<ModelState<ModelDef>> &
     StripIndexSignature<ModelViews<ModelDef>> &
     StripIndexSignature<ModelActions<ModelDef>> &
-    StripIndexSignature<ModelQueryFetches<ModelDef>> & {
-      readonly $queries: ModelQueries<ModelDef>
-    }
+    StripIndexSignature<ModelQueryFetches<ModelDef>>
 
 // Keep each section stripped independently so optional/absent model sections
 // don't leak broad index signatures into the merged public API shape.

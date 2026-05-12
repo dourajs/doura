@@ -93,7 +93,7 @@ describe('defineModel', () => {
     ).toThrow(/key "\$options" in "actions".*reserved model definition/)
   })
 
-  it('should reject queries that conflict with action refs', () => {
+  it('should reject actions that conflict with query refs', () => {
     expect(() =>
       defineModel({
         name: 'actionQueryConflict',
@@ -107,7 +107,7 @@ describe('defineModel', () => {
           refresh: async () => 1,
         },
       } as any)
-    ).toThrow(/key "refresh" in "queries".*key in "actions"/)
+    ).toThrow(/key "refresh" in "actions".*key in "queries"/)
   })
 
   describe('composing models', () => {

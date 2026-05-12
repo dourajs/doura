@@ -35,7 +35,7 @@ describe('useModel with queries', () => {
     expect(typeof apiRef.increment).toBe('function')
   })
 
-  test('query names appear on merged API as fetch functions with $queries handles', () => {
+  test('query names appear on merged API as fetch functions only', () => {
     let apiRef: any = null
     const App = () => {
       const counter = useModel(model)
@@ -50,13 +50,9 @@ describe('useModel with queries', () => {
     )
 
     expect(apiRef.fetchData).toBeDefined()
-    expect(apiRef.fetchData).not.toBe(apiRef.$queries.fetchData)
-    expect(apiRef.$queries.fetchData._queryName).toBe('fetchData')
-    expect(apiRef.$queries.fetchData._model).toBeDefined()
-    expect(apiRef.$queries.fetchData._spec).toBeDefined()
-    expect(apiRef.$queries.fetchData._spec.fn).toBeInstanceOf(Function)
-
-    expect(apiRef.$queries.fetchUser._queryName).toBe('fetchUser')
+    expect(apiRef.$queries).toBeUndefined()
+    expect((apiRef.fetchData as any)._queryName).toBeUndefined()
+    expect((apiRef.fetchData as any)._spec).toBeUndefined()
   })
 
   test('no queries — no QueryHandles in merged API', () => {
@@ -85,9 +81,9 @@ describe('useModel with queries', () => {
 
     expect(apiRef.count).toBe(0)
     expect(typeof apiRef.inc).toBe('function')
-    // No query fetch or handle properties
+    // No query fetch or handle properties on the ModelAPI snapshot.
     expect(apiRef.fetchData).toBeUndefined()
-    expect(apiRef.$queries.fetchData).toBeUndefined()
+    expect(apiRef.$queries).toBeUndefined()
   })
 
   test('queries binding persists across state changes', () => {
@@ -121,6 +117,6 @@ describe('useModel with queries', () => {
           sameKey: (_ctx: any) => Promise.resolve('query'),
         },
       } as any)
-    ).toThrow(/key "sameKey" in "queries".*key in "actions"/)
+    ).toThrow(/key "sameKey" in "actions".*key in "queries"/)
   })
 })

@@ -2,7 +2,7 @@ import React, { StrictMode } from 'react'
 import { render, act, waitFor } from '@testing-library/react'
 import { defineModel, doura } from 'doura'
 import { createContainer } from '../src/createContainer'
-import { DouraRoot, useModel, useQuery } from '../src/index'
+import { DouraRoot, useDouraContext, useModel, useQuery } from '../src/index'
 
 // Use real timers — our tests rely on real Promise microtask flush.
 // Existing react-doura tests default to fake timers, so we override here.
@@ -193,7 +193,8 @@ describe('useQuery', () => {
 
     const App = ({ id }: { id: string }) => {
       const api = useModel(model)
-      patchHandle?.(api.$queries.fetchUser)
+      const context = useDouraContext()
+      patchHandle?.(context.store.getModel(model).$queries.fetchUser)
       useQuery(api.fetchUser, [id], { enabled: false })
       return <div id="id">{id}</div>
     }

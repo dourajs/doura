@@ -80,10 +80,10 @@ type ModelKeyConflicts<
   | KeyConflict<'queries', Q, 'state', S>
   | KeyConflict<'queries', Q, 'models', ModelChildren<Models>>
   | KeyConflict<'queries', Q, 'views', V>
-  | KeyConflict<'queries', Q, 'actions', A>
   | KeyConflict<'actions', A, 'state', S>
   | KeyConflict<'actions', A, 'models', ModelChildren<Models>>
   | KeyConflict<'actions', A, 'views', V>
+  | KeyConflict<'actions', A, 'queries', Q>
   | ReservedKeyConflict<'queries', Q>
   | ReservedKeyConflict<'actions', A>
 
@@ -234,29 +234,11 @@ function assertNoModelKeyConflicts(modelOptions: any): void {
   cacheObjectKeys(keys, 'state', modelOptions?.state)
   cacheModelKeys(keys, modelOptions?.models)
   cacheObjectKeys(keys, 'views', modelOptions?.views)
-  cacheObjectKeys(keys, 'actions', modelOptions?.actions)
   cacheObjectKeys(keys, 'queries', modelOptions?.queries)
+  cacheObjectKeys(keys, 'actions', modelOptions?.actions)
 }
 
 function defineModelReferences(modelDefinition: any, modelOptions: any): void {
-  const actions = modelOptions?.actions
-  if (actions && typeof actions === 'object') {
-    for (const actionName of Object.keys(actions)) {
-      const actionRef = () => {
-        throw new Error(
-          `Action "${actionName}" must be used with a model instance.`
-        )
-      }
-      Object.defineProperty(actionRef, DOURA_ACTION_REF, {
-        configurable: false,
-        enumerable: false,
-        writable: false,
-        value: { model: modelDefinition, actionName },
-      })
-      defineReference(modelDefinition, 'actions', actionName, actionRef)
-    }
-  }
-
   const queries = modelOptions?.queries
   if (queries && typeof queries === 'object') {
     for (const queryName of Object.keys(queries)) {
@@ -272,6 +254,24 @@ function defineModelReferences(modelDefinition: any, modelOptions: any): void {
         value: { model: modelDefinition, queryName },
       })
       defineReference(modelDefinition, 'queries', queryName, queryRef)
+    }
+  }
+
+  const actions = modelOptions?.actions
+  if (actions && typeof actions === 'object') {
+    for (const actionName of Object.keys(actions)) {
+      const actionRef = () => {
+        throw new Error(
+          `Action "${actionName}" must be used with a model instance.`
+        )
+      }
+      Object.defineProperty(actionRef, DOURA_ACTION_REF, {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: { model: modelDefinition, actionName },
+      })
+      defineReference(modelDefinition, 'actions', actionName, actionRef)
     }
   }
 }
