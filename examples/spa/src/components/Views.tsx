@@ -1,17 +1,15 @@
 import React, { useState } from 'react'
-import { defineModel, ModelData } from 'doura'
-import { useRootModel } from '../../../../packages/react-doura/esm'
+import { defineModel, ModelAPI } from 'doura'
+import { useModel } from 'react-doura'
 
 const otherDep = defineModel({
   name: 'otherDep',
   state: {
     other: ['other'],
   },
-  reducers: {
-    add: (state, step: string = 'other') => {
-      return {
-        other: [...state.other, step],
-      }
+  actions: {
+    add(step: string = 'other') {
+      this.other = [...this.other, step]
     },
   },
 })
@@ -21,56 +19,56 @@ const domeDep = defineModel({
   state: {
     dome: 0,
   },
-  reducers: {
-    add: (state, step: number = 1) => {
-      state.dome += step
+  actions: {
+    add(step: number = 1) {
+      this.dome += step
     },
   },
 })
 
-const user = defineModel(
-  {
-    name: 'user',
-    state: {
-      value: 1,
-      value1: 1,
+const user = defineModel({
+  name: 'user',
+  models: [otherDep, domeDep],
+  state: {
+    value: 1,
+    value1: 1,
+  },
+  actions: {
+    add(step: number = 1) {
+      this.value += step
     },
-    reducers: {
-      add: (state, step: number = 1) => {
-        state.value += step
-      },
-      add1: (state, step: number = 1) => {
-        state.value1 += step
-      },
-    },
-    views: {
-      viewValue1() {
-        console.log('viewValue1 computed')
-        return this.value1
-      },
-      viewDome() {
-        console.log('viewDome computed')
-        return this.$dep.domeDep.dome
-      },
+    add1(step: number = 1) {
+      this.value1 += step
     },
   },
-  [otherDep, domeDep]
-)
+  views: {
+    viewValue1() {
+      console.log('viewValue1 computed')
+      return this.value1
+    },
+    viewDome() {
+      console.log('viewDome computed')
+      return this.domeDep.dome
+    },
+  },
+})
 
-export type userSelectorParameters = ModelData<typeof user>
+export type userSelectorParameters = ModelAPI<typeof user>
 
 const selector = function (stateAndViews: userSelectorParameters) {
   return {
     v: stateAndViews.viewValue1,
     d: stateAndViews.viewDome,
+    add: stateAndViews.add,
+    add1: stateAndViews.add1,
   }
 }
 
 export default function Views() {
   const [index, setIndex] = useState(0)
-  const [stateOther, actionsOther] = useRootModel(otherDep)
-  const [stateDome, actionsDome] = useRootModel(domeDep)
-  const [views, actions] = useRootModel(user, selector)
+  const other = useModel(otherDep)
+  const dome = useModel(domeDep)
+  const views = useModel(user, selector)
 
   return (
     <div>
@@ -91,34 +89,34 @@ export default function Views() {
       </div>
       <button
         onClick={() => {
-          actions.add(1)
+          views.add(1)
         }}
       >
         changed user value
       </button>
       <button
         onClick={() => {
-          actions.add1(1)
+          views.add1(1)
         }}
       >
         changed user value1
       </button>
       <hr />
-      {JSON.stringify(stateDome)}
+      {JSON.stringify({ dome: dome.dome })}
       <hr />
       <button
         onClick={() => {
-          actionsDome.add(1)
+          dome.add(1)
         }}
       >
         trigger dome actions
       </button>
       <hr />
-      {JSON.stringify(stateOther)}
+      {JSON.stringify({ other: other.other })}
       <hr />
       <button
         onClick={() => {
-          actionsOther.add()
+          other.add()
         }}
       >
         trigger other actions

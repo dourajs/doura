@@ -1,17 +1,15 @@
 import * as React from 'react'
-import { useRootStaticModel } from '../../../../packages/react-doura/esm'
+import { useStaticModel } from 'react-doura'
 
 import { login } from '../models/login'
 
 function Login() {
   // not support Destructuring Assignment
-  const [state] = useRootStaticModel(login)
+  const state = useStaticModel(login)
   return (
     <div>
-      <h3>useRootStaticModel isLogin: {state.current.isLogin.toString()}</h3>
-      <button onClick={() => alert(state.current.isLogin)}>
-        alert isLogin
-      </button>
+      <h3>useStaticModel isLogin: {state.isLogin.toString()}</h3>
+      <button onClick={() => alert(state.isLogin)}>alert isLogin</button>
       <hr />
     </div>
   )

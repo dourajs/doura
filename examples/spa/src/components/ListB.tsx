@@ -1,31 +1,30 @@
 import * as React from 'react'
-import { ModelData } from 'doura'
-import { useModel } from '../../../../packages/react-doura/esm'
+import { ModelAPI } from 'doura'
+import { useModel } from 'react-doura'
 
 import { listB } from '../models/listB'
-export type selectorParameters = ModelData<typeof listB>
+export type selectorParameters = ModelAPI<typeof listB>
 
 const selector = function (stateAndViews: selectorParameters) {
   return {
     arr: stateAndViews.arr,
     current: stateAndViews.current,
+    addContentAsync: stateAndViews.addContentAsync,
+    choose: stateAndViews.choose,
   }
 }
 
 function ListB() {
   console.log('ListB rendered')
-  const [{ arr, current }, { addContentAsync, choose }] = useModel(
-    listB,
-    selector
-  )
+  const list = useModel(listB, selector)
   const [inputValue, setInputValue] = React.useState('')
   return (
     <div>
       <h2>
-        <strong>current: {current}</strong>
+        <strong>current: {list.current}</strong>
       </h2>
       <h3>todo listB</h3>
-      {arr.map((item) => {
+      {list.arr.map((item) => {
         return (
           <div key={item.id} style={{ padding: '5px' }}>
             <span
@@ -38,7 +37,7 @@ function ListB() {
             </span>
             <button
               onClick={() => {
-                choose(item.id)
+                list.choose(item.id)
               }}
             >
               choose
@@ -58,7 +57,7 @@ function ListB() {
         onClick={() => {
           const val = inputValue
           setInputValue('')
-          addContentAsync(val)
+          list.addContentAsync(val)
         }}
       >
         add content

@@ -1,16 +1,20 @@
 import { useMemo, useRef } from 'react'
-import { doura, AnyModel, Selector, Doura } from 'doura'
+import {
+  doura,
+  type Model,
+  type ModelDefinition,
+  type Selector,
+  type Doura,
+} from 'doura'
 import { createUseModel } from './createUseModel'
-import { UseAnonymousModel, UseModel, UseStaticModel } from './types'
+import type { UseDetachedModel, UseModel, UseStaticModel } from './types'
 import { DouraRoot, useRootModel, useRootStaticModel } from './global'
 
-const ANONYMOUS_MODEL_NAME = 'anonymous model'
-
-const useAnonymousModel: UseAnonymousModel = <
-  IModel extends AnyModel,
-  S extends Selector<IModel>
+const useDetachedModel: UseDetachedModel = <
+  ModelDef extends ModelDefinition<Model>,
+  S extends Selector<ModelDef>,
 >(
-  model: IModel,
+  model: ModelDef,
   selector?: S,
   depends?: any[]
 ) => {
@@ -26,30 +30,25 @@ const useAnonymousModel: UseAnonymousModel = <
     }
   }
 
-  // The anonymous store is created via doura() with no plugins, so there are
+  // The detached store is created via doura() with no plugins, so there are
   // no onDestroy hooks or external subscriptions to clean up. All resources
   // (draft watchers, effect scope, model state) are only reachable through
   // this useRef and will be GC'd when the component unmounts.
   // View cleanup is handled by useModelWithSelector's own useEffect.
 
-  return useMemo(
-    function () {
-      return createUseModel(context.current!.douraStore)
-    },
-    [context.current.douraStore]
-  )(ANONYMOUS_MODEL_NAME, model, selector, depends)
+  return useMemo(() => createUseModel(context.current!.douraStore), [])(
+    model,
+    selector,
+    depends
+  )
 }
 
-const useModel = ((name: any, model: any, selector?: any, depends?: any) => {
-  if (typeof name === 'string') {
-    return useRootModel(name, model, selector, depends)
-  }
-
-  return useAnonymousModel(name, model, selector)
+const useModel = ((model: any, selector?: any, depends?: any) => {
+  return useRootModel(model, selector, depends)
 }) as UseModel
 
-const useStaticModel: UseStaticModel = (name, model) => {
-  return useRootStaticModel(name, model)
+const useStaticModel: UseStaticModel = (model) => {
+  return useRootStaticModel(model)
 }
 
-export { DouraRoot, useModel, useStaticModel }
+export { DouraRoot, useModel, useDetachedModel, useStaticModel }

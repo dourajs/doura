@@ -23,7 +23,7 @@ function hasStorage(storageType: string) {
     storage.setItem(testKey, 'test')
     storage.getItem(testKey)
     storage.removeItem(testKey)
-  } catch (e) {
+  } catch {
     if (process.env.NODE_ENV === 'development')
       console.warn(
         `persist ${storageType} test failed, persistence will be disabled.`

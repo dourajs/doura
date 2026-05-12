@@ -8,7 +8,8 @@ Doura has taken a very different way to do reactivity. Fortunately, We won't nee
 Considering the following example:
 
 ```ts
-const user = defineModel({
+const userModel = defineModel({
+  name: 'user',
   state: {
     count: 0,
     user: {
@@ -30,7 +31,8 @@ But that's not how Doura works. Internally, `userName` will track the update of 
 For the sake of performance, we need to explicitly mark out the `user` from the reactivity tracking system. Here is how you can do this:
 
 ```ts
-const user = defineModel({
+const userModel = defineModel({
+  name: 'user',
   state: {
     count: 0,
     user: {

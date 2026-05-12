@@ -1,4 +1,4 @@
-import { defineModel, modelManager, use } from '../index'
+import { defineModel, modelManager } from '../index'
 import { nextTick } from '../scheduler'
 import { isDraft } from '../../reactivity'
 
@@ -19,6 +19,7 @@ afterAll(() => {
 describe('defineModel/views', () => {
   it('should receive state as first params', () => {
     const count = defineModel({
+      name: 'test',
       state: {
         count: 1,
       },
@@ -28,53 +29,9 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', count)
+    const store = modelMgr.getModel(count)
 
     expect(store.double).toBe(2)
-  })
-
-  it('should receive external params', () => {
-    const count = defineModel({
-      state: {
-        count: 1,
-      },
-      views: {
-        double(s, a: number) {
-          return s.count * a
-        },
-      },
-    })
-    const store = modelMgr.getModel('test', count)
-
-    expect(typeof store.double).toBe('function')
-    expect(store.double(2)).toBe(2)
-    expect(
-      'The double in the views is using additional parameters.'
-    ).toHaveBeenWarned()
-  })
-
-  // fixme: this test is not working
-  it('receive external params - return same ref when params does not change', () => {
-    const count = defineModel({
-      state: {
-        count: 1,
-      },
-      views: {
-        double(s, a: number) {
-          return {}
-        },
-      },
-    })
-    const store = modelMgr.getModel('test', count)
-
-    expect(typeof store.double).toBe('function')
-    const a = store.double(2)
-    expect(store.double(2)).toBe(a)
-    const b = store.double(3)
-    expect(store.double(3)).toBe(b)
-    expect(
-      'The double in the views is using additional parameters.'
-    ).toHaveBeenWarned()
   })
 
   it('should warn when changing state in a view', () => {
@@ -82,6 +39,7 @@ describe('defineModel/views', () => {
       a: 0,
     }
     const model = defineModel({
+      name: 'test',
       state: initState,
       views: {
         view() {
@@ -90,7 +48,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(() => store.view).toThrow()
     expect(
       'Attempting to change state "a". State are readonly in "views"'
@@ -102,6 +60,7 @@ describe('defineModel/views', () => {
       a: 0,
     }
     const model = defineModel({
+      name: 'test',
       state: initState,
       actions: {
         set(v: number) {
@@ -115,15 +74,92 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(store.view).toEqual(0)
     expect(
       'Action "set" is called in view function, it will be ignored and has no effect.'
     ).toHaveBeenWarned()
   })
 
+  it('should warn when calling query fetch in a view', () => {
+    const fetchUser = jest.fn(async () => ({ id: 1 }))
+    const model = defineModel({
+      name: 'test',
+      state: {
+        a: 0,
+      },
+      queries: {
+        fetchUser,
+      },
+      views: {
+        view() {
+          void (this as any).fetchUser()
+          return this.a
+        },
+      },
+    })
+    const store = modelMgr.getModel(model)
+
+    expect(store.view).toEqual(0)
+    expect(fetchUser).not.toHaveBeenCalled()
+    expect(store.$queries.fetchUser.getState()).toBeUndefined()
+    expect(
+      'Query "fetchUser.fetch" is called in view function, it will be ignored and has no effect.'
+    ).toHaveBeenWarned()
+  })
+
+  it('should warn when mutating query cache in a view', () => {
+    const model = defineModel({
+      name: 'test',
+      state: {
+        a: 0,
+      },
+      queries: {
+        fetchUser: async () => ({ id: 1 }),
+      },
+      views: {
+        view() {
+          ;(this as any).$queries.fetchUser.setData({ id: 1 })
+          return this.a
+        },
+      },
+    })
+    const store = modelMgr.getModel(model)
+
+    expect(store.view).toEqual(0)
+    expect(store.$queries.fetchUser.getData()).toBeUndefined()
+    expect(
+      'Query "fetchUser.setData" is called in view function, it will be ignored and has no effect.'
+    ).toHaveBeenWarned()
+  })
+
+  it('should warn when reading query cache in a view', () => {
+    const model = defineModel({
+      name: 'test',
+      state: {
+        a: 0,
+      },
+      queries: {
+        fetchUser: async () => ({ id: 1 }),
+      },
+      views: {
+        view() {
+          return (this as any).$queries.fetchUser.getData()
+        },
+      },
+    })
+    const store = modelMgr.getModel(model)
+    store.$queries.fetchUser.setData({ id: 1 })
+
+    expect(store.view).toBeUndefined()
+    expect(
+      'Query "fetchUser.getData" is called in view function, it will be ignored and has no effect.'
+    ).toHaveBeenWarned()
+  })
+
   it('should warn when return "this" or "this.$state"', () => {
     const model = defineModel({
+      name: 'test',
       state: {
         a: {},
       },
@@ -137,7 +173,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const modelStore = modelMgr.getModel('test', model)
+    const modelStore = modelMgr.getModel(model)
 
     void modelStore.This
     expect(
@@ -151,6 +187,7 @@ describe('defineModel/views', () => {
 
   it('should return same reference if no update', () => {
     const model = defineModel({
+      name: 'test',
       state: {
         a: { foo: 'bar' },
         b: 1,
@@ -167,7 +204,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     const value = store.viewA
     store.changeB()
@@ -176,6 +213,7 @@ describe('defineModel/views', () => {
 
   it('should always return same reference if no depends', () => {
     const model = defineModel({
+      name: 'test',
       state: {
         a: { foo: 'bar' },
         b: 1,
@@ -194,7 +232,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     const value = store.test
     store.changeB()
@@ -207,6 +245,7 @@ describe('defineModel/views', () => {
   it("should not be invoked when deps don't change", () => {
     let calltime = 0
     const model = defineModel({
+      name: 'test',
       state: {
         a: 0,
         b: 1,
@@ -223,7 +262,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     expect(calltime).toBe(0)
     store.doubleB
@@ -233,35 +272,10 @@ describe('defineModel/views', () => {
     expect(calltime).toBe(1)
   })
 
-  it("should not be invoked when extra args don't change", () => {
-    let calltime = 0
-    const model = defineModel({
-      state: {
-        b: 1,
-      },
-      actions: {},
-      views: {
-        doubleB(s, n: number) {
-          calltime++
-          return s.b * n
-        },
-      },
-    })
-    const store = modelMgr.getModel('test', model)
-
-    expect(calltime).toBe(0)
-    store.doubleB(1)
-    expect(calltime).toBe(1)
-    store.doubleB(1)
-    expect(calltime).toBe(1)
-    expect(
-      'The doubleB in the views is using additional parameters.'
-    ).toHaveBeenWarned()
-  })
-
   it("should not be invoked when deps don't change (complex)", () => {
     let sampleComputeTimes = 0
     const model = defineModel({
+      name: 'test',
       state: {
         value: 0,
         value1: {
@@ -284,7 +298,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     expect(sampleComputeTimes).toBe(0)
     store.sampleView
@@ -297,6 +311,7 @@ describe('defineModel/views', () => {
   it("should not be invoked when deps don't change (nested views)", () => {
     let selfViewComputeTimes = 0
     const model = defineModel({
+      name: 'test',
       state: {
         value: 0,
         value1: {
@@ -321,7 +336,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     expect(selfViewComputeTimes).toBe(0)
 
@@ -335,6 +350,7 @@ describe('defineModel/views', () => {
   it("should not be invoked when deps don't change (this.$state())", () => {
     let calltime = 0
     const model = defineModel({
+      name: 'test',
       state: {
         foo: 'bar',
       },
@@ -351,7 +367,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(calltime).toBe(0)
     store.getFoo
     store.getFoo
@@ -367,6 +383,7 @@ describe('defineModel/views', () => {
     let calltimeB = 0
     let calltimeC = 0
     const model = defineModel({
+      name: 'test',
       state: {
         a: 0,
         b: {},
@@ -400,7 +417,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     expect(calltimeC).toBe(0)
     const originC = store.viewC
@@ -432,6 +449,7 @@ describe('defineModel/views', () => {
       a: 0,
     }
     const model = defineModel({
+      name: 'test',
       state: initState,
       actions: {
         replace(newState: any) {
@@ -444,7 +462,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(store.view).toStrictEqual(0)
     const newState = { a: 2 }
     store.replace(newState)
@@ -454,6 +472,7 @@ describe('defineModel/views', () => {
   it('should return last value (using this.$state in view)', () => {
     let numberOfCalls = 0
     const model = defineModel({
+      name: 'test',
       state: {
         other: 'other value',
         level1: {
@@ -482,7 +501,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     expect(numberOfCalls).toBe(0)
     store.getOther
@@ -511,6 +530,7 @@ describe('defineModel/views', () => {
     const fn = jest.fn()
     let initState = {}
     const model = defineModel({
+      name: 'test',
       state: initState as { a: number },
       views: {
         view() {
@@ -519,7 +539,7 @@ describe('defineModel/views', () => {
         },
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(fn).toHaveBeenCalledTimes(0)
 
     expect(store.view).toBeUndefined()
@@ -532,8 +552,9 @@ describe('defineModel/views', () => {
   })
 
   describe('view with depends', () => {
-    it('should not be invoked if no dep update', () => {
+    it('should be invoked when shared dependency updates', () => {
       const modelA = defineModel({
+        name: 'a',
         state: {
           value: 0,
         },
@@ -544,31 +565,30 @@ describe('defineModel/views', () => {
         },
       })
       let calltime = 0
-      const model = defineModel(() => {
-        const a = use(modelA)
-
-        return {
-          state: {},
-          views: {
-            viewA() {
-              calltime++
-              return a.value
-            },
+      const model = defineModel({
+        name: 'test',
+        state: {},
+        models: [modelA],
+        views: {
+          viewA() {
+            calltime++
+            return this.a.value
           },
-        }
+        },
       })
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       expect(calltime).toBe(0)
       store.viewA
       expect(calltime).toBe(1)
-      modelMgr.getModel('a', modelA).inc()
+      modelMgr.getModel(modelA).inc()
       store.viewA
-      expect(calltime).toBe(1)
+      expect(calltime).toBe(2)
     })
 
     it('should return last state', () => {
       const modelA = defineModel({
+        name: 'a',
         state: {
           a: 0,
         },
@@ -583,19 +603,18 @@ describe('defineModel/views', () => {
           },
         },
       })
-      const model = defineModel(() => {
-        const a = use('a', modelA)
-        return {
-          state: {},
-          views: {
-            viewA() {
-              return a.doubleA
-            },
+      const model = defineModel({
+        name: 'test',
+        state: {},
+        models: [modelA],
+        views: {
+          viewA() {
+            return this.a.doubleA
           },
-        }
+        },
       })
-      const store = modelMgr.getModel('test', model)
-      const storeA = modelMgr.getModel('a', modelA)
+      const store = modelMgr.getModel(model)
+      const storeA = modelMgr.getModel(modelA)
       expect(store.viewA).toBe(0)
       storeA.changeA()
       expect(storeA.doubleA).toBe(2)
@@ -606,6 +625,7 @@ describe('defineModel/views', () => {
   describe('array', () => {
     it('should return a new array when it is modified', async () => {
       const model = defineModel({
+        name: 'test',
         state: {
           numbers: [1, 2],
         },
@@ -621,7 +641,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       let value = store.nums
       expect(value).toEqual([1, 2])
@@ -636,6 +656,7 @@ describe('defineModel/views', () => {
 
     it('should return a new array when an existing element is modified', async () => {
       const todo = defineModel({
+        name: 'todo',
         state: {
           todos: [{ id: 0, finished: false }],
           nextId: 0,
@@ -655,7 +676,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const store = modelMgr.getModel('todo', todo)
+      const store = modelMgr.getModel(todo)
 
       let value = store.allTodos
       expect(value).toEqual([{ id: 0, finished: false }])
@@ -668,6 +689,7 @@ describe('defineModel/views', () => {
 
     it('should return a new array when a new element is modified', async () => {
       const todo = defineModel({
+        name: 'todo',
         state: {
           todos: [] as { id: number; finished: boolean }[],
           nextId: 0,
@@ -693,7 +715,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const store = modelMgr.getModel('todo', todo)
+      const store = modelMgr.getModel(todo)
 
       expect(store.allTodos).toEqual([])
       store.addTodo()
@@ -715,6 +737,7 @@ describe('defineModel/views', () => {
       let numberOfCalls = 0
 
       const arrayModel = defineModel({
+        name: 'array',
         state: [0, 1],
         actions: {
           doNothing: () => {},
@@ -727,7 +750,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const arrayStore = modelMgr.getModel('array', arrayModel)
+      const arrayStore = modelMgr.getModel(arrayModel)
 
       expect(numberOfCalls).toBe(0)
       expect(arrayStore.double).toEqual([0, 2])
@@ -742,6 +765,7 @@ describe('defineModel/views', () => {
       let numberOfCalls = 0
 
       const arrayModel = defineModel({
+        name: 'array',
         state: [0],
         actions: {
           remove(payload: number) {
@@ -759,7 +783,7 @@ describe('defineModel/views', () => {
         },
       })
 
-      const arrayStore = modelMgr.getModel('array', arrayModel)
+      const arrayStore = modelMgr.getModel(arrayModel)
 
       expect(numberOfCalls).toBe(0)
       expect(arrayStore.double).toEqual([0])
@@ -819,6 +843,7 @@ describe('defineModel/views', () => {
   // ---------------------------------------------------------------
   it('known limitation: view returns stale snapshot after draft is moved to a different parent', () => {
     const model = defineModel({
+      name: 'test',
       state: {
         a: { nested: { x: 1 } },
         b: {} as any,
@@ -843,7 +868,7 @@ describe('defineModel/views', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     // After move(), the view correctly picks up the new subtree.
     store.move()
@@ -868,11 +893,12 @@ describe('defineModel/views', () => {
 describe('createView', () => {
   it('should not return a draft', () => {
     const model = defineModel({
+      name: 'test',
       state: {
         a: {},
       },
     })
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     const view = store.$createView((s) => s.a)
     expect(isDraft(view())).toBeFalsy()
@@ -885,6 +911,7 @@ describe('createView', () => {
 
     it('should remove view from viewInstances when destroyed', () => {
       const model = defineModel({
+        name: 'test',
         state: { value: 1 },
         views: {
           double() {
@@ -892,7 +919,7 @@ describe('createView', () => {
           },
         },
       })
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const internal = getModelInternal('test')
       const baseline = internal.viewInstances.length
 
@@ -905,9 +932,10 @@ describe('createView', () => {
 
     it('should not accumulate viewInstances across create/destroy cycles', () => {
       const model = defineModel({
+        name: 'test',
         state: { value: 1 },
       })
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const internal = getModelInternal('test')
       const baseline = internal.viewInstances.length
 
@@ -923,6 +951,7 @@ describe('createView', () => {
   describe('getApi() cache invalidation with cross-model dependencies', () => {
     test('parent $getApi() should reflect child state changes', async () => {
       const childModel = defineModel({
+        name: 'child',
         state: { count: 0 },
         actions: {
           inc() {
@@ -931,20 +960,19 @@ describe('createView', () => {
         },
       })
 
-      const parentModel = defineModel(() => {
-        const child = use('child', childModel)
-        return {
-          state: { value: 1 },
-          views: {
-            childCount() {
-              return child.count
-            },
+      const parentModel = defineModel({
+        name: 'parent',
+        state: { value: 1 },
+        models: [childModel],
+        views: {
+          childCount() {
+            return this.child.count
           },
-        }
+        },
       })
 
-      const child = modelMgr.getModel('child', childModel)
-      const parent = modelMgr.getModel('parent', parentModel)
+      const child = modelMgr.getModel(childModel)
+      const parent = modelMgr.getModel(parentModel)
 
       // Initial: parent view reads child.count = 0
       const api1 = parent.$getApi()
@@ -961,8 +989,8 @@ describe('createView', () => {
   })
 
   /**
-   * Validates the "no-arg view returning a closure" pattern as an alternative
-   * to the soon-to-be-deprecated parameterized view.
+   * Validates the "no-arg view returning a closure" pattern for dynamic
+   * lookups.
    *
    * Shape: `getById: (s) => (id) => s.users[id]`
    *
@@ -979,6 +1007,7 @@ describe('createView', () => {
 
     it('re-runs a sibling view when the tracked entry is replaced (same model)', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
           activeId: 'a',
@@ -1000,7 +1029,7 @@ describe('createView', () => {
         },
       })
       let calls = 0
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       expect(store.activeUser).toEqual({ name: 'Alice' })
       expect(calls).toBe(1)
@@ -1017,6 +1046,7 @@ describe('createView', () => {
 
     it('re-runs a sibling view on deep change when leaf is read (same model)', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           users: {
             a: { name: 'Alice' },
@@ -1041,7 +1071,7 @@ describe('createView', () => {
         },
       })
       let calls = 0
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       expect(store.activeName).toBe('Alice')
       expect(calls).toBe(1)
@@ -1064,6 +1094,7 @@ describe('createView', () => {
 
     it('external caller (no active effect) just reads current value, no subscription', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
         },
@@ -1076,7 +1107,7 @@ describe('createView', () => {
           getById: (s) => (id: string) => s.users[id],
         },
       })
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       // Direct external call returns a live snapshot view of the current state
       expect(store.getById('a')).toEqual({ name: 'Alice' })
@@ -1091,6 +1122,7 @@ describe('createView', () => {
 
     it('rebuilds when the tracked entry is replaced (cross-model)', () => {
       const modelA = defineModel({
+        name: 'a',
         state: {
           users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
         },
@@ -1105,21 +1137,20 @@ describe('createView', () => {
       })
 
       let calls = 0
-      const modelB = defineModel(() => {
-        const a = use('a', modelA)
-        return {
-          state: { activeId: 'a' },
-          views: {
-            activeUser() {
-              calls++
-              return a.getById(this.activeId) // only reads users[id]
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { activeId: 'a' },
+        models: [modelA],
+        views: {
+          activeUser() {
+            calls++
+            return this.a.getById(this.activeId) // only reads users[id]
           },
-        }
+        },
       })
 
-      const a = modelMgr.getModel('a', modelA)
-      const b = modelMgr.getModel('b', modelB)
+      const a = modelMgr.getModel(modelA)
+      const b = modelMgr.getModel(modelB)
 
       expect(b.activeUser).toEqual({ name: 'Alice' })
       expect(calls).toBe(1)
@@ -1136,6 +1167,7 @@ describe('createView', () => {
 
     it('rebuilds when a deep field is read inside the view (cross-model)', () => {
       const modelA = defineModel({
+        name: 'a',
         state: {
           users: {
             a: { name: 'Alice' },
@@ -1153,26 +1185,25 @@ describe('createView', () => {
       })
 
       let calls = 0
-      const modelB = defineModel(() => {
-        const a = use('a', modelA)
-        return {
-          state: { activeId: 'a' },
-          actions: {
-            setActive(id: string) {
-              this.activeId = id
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { activeId: 'a' },
+        models: [modelA],
+        actions: {
+          setActive(id: string) {
+            this.activeId = id
           },
-          views: {
-            activeName() {
-              calls++
-              return a.getById(this.activeId).name // reads the leaf
-            },
+        },
+        views: {
+          activeName() {
+            calls++
+            return this.a.getById(this.activeId).name // reads the leaf
           },
-        }
+        },
       })
 
-      const a = modelMgr.getModel('a', modelA)
-      const b = modelMgr.getModel('b', modelB)
+      const a = modelMgr.getModel(modelA)
+      const b = modelMgr.getModel(modelB)
 
       expect(b.activeName).toBe('Alice')
       expect(calls).toBe(1)
@@ -1201,55 +1232,6 @@ describe('createView', () => {
       a.rename('a', 'AliceX')
       expect(b.activeName).toBe('Bob2')
       expect(calls).toBe(3)
-    })
-
-    it('same granularity limit applies to parameterized views (not a closure issue)', () => {
-      const modelA = defineModel({
-        state: {
-          users: { a: { name: 'Alice' } } as Record<string, { name: string }>,
-        },
-        actions: {
-          rename(id: string, name: string) {
-            this.users[id].name = name
-          },
-        },
-        views: {
-          // Parameterized view form (emits deprecation warning in dev)
-          getByIdParam(s, id: string) {
-            return s.users[id]
-          },
-        },
-      })
-
-      let calls = 0
-      const modelB = defineModel(() => {
-        const a = use('a', modelA)
-        return {
-          state: { activeId: 'a' },
-          views: {
-            activeUser() {
-              calls++
-              return a.getByIdParam(this.activeId) // only reads users[id]
-            },
-          },
-        }
-      })
-
-      const a = modelMgr.getModel('a', modelA)
-      const b = modelMgr.getModel('b', modelB)
-
-      expect(b.activeUser).toEqual({ name: 'Alice' })
-      expect(calls).toBe(1)
-
-      // Mutating users.a.name only triggers (users.a, 'name').
-      // The view read users[id] one level above, so it does NOT re-run.
-      // This proves the limitation is access depth, not closure vs param.
-      a.rename('a', 'Alice2')
-      expect(calls).toBe(1)
-
-      expect(
-        'The getByIdParam in the views is using additional parameters.'
-      ).toHaveBeenWarned()
     })
   })
 })

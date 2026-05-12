@@ -1,6 +1,7 @@
-import { AnyObjectModel } from '../modelOptions'
+import { Model } from '../modelOptions'
 import { ModelInternal, ActionType, ModelInternalOptions } from '../model'
 import { nextTick } from '../scheduler'
+import { defineModel } from '../defineModel'
 
 let oldEnv: any
 beforeAll(() => {
@@ -11,10 +12,20 @@ afterAll(() => {
   process.env.NODE_ENV = oldEnv
 })
 
+type TestModelOptions = Record<string, any> & { name?: string }
+
+let modelId = 0
 const createModel = (
-  model: AnyObjectModel,
+  model: TestModelOptions,
   options: ModelInternalOptions = {}
-) => new ModelInternal(model, options)
+) =>
+  new ModelInternal(
+    defineModel({
+      name: model.name || `model-${++modelId}`,
+      ...model,
+    } as any).$options as Model,
+    options
+  )
 
 export const sleep = (time: number) =>
   new Promise((resolve) => {
@@ -76,6 +87,71 @@ describe('model', () => {
       arr: [1, 2],
       firstOfArr: 1,
     })
+  })
+
+  test('direct access resolves each model member kind', async () => {
+    const makeChild = (name: string) =>
+      createModel({
+        name,
+        state: { value: name },
+      })
+
+    const modelKeyChild = makeChild('modelKey')
+
+    const model = createModel(
+      {
+        state: {
+          stateKey: 'state',
+        },
+        views: {
+          viewKey() {
+            return 'view'
+          },
+        },
+        actions: {
+          actionKey() {
+            return 'action'
+          },
+        },
+        queries: {
+          queryKey: async () => 'query',
+        },
+      },
+      {
+        models: {
+          modelKey: modelKeyChild.publicInst,
+        },
+        modelProxies: {
+          modelKey: modelKeyChild.proxy,
+        },
+      }
+    )
+    const api = model.proxy as any
+
+    expect(api.stateKey).toBe('state')
+    expect(api.modelKey).toBe(modelKeyChild.proxy)
+    expect(api.viewKey).toBe('view')
+    expect(api.actionKey()).toBe('action')
+    await expect(api.queryKey()).resolves.toBeUndefined()
+
+    expect(api.$views.viewKey).toBe('view')
+    expect(api.$actions.actionKey()).toBe('action')
+    expect(api.$queries.queryKey).toBeDefined()
+    expect(api.$queries.queryKey).not.toBe(api.queryKey)
+    expect(api.$models.modelKey).toBe(modelKeyChild.publicInst)
+
+    expect(() => {
+      api.viewKey = 'new'
+    }).toThrow()
+    expect('Attempting to mutate view "viewKey"').toHaveBeenWarned()
+
+    expect(() => {
+      api.modelKey = 'new'
+    }).toThrow()
+    expect('Attempting to mutate model "modelKey"').toHaveBeenWarned()
+
+    model.replace({})
+    expect(api.stateKey).toBeUndefined()
   })
 
   describe('isolate', () => {
@@ -419,6 +495,54 @@ describe('model', () => {
       expect(api4).toBe(api3)
     })
 
+    it('should expose actions and query fetches in getApi()', async () => {
+      const model = createModel({
+        state: { value: 1 },
+        actions: {
+          actionKey() {
+            return 'action'
+          },
+        },
+        queries: {
+          queryKey: async () => 'query',
+        },
+      })
+
+      const api = model.getApi() as any
+
+      expect(api.actionKey()).toBe('action')
+      expect(api.actionKey).toBe((model.actions as any).actionKey)
+      expect(api.queryKey).not.toBe((model.queries as any).queryKey)
+      await expect(api.queryKey()).resolves.toBeUndefined()
+    })
+
+    it('should not expose child models in getApi()', () => {
+      const child = createModel({
+        name: 'child',
+        state: { value: 1 },
+      })
+      const model = createModel(
+        {
+          state: { value: 1 },
+        },
+        {
+          models: {
+            child: child.publicInst,
+          },
+          modelProxies: {
+            child: child.proxy,
+          },
+        }
+      )
+
+      const api = model.getApi() as any
+
+      expect(api.child).toBeUndefined()
+      expect(api.$models).toBeUndefined()
+      expect((model.publicInst as any).child).toBe(child.publicInst)
+      expect((model.publicInst as any).$models.child).toBe(child.publicInst)
+    })
+
     it('should reuse action references across getApi() rebuilds', () => {
       const model = createModel({
         state: { value: 1 },
@@ -459,7 +583,7 @@ describe('model', () => {
       const pub = model.publicInst
 
       // Cache 'data' as STATE
-      expect(pub.data).toBe(1)
+      expect((pub as any).data).toBe(1)
 
       // Replace state — 'data' removed
       ;(model.actions as any).replaceFull({ other: 2 })
@@ -470,7 +594,7 @@ describe('model', () => {
       // With the bug: accessCache has data=STATE, returns state.data (undefined)
       //   instead of falling through to ctx where data='from-ctx'
       // Without the bug: cache is invalidated, falls through to ctx
-      expect(pub.data).toBe('from-ctx')
+      expect((pub as any).data).toBe('from-ctx')
     })
   })
 

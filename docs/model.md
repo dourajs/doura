@@ -2,7 +2,7 @@
 
 源码位置：`packages/doura/src/core/`
 
-Model 是 doura 的核心抽象单元。一个 model 定义了 state + actions + views，由 `ModelInternal` 实例化并管理运行时生命周期。
+Model 是 doura 的核心抽象单元。一个 model definition 定义了 state + actions + views + queries + child models，由 `ModelInternal` 实例化并管理运行时生命周期。
 
 ---
 
@@ -10,23 +10,26 @@ Model 是 doura 的核心抽象单元。一个 model 定义了 state + actions +
 
 > `core/defineModel.ts`
 
-`defineModel({ state, actions?, views? })` 是一个 **identity function**，零运行时开销。它的唯一作用是为 TypeScript 提供类型推断：action 中 `this` 的类型、view 的返回类型、`useModel` 的结果类型。
+`defineModel({ name, state, models?, actions?, views?, queries? }, setup?)` 主要作用是为 TypeScript 提供类型推断：action 中 `this` 的类型、view 的返回类型、组合 model 的实例类型、query fetch/handle 的参数与返回值、`useModel` 的结果类型。运行时做三件事：1) 调用 `decorateModelQueries` 将 query 函数规范化为内部 `{ fn }` 结构；2) 在 define 阶段检查 state/models/views/actions/queries 的 key 冲突、重复 child model、`$options` definition ref 命名冲突；3) 如果提供了 `setup` 回调则执行它（用于 `model.setQueryOptions`）。返回 `ModelDefinition` wrapper，原始 model options 保存在非枚举的 `definition.$options`。
 
-两种 model 形式：
+Store 只接受 `defineModel()` 返回的 `ModelDefinition`。原始 object/function model 不能直接传给 `store.getModel()` 或 `getDetachedModel()`：
 
-- **ObjectModel**: `defineModel({ state, actions, views })` — 直接声明
-- **FunctionModel**: `defineModel(() => { use(...); return { state, actions, views } })` — 函数形式，支持 `use()` 组合
+- **Model**: `{ name, state, models, actions, views, queries }`
+- **ModelDefinition**: `defineModel(model, setup?)` 的返回值
+- **definition.$options**: 原始 options；`$options` 是 definition 的保留字段
+- `models: [childModel]` 使用子 model 的 `childModel.$options.name` 作为 key，暴露为 `this.childName`、`instance.childName` 和 `instance.$models.childName`
+- `definition.actionName` / `definition.queryName` 是 React hooks 可解析的 definition ref；必须在 Provider context 下绑定到当前 store
 
 ---
 
 ## 2. ModelInternal — 运行时实例
 
-> `core/model.ts:161-607`
+> `core/model.ts`
 
 ### 构造流程
 
 ```ts
-// model.ts:203-244（简化）
+// model.ts（简化）
 constructor(model, { name, initState }) {
   // 1. 创建 draft — state 被包装在 { value: initState } 中
   this.stateRef = draft({ value: initState || model.state })
@@ -40,9 +43,11 @@ constructor(model, { name, initState }) {
   this.proxy = new Proxy(ctx, InternalInstanceProxyHandlers)   // action/view 的 this
   this.publicInst = new Proxy(ctx, PublicInstanceProxyHandlers) // 外部 API
 
-  // 4. 初始化 actions 和 views
+  // 4. 初始化 models、actions、views 和 queries
+  this._initModels()
   this._initActions()
   this._initViews()
+  this._initQueries()
 }
 ```
 
@@ -50,7 +55,7 @@ constructor(model, { name, initState }) {
 
 ### Action 执行
 
-`model.ts:508-557` 的 `_initActions()`：
+`model.ts:654-684` 的 `_initActions()`：
 
 ```
 action 调用
@@ -69,13 +74,13 @@ action 调用
           }
 ```
 
-**为什么 depth=0 时同步刷新？** 如果依赖 microtask 延迟刷新，调用者在 action 返回后立即读取 state 会拿到旧值。同步 `invalidateJob` + `_update` 保证 action 完成后 snapshot 立即可用。这也防止了 [valtio#270](https://github.com/pmndrs/valtio/issues/270) 类似的问题（注释见 `model.ts:544`）。
+**为什么 depth=0 时同步刷新？** 如果依赖 microtask 延迟刷新，调用者在 action 返回后立即读取 state 会拿到旧值。同步 `invalidateJob` + `_update` 保证 action 完成后 snapshot 立即可用。这也防止了 [valtio#270](https://github.com/pmndrs/valtio/issues/270) 类似的问题（注释见 `model.ts:644`）。
 
 **为什么用 depth 计数？** 嵌套 action（action A 调用 action B）只在最外层完成时刷新一次，避免中间状态产生不必要的 snapshot。
 
-### _update — 状态转换
+### \_update — 状态转换
 
-`model.ts:491-500`：
+`model.ts:595-604`：
 
 ```ts
 _update() {
@@ -87,7 +92,7 @@ _update() {
 
 ### dispatch — 状态分发
 
-`model.ts:427-463`：
+`model.ts:511-547`：
 
 1. `this.reducer(currentState, action)` — 根据 action type 生成新 state
 2. 引用比较 `nextState !== currentState`
@@ -96,15 +101,15 @@ _update() {
 
 ### reducer
 
-`model.ts:408-425`：
+`model.ts:494-508`：
 
-| Action Type | 行为 |
-|-------------|------|
-| `MODIFY` | `snapshot(stateRef.value, stateRef.value, lastDraftToSnapshot)` — 从 draft 生成不可变 snapshot |
-| `PATCH` | 同 MODIFY（patch 已在 `patch()` 方法中直接修改了 draft） |
-| `REPLACE` | 直接返回 `action.payload`（新的 plain object） |
+| Action Type | 行为                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `MODIFY`    | `snapshot(stateRef.value, stateRef.value, lastDraftToSnapshot)` — 从 draft 生成不可变 snapshot |
+| `PATCH`     | 同 MODIFY（patch 已在 `patch()` 方法中直接修改了 draft）                                       |
+| `REPLACE`   | 直接返回 `action.payload`（新的 plain object）                                                 |
 
-`lastDraftToSnapshot` (`model.ts:201`) 是 snapshot 缓存 Map，实现跨 dispatch 的结构共享。
+`lastDraftToSnapshot` 是 snapshot 缓存 Map，实现跨 dispatch 的结构共享。
 
 ---
 
@@ -114,10 +119,10 @@ _update() {
 
 ### 为什么需要两层？
 
-- **Internal Proxy** (`InternalInstanceProxyHandlers`, `model.ts:232-235`): action/view 内部的 `this`。读取 `stateValue`（可变 draft），允许直接修改。
-- **Public Proxy** (`PublicInstanceProxyHandlers`, `model.ts:236-239`): 外部消费者的 API。读取 `getState()`（不可变 snapshot），不可直接修改。
+- **Internal Proxy** (`InternalInstanceProxyHandlers`): action/view 内部的 `this`。读取 `stateValue`（可变 draft），允许直接修改。
+- **Public Proxy** (`PublicInstanceProxyHandlers`): 外部消费者的 API。读取 `getState()`（不可变 snapshot），不可直接修改。
 
-两者共用同一个 `set` handler，但 `get` handler 的数据源不同（`modelPublicInstance.ts:62-113`）：
+两者共用同一个 `set` handler，但 `get` handler 的数据源不同：
 
 ```ts
 const createGetter = (isPublicInstance: boolean) =>
@@ -125,18 +130,18 @@ const createGetter = (isPublicInstance: boolean) =>
     // public 读 getState()（snapshot），internal 读 stateValue（draft）
     let state = isPublicInstance ? instance.getState() : instance.stateValue
 
-    // 按优先级查找：accessCache → state → views → actions → ctx → $ 属性
+    // 按优先级查找：state → accessCache → views/actions/queryFetches/models/ctx → $ 属性
     ...
   }
 ```
 
 ### accessCache
 
-`modelPublicInstance.ts:76-94`: 首次访问某个 key 时确定它是 STATE/VIEW/ACTION/CONTEXT 哪种类型，缓存到 `accessCache`。后续访问直接 switch 跳转，避免重复的 `hasOwn` 检查。
+首次访问某个 key 时确定它是 STATE/VIEW/ACTION/QUERY/MODEL/CONTEXT 哪种类型，缓存到 `accessCache`。后续访问直接 switch 跳转，避免重复的 `hasOwn` 检查。
 
 ### $ 前缀属性
 
-`modelPublicInstance.ts:42-59` 的 `publicPropertiesMap` 路由了所有 `$` 开头的属性：
+`publicPropertiesMap` 路由了所有 `$` 开头的属性：
 
 ```ts
 $name    → instance.name
@@ -144,67 +149,79 @@ $rawState → instance.getState()    // snapshot
 $state   → instance.stateValue     // draft（供 action 内部使用）
 $actions → instance.actions
 $views   → instance.views
+$queries → instance.queries
+$models  → instance.models
 $patch   → instance.patch
 $onAction → instance.onAction
 $subscribe → instance.subscribe
 $isolate  → instance.isolate
 $getApi   → instance.getApi
 $createView → createView.bind(null, instance)
+$invalidateQueries → () => instance.invalidateQueries()   // 标记所有 query 缓存过期
+$cancelQueries     → () => instance.cancelQueries()       // 取消所有 inflight fetch
+$resetQueries      → () => instance.resetQueries()        // 清除所有 query 缓存
 ```
+
+`$getApi()` 构造的是 `ModelAPI` snapshot，用于 React `useModel()`、`useStaticModel()` 和 selectors。它只包含 state、views、actions、direct query fetches 与 `$queries`；不包含 child models 或 `$models`。`store.getModel()` 返回的 `ModelInstance` 仍然保留 `instance.childName` 与 `instance.$models.childName`。
 
 ### set handler
 
-`modelPublicInstance.ts:115-180`：
+`modelPublicInstance.ts` set handler：
 
 - `state` 属性 → 写入 draft（VIEW context 中禁止写入）
-- `actions/views` → 只读，拒绝修改
+- `actions/views/queries/models` → 只读，拒绝修改
+- 普通 `queryName` 访问 → 返回 `queryFetches[queryName]`，即直接 fetch 函数
+- `$queries.queryName` → 返回完整 `QueryHandle`
 - `$state` → 触发 `instance.replace(value)` 整体替换
 - 其他 `$` 属性 → 只读
 - 其余 → 写入 `ctx`
 
 ---
 
-## 4. Model 组合 — use()
+## 4. Model 组合 — models
 
-> `core/use.ts`, `core/modelManager.ts:78-82, 128-140, 174-189`
+> `core/modelManager.ts`, `core/model.ts`
 
 ### 原理
 
-FunctionModel 允许通过 `use(name, otherModel)` 组合其他 model：
+Model options 允许通过 `models: [otherModel]` 组合其他 model definition。子 model 使用自己的 `childModel.$options.name` 作为父实例上的 key：
 
 ```ts
-const parentModel = defineModel(() => {
-  const [state, actions] = use('child', childModel)
-  return {
-    state: { ... },
-    actions: {
-      doSomething() {
-        actions.childAction()  // 调用子 model action
-      }
-    }
-  }
+const childModel = defineModel({
+  name: 'child',
+  state: { count: 0 },
+  actions: {
+    inc() {
+      this.count++
+    },
+  },
+})
+
+const parentModel = defineModel({
+  name: 'parent',
+  state: { value: 0 },
+  models: [childModel],
+  actions: {
+    doSomething() {
+      this.child.inc()
+    },
+  },
+  views: {
+    childCount() {
+      return this.child.count
+    },
+  },
 })
 ```
 
 ### 实现机制
 
-1. `ModelManager.getModelInstance()` (`modelManager.ts:121-148`) 在执行 FunctionModel 前，创建 `ModelProxy` 并设置 `currentModelContext`：
-
-```ts
-const modelProxy = this._createModelProxy()
-setCurrentModelContext({ manager: this, model: modelProxy })
-instance = this._initModel({ name, model: model() })  // 执行函数
-modelProxy.setModel(instance)                            // 建立依赖
-```
-
-2. 函数体内调用 `use(name, model)` (`use.ts`)：
-   - 从 `currentModelContext` 获取 manager 和 modelProxy
-   - `manager.getModelInstance({ name, model })` 获取或创建子 model
-   - `modelProxy.addChild(childInstance)` 注册子 model
-
-3. 函数执行完毕后，`modelProxy.setModel(parentInstance)` 对所有 children 调用 `parentInstance.depend(child)` (`modelManager.ts:180-186`)
-
-4. `model.depend(dep)` (`model.ts:345-355`): subscribe 到 child 的变更事件，转发给 parent 的 subscribers
+1. `ModelManager._initModel()` 读取 `model.models`，通过 `getModelInstance({ model: child })` 获取或创建共享子实例。
+2. 父实例创建时拿到两份子模型映射：
+   - `models`：public instance，用于 `instance.child` 和 `$models.child`
+   - `modelProxies`：internal proxy，用于 action/view 内部的 `this.child`，保证跨模型 view 读取仍能参与响应式追踪
+3. 父实例创建后，对每个 child 调用 `parentInstance.depend(child)`。
+4. `model.depend(dep)` subscribe 到 child 的变更事件，转发给 parent 的 subscribers。
 
 ```ts
 depend(dep: ModelInternal) {
@@ -220,17 +237,17 @@ depend(dep: ModelInternal) {
 
 ## 5. ModelManager — 实例仓库
 
-> `core/modelManager.ts:84-232`
+> `core/modelManager.ts`
 
-ModelManager 是 model 实例的注册中心：
+ModelManager 是 model 实例的注册中心。公开 API 只接收 `ModelDefinition`：
 
-- `getModel(name, model)` — 按名缓存。相同 name 返回同一个实例
-- `getDetachedModel(model)` — 匿名实例，不缓存
+- `getModel(modelDefinition)` — 按 `definition.$options.name` 缓存。相同 name 返回同一个实例
+- `getDetachedModel(modelDefinition)` — 匿名实例，不缓存，也不进入 `getState()`
 - `subscribe(fn)` — 任何 model 变更时触发（通过 `queueJob` 合并）
 
 ### Plugin 生命周期
 
-`modelManager.ts:102-103, 202-212`:
+`modelManager.ts`:
 
 ```
 constructor:  hooks.onInit({ initialState }, { doura })
@@ -239,4 +256,166 @@ _initModel:   hooks.onModel(name, model, { doura })
 destroy:      hooks.onDestroy()
 ```
 
-Plugin 通过 `onModelInstance` 拿到 `ModelPublicInstance`，可以调用 `$subscribe`、`$onAction` 等 API 扩展行为。
+Plugin 的 `onModel(name, modelOptions, ctx)` 接收原始 options；`onModelInstance(instance, ctx)` 接收 `ModelInstance`，可以调用 `$subscribe`、`$onAction`、`$queries` 等 API 扩展行为。
+
+---
+
+## 6. Query 系统
+
+> `core/model.ts`（\_initQueries, \_buildQueryHandle）、`core/queryCoordinator.ts`、`core/queryTypes.ts`
+
+Query 系统为 model 提供声明式的异步数据获取能力，支持缓存、去重、过期控制和垃圾回收。
+
+### defineModel queries 选项
+
+```ts
+const userModel = defineModel(
+  {
+    name: 'user',
+    state: { users: {} as Record<string, User> },
+    queries: {
+      fetchUser: async function (ctx, id: string) {
+        return await api.getUser(id)
+      },
+
+      fetchList: async function (ctx, page: number) {
+        return await api.getUserList(page)
+      },
+    },
+  },
+  ({ model }) => {
+    model.setQueryOptions('fetchUser', {
+      onData({ api, args, data }) {
+        api.users[args[0]] = data // sync fetched user into state
+      },
+    })
+    model.setQueryOptions('fetchList', { staleTime: 30_000 })
+  }
+)
+```
+
+**声明方式**：
+
+- `queries` 中每个 entry 都是函数：`(ctx: QueryCtx, ...args) => Promise<TData>`
+- 每个 query 的 options 通过 `defineModel` 第二参配置：`model.setQueryOptions('fetchList', { staleTime, onData })`
+
+不要在 `queries` 中写 `{ fn }` 对象；query entry 必须直接是函数。
+
+**QueryOptions**：
+
+| 选项        | 类型                       | 说明                                            |
+| ----------- | -------------------------- | ----------------------------------------------- |
+| `staleTime` | `number`                   | 数据新鲜期（ms），默认 `0`（每次都 stale）      |
+| `onData`    | `(ctx: OnDataCtx) => void` | 数据到达回调（fetch 完成或 setData 调用时触发） |
+
+**OnDataCtx**：`{ api: ModelThis, args: TArgs, data: TData }`
+
+`onData` 在 action context 中执行，可以修改 state、调用 action。query cache 在 `onData` 完成后自动更新。与直接在 query 函数内部 `this.xxx = data` 相比，`onData` 的优势是 `setData()` 手动写入也会触发它，确保状态与缓存始终同步。
+
+**fn 签名**：`fn(this: void, ctx: QueryCtx, ...args: TArgs): Promise<TData>`
+
+- `this` 不绑定到 model proxy — query 函数以 `undefined` 为 `this` 调用
+- `ctx.signal` 是 `AbortSignal`，fetch 被取消时会 abort
+- 如需在数据到达时修改 state，使用 `onData` 回调（它提供 `api` 代理可修改 state）
+
+### QueryFetch 与 QueryHandle
+
+每个 query 在运行时拆成两个公开入口：
+
+- `instance.queryName` / action 内 `this.queryName`：`QueryFetch<TArgs, TData>`，直接调用后返回 `Promise<TData>`
+- `instance.$queries.queryName` / action 内 `this.$queries.queryName`：`QueryHandle<TArgs, TData>`，用于读缓存、预取、取消、失效、重置、手动写入缓存
+
+```ts
+actions: {
+  async loadUser(id: string) {
+    const user = await this.fetchUser(id)
+    this.users[id] = user
+  },
+  refreshUser(id: string) {
+    this.$queries.fetchUser.invalidate(id)
+  },
+}
+```
+
+`QueryHandle<TArgs, TData>` 方法：
+
+| 方法                                       | 说明                                                        |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| `getData(...args)`                         | 读缓存数据，无则返回 `undefined`                            |
+| `getState(...args)`                        | 读原始缓存条目（data, error, fetchStatus, dataUpdatedAt）   |
+| `isFetching(...args)`                      | 是否正在 fetch                                              |
+| `isStale(...args)`                         | 缓存是否过期（data 缺失或超过 staleTime）                   |
+| `fetch(...args)`                           | 发起 fetch，返回 Promise<TData>                             |
+| `prefetch(...args)`                        | 预热缓存（同 fetch 但 swallow rejection）                   |
+| `cancel(...args?)`                         | 取消指定 args 的 inflight；无参则取消该 query 所有 inflight |
+| `invalidate(...args?)`                     | 标记过期（不清数据）；无参则标记该 query 所有 entry         |
+| `reset(...args?)`                          | 清除缓存条目；无参则清除该 query 所有 entry                 |
+| `setData(data)` / `setData(...args, data)` | 手动写入缓存（如配置了 `onData` 也会触发它）                |
+
+`cancel`/`invalidate`/`reset` 无参时作用于该 query 的所有缓存 entry。
+
+**setData 与 onData 的交互**：调用 `setData` 时，如果该 query 配置了 `onData` 回调，会先在 action context 中执行 `onData({ api, args, data })`，然后写入 query cache。这确保无论数据来自 fetch 还是手动写入，状态都保持同步。
+
+### 初始化流程
+
+`_initQueries()` 遍历 `model.queries`，对每个 entry：
+
+1. 跳过非 `isQuerySpecLike` 的 entry（`decorateModelQueries` 已将函数规范化为 `{ fn }` 结构）
+2. 调用 `_cacheAccess(queryName, QUERY)` 注册到 accessCache
+3. `_buildQueryHandle(queryName, spec)` 构造 handle 对象
+4. 注册到 `this.queries[queryName]`
+5. 将 `handle.fetch` 打上内部 handle 标记，注册到 `this.queryFetches[queryName]`
+6. `Object.freeze(this.queries)` 和 `Object.freeze(this.queryFetches)`，不可运行时追加
+
+**\_hasArgs 标志**：通过 `spec.fn.length > 1` 判断。有参 query 的 `setData` 签名为 `(...args, data)`；无参 query 的 `setData` 签名为 `(data)`。
+
+### QueryCoordinator — 协调层
+
+每个 `ModelManager` 持有一个共享的 `QueryCoordinator` 实例，协调所有 model 的 query 行为。
+
+```
+QueryCoordinator
+├── FetchManager     去重 inflight request（按 hash 合并并发请求）
+├── GCManager        引用计数 + 定时清理
+└── config           { gcTime: 5min, staleTime: 0 }
+```
+
+**QueryCoordinator 去重**：`_appliedInflight` 索引记录了所有进行中的 fetch。同一 hash 的并发调用直接返回已进行中的 Promise，不会发起重复请求。fetch 完成（成功或失败）后从索引中清除。FetchManager 本身是底层执行器，内部对重复 hash 有断言保护（不应直接调用两次）。
+
+**GCManager 引用计数**：
+
+- `observeQuery(hash)` — 增加引用计数（React hook mount 时调用）
+- `unobserveQuery(hash, cleanup)` — 减少引用计数。归零后启动 `gcTime` 定时器，到期执行 `cleanup`（清除缓存条目）
+
+**为什么需要 GC？** query 缓存全局持有。如果所有消费者都 unmount 了，缓存条目仍占内存。GCManager 在最后一个观察者离开后 `gcTime`（默认 5 分钟）后清理。
+
+### Query Hash 方案
+
+```ts
+computeQueryHash(scope, queryName, argsKey) → QueryHash (branded string)
+```
+
+- `scope`：命名 model 为 `definition.$options.name`；detached model 为 `@@detached:<id>`（自增 id）
+- `queryName`：query 在 model 中的 key
+- `argsKey`：`computeArgsKey(args)` 将 args tuple JSON 化为稳定字符串
+
+hash 格式保证不同 store、不同 model、不同 args 之间缓存完全隔离。
+
+### staleTime 解析优先级
+
+```
+hook 级 staleTime (QueryOverrides.staleTime)
+  → query options staleTime (model.setQueryOptions)
+    → 全局 staleTime (doura({ query: { staleTime } }))
+      → 默认 0（每次都重新 fetch）
+```
+
+### model 级批量操作
+
+| 方法                   | 行为                                          |
+| ---------------------- | --------------------------------------------- |
+| `$invalidateQueries()` | 标记该 model 所有 query 的所有 entry 过期     |
+| `$cancelQueries()`     | 取消该 model 所有 query 的所有 inflight fetch |
+| `$resetQueries()`      | 清除该 model 所有 query 的所有缓存 entry      |
+
+这三个操作通过 `_queryIndex`（前缀索引）定位属于当前 model 的所有 hash，然后逐一操作。

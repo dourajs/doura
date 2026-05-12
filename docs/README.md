@@ -16,8 +16,9 @@ doura (核心)
 
 react-doura (React 集成，peer: doura)
   ├── createContainer    Context + Provider
+  ├── DouraRoot          预构建的全局 Provider（dev 模式自动注入 devtool）
   ├── createUseModel     useSyncExternalStore 驱动
-  └── batchManager       unstable_batchedUpdates 合并渲染
+  └── useQuery / useAction / useInfiniteQuery  Query/Action React 集成
 
 doura-plugin-log    (peer: doura)  Action 日志
 doura-plugin-persist (peer: doura) 持久化 + 迁移
@@ -26,10 +27,13 @@ doura-plugin-persist (peer: doura) 持久化 + 迁移
 ## 数据流全景
 
 ```
-defineModel({ state, actions, views })
+defineModel({ name, state, actions, views, queries, models })
         │
         ▼
-  ModelInternal 构造
+  ModelDefinition（原始 options 位于 definition.$options）
+        │
+        ▼
+  store.getModel(definition) → ModelInternal 构造
         │
         ├── draft({ value: initState })          ← 创建可变 Proxy
         ├── watch(stateRef, () => queueJob(_update))  ← 监听 draft 变更
@@ -50,13 +54,20 @@ defineModel({ state, actions, views })
         │
         └── useSyncExternalStore(subscribe, getSnapshot)
               └── getSnapshot 返回 snapshot proxy（结构共享）
+
+  Query 路径（并行于 action 同步路径）
+        │
+        ├── queryFetch(args) 或 $queries.queryName 的 fetch 方法
+        │     → QueryCoordinator → FetchManager 去重
+        ├── fetch 完成 → 写入 query cache entry → notifyQueryListeners
+        └── useQuery 订阅 → useSyncExternalStore → React re-render
 ```
 
 ## 文档导航
 
-| 文档 | 内容 |
-|------|------|
-| [reactivity.md](./reactivity.md) | 响应式系统：Draft、Snapshot、Effect、View |
-| [model.md](./model.md) | Model 系统：定义、实例化、两层 Proxy、use() 组合 |
-| [scheduler.md](./scheduler.md) | 调度器：微任务队列、同步刷新策略 |
-| [react-bindings.md](./react-bindings.md) | React 集成：Container、useModel、BatchManager |
+| 文档                                     | 内容                                                                                                |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [reactivity.md](./reactivity.md)         | 响应式系统：Draft、Snapshot、Effect、View                                                           |
+| [model.md](./model.md)                   | Model 系统：定义、实例化、两层 Proxy、models 组合、Query 系统                                       |
+| [scheduler.md](./scheduler.md)           | 调度器：微任务队列、同步刷新策略                                                                    |
+| [react-bindings.md](./react-bindings.md) | React 集成：Container、DouraRoot、useModel、useDetachedModel、useQuery、useAction、useInfiniteQuery |

@@ -1,0 +1,1143 @@
+import {
+  defineModel,
+  modelManager,
+  computeQueryHash,
+  computeArgsKey,
+  nextTick,
+  DOURA_QUERY_HANDLE,
+} from '../index'
+
+let modelMgr: ReturnType<typeof modelManager>
+beforeEach(() => {
+  modelMgr = modelManager()
+})
+
+let oldEnv: any
+beforeAll(() => {
+  oldEnv = process.env.NODE_ENV
+  process.env.NODE_ENV = 'development'
+})
+afterAll(() => {
+  process.env.NODE_ENV = oldEnv
+})
+
+describe('model queries', () => {
+  describe('query normalization in ModelInternal', () => {
+    it('should normalize shorthand (bare function) into { fn: ... }', () => {
+      const fetchUser = async () => ({ id: 1 })
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser,
+        },
+      })
+
+      const inst = modelMgr.getModel(model)
+      const spec = (model.$options as any).queries.fetchUser
+      expect(typeof spec).toBe('object')
+      expect(spec.fn).toBe(fetchUser)
+      expect(inst.$queries.fetchUser).toBeDefined()
+      expect((inst.$queries.fetchUser as any)._spec).toBe(spec)
+    })
+
+    it('should preserve setup query options', () => {
+      const fn = async (_ctx: any, id: number) => ({ id })
+      const onData = jest.fn(
+        ({ api, data }: { api: any; data: { id: number } }) => {
+          api.user = data
+        }
+      )
+
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { user: null as { id: number } | null },
+          queries: {
+            fetchUser: fn,
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('fetchUser', { staleTime: 5000, onData })
+        }
+      )
+
+      const inst = modelMgr.getModel(model)
+      const handle = inst.$queries.fetchUser as any
+      expect(handle._spec).toBe((model.$options as any).queries.fetchUser)
+      expect(handle._spec.fn).toBe(fn)
+      expect(handle._spec.staleTime).toBe(5000)
+      expect(handle._spec.onData).toBe(onData)
+    })
+
+    it('should skip entries without a callable query function', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: { staleTime: 1000 },
+        } as any,
+      })
+
+      const inst = modelMgr.getModel(model)
+      expect(Object.keys(inst.$queries)).toHaveLength(0)
+      expect(
+        'query "fetchUser" must be a function. Configure query options with defineModel(..., setup).'
+      ).toHaveBeenWarned()
+    })
+
+    it('should have no queries when no queries option', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+      })
+      const inst = modelMgr.getModel(model)
+      expect(Object.keys(inst.$queries)).toHaveLength(0)
+    })
+  })
+
+  describe('query name conflict detection', () => {
+    it('should reject when query name conflicts with state key', () => {
+      expect(() =>
+        // @ts-expect-error - intentional runtime validation fixture
+        defineModel({
+          name: 'model',
+          state: { fetchUser: 'existing' },
+          queries: {
+            fetchUser: async () => ({ id: 1, name: '' }),
+          },
+        })
+      ).toThrow(/key "fetchUser" in "queries".*key in "state"/)
+    })
+  })
+
+  describe('queries initialization', () => {
+    it('should freeze the queries object', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1, name: '' }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      expect(Object.isFrozen(store.$queries)).toBe(true)
+    })
+
+    it('should expose queries via $queries', () => {
+      const fn = async () => ({ id: 1 })
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: fn,
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      expect(store.$queries.fetchUser).toBeDefined()
+      expect((store.$queries.fetchUser as any)._spec.fn).toBe(fn)
+    })
+
+    it('should resolve query names from proxy', () => {
+      const fn = async () => ({ id: 1 })
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: fn,
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      expect((store as any).fetchUser).toBeDefined()
+      expect((store as any).fetchUser).not.toBe(store.$queries.fetchUser)
+      expect((store.$queries.fetchUser as any)._spec.fn).toBe(fn)
+    })
+
+    it('should reject writes to queries', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1, name: '' }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      expect(() => {
+        ;(store as any).fetchUser = 'something'
+      }).toThrow()
+      expect('Attempting to mutate query "fetchUser"').toHaveBeenWarned()
+    })
+  })
+
+  describe('QueryHandle getData / setData with isolated storage', () => {
+    it('should store and retrieve data from query cache', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1, name: '' }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({ id: 42, name: 'Alice' })
+
+      const data = store.$queries.fetchUser.getData()
+      expect(data).toEqual({ id: 42, name: 'Alice' })
+    })
+
+    it('should differentiate by args', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async (_ctx: any, id: number) => ({
+            id,
+            name: '',
+          }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData(1, { id: 1, name: 'Alice' })
+      store.$queries.fetchUser.setData(2, { id: 2, name: 'Bob' })
+
+      expect(store.$queries.fetchUser.getData(1)).toEqual({
+        id: 1,
+        name: 'Alice',
+      })
+      expect(store.$queries.fetchUser.getData(2)).toEqual({
+        id: 2,
+        name: 'Bob',
+      })
+    })
+  })
+
+  describe('query data commits', () => {
+    it('setData should write cache without mutating model state', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { user: null as any },
+        queries: {
+          fetchUser: async () => ({ id: 1, name: '' }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({
+        id: 1,
+        name: 'Alice',
+      })
+
+      expect(store.$rawState.user).toBeNull()
+      expect(store.$queries.fetchUser.getData()).toEqual({
+        id: 1,
+        name: 'Alice',
+      })
+    })
+
+    it('setData should apply onData and write query cache', () => {
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { user: null as any },
+          queries: {
+            fetchUser: async () => ({ id: 1, name: '' }),
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('fetchUser', {
+            onData({ api, data }) {
+              api.user = data
+            },
+          })
+        }
+      )
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({
+        id: 1,
+        name: 'Alice',
+      })
+
+      expect(store.$rawState.user).toEqual({ id: 1, name: 'Alice' })
+      expect(store.$queries.fetchUser.getData()).toEqual({
+        id: 1,
+        name: 'Alice',
+      })
+    })
+
+    it('setData should batch actions and state writes in onData', () => {
+      const model = defineModel(
+        {
+          name: 'model',
+          state: {
+            user: 0 as number | { id: number },
+            status: '',
+          },
+          actions: {
+            action1() {
+              this.status = 'xx'
+            },
+            action2() {
+              this.status = 'oo'
+            },
+          },
+          queries: {
+            fetchUser: async () => ({ id: 1 }),
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('fetchUser', {
+            onData({ api, data }) {
+              api.action1()
+              api.action2()
+              api.user = data
+            },
+          })
+        }
+      )
+
+      const store = modelMgr.getModel(model)
+      const snapshots: Array<{
+        user: number | { id: number }
+        status: string
+      }> = []
+      const actionEvents: Array<{ name: string; args: any[] }> = []
+
+      store.$subscribe(() => {
+        snapshots.push({ ...store.$rawState })
+      })
+      store.$onAction((action) => {
+        actionEvents.push(action)
+      })
+
+      store.$queries.fetchUser.setData({ id: 1 })
+
+      expect(snapshots).toEqual([{ user: { id: 1 }, status: 'oo' }])
+      expect(actionEvents).toEqual([
+        { name: 'action1', args: [] },
+        { name: 'action2', args: [] },
+      ])
+      expect(store.$queries.fetchUser.getData()).toEqual({ id: 1 })
+    })
+
+    it('should read from query cache even when model state is populated', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { user: { id: 1, name: 'Alice' } },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const data = store.$queries.fetchUser.getData()
+      expect(data).toBeUndefined()
+    })
+
+    it('should not bind model this inside the query function', async () => {
+      const seenThis = jest.fn()
+      const model = defineModel({
+        name: 'model',
+        state: { user: null as any },
+        queries: {
+          fetchUser: async function (this: any) {
+            seenThis(this)
+            const user = { id: 1, name: 'Alice' }
+            return user
+          },
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      await store.$queries.fetchUser.fetch()
+
+      expect(seenThis).toHaveBeenCalledWith(undefined)
+      expect(store.$rawState.user).toBeNull()
+      expect(store.$queries.fetchUser.getData()).toEqual({
+        id: 1,
+        name: 'Alice',
+      })
+    })
+  })
+
+  describe('query invalidation', () => {
+    it('handle.invalidate should invalidate a specific args slot', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async (_ctx: any, id: number) => ({
+            id,
+            name: '',
+          }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData(1, { id: 1, name: 'Alice' })
+      store.$queries.fetchUser.setData(2, { id: 2, name: 'Bob' })
+
+      // Invalidate only id:1
+      store.$queries.fetchUser.invalidate(1)
+
+      // The entry should still exist, but dataUpdatedAt should be 0
+      const state = (store as any)._.getQueryState('fetchUser', [1])
+      expect(state.dataUpdatedAt).toBe(0)
+
+      // id:2 should be unaffected
+      const state2 = (store as any)._.getQueryState('fetchUser', [2])
+      expect(state2.dataUpdatedAt).not.toBe(0)
+    })
+
+    it('should invalidate all queries when called with no args', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+          fetchPosts: async () => [{ id: 1 }],
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({ id: 1 })
+      store.$queries.fetchPosts.setData([{ id: 1 }])
+
+      store.$invalidateQueries()
+
+      const state1 = (store as any)._.getQueryState('fetchUser', [])
+      const state2 = (store as any)._.getQueryState('fetchPosts', [])
+      expect(state1.dataUpdatedAt).toBe(0)
+      expect(state2.dataUpdatedAt).toBe(0)
+    })
+
+    it('handle.invalidate should invalidate all args slots for one query', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async (_ctx: any, id: number) => ({
+            id,
+          }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData(1, { id: 1 })
+      store.$queries.fetchUser.setData(2, { id: 2 })
+
+      store.$queries.fetchUser.invalidate()
+
+      const state1 = (store as any)._.getQueryState('fetchUser', [1])
+      const state2 = (store as any)._.getQueryState('fetchUser', [2])
+      expect(state1.dataUpdatedAt).toBe(0)
+      expect(state2.dataUpdatedAt).toBe(0)
+    })
+  })
+
+  describe('query reset', () => {
+    it('should clear query data', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({ id: 1 })
+      expect(store.$queries.fetchUser.getData()).toEqual({ id: 1 })
+
+      store.$queries.fetchUser.reset()
+      expect(store.$queries.fetchUser.getData()).toBeUndefined()
+    })
+
+    it('should clear all queries when called with no args', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+          fetchPosts: async () => [{ id: 1 }],
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      store.$queries.fetchUser.setData({ id: 1 })
+      store.$queries.fetchPosts.setData([{ id: 1 }])
+
+      store.$resetQueries()
+
+      expect(store.$queries.fetchUser.getData()).toBeUndefined()
+      expect(store.$queries.fetchPosts.getData()).toBeUndefined()
+    })
+  })
+
+  describe('query cache subscription and notification', () => {
+    it('should notify subscribers when query state changes', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const listener = jest.fn()
+
+      const unsub = (store as any)._.subscribeQuery('fetchUser', [], listener)
+
+      store.$queries.fetchUser.setData({ id: 1 })
+      expect(listener).not.toHaveBeenCalled()
+      await nextTick()
+      expect(listener).toHaveBeenCalledTimes(1)
+
+      store.$queries.fetchUser.setData({ id: 2 })
+      await nextTick()
+      expect(listener).toHaveBeenCalledTimes(2)
+
+      unsub()
+      store.$queries.fetchUser.setData({ id: 3 })
+      await nextTick()
+      expect(listener).toHaveBeenCalledTimes(2) // no more calls
+    })
+
+    it('should dedupe query notifications for the same args slot', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async (_ctx: any, id: string) => ({
+            id,
+            name: 'User ' + id,
+          }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const internal = (store as any)._
+      const listener = jest.fn(() => {
+        expect(store.$queries.fetchUser.getData('1')).toEqual({
+          id: '1',
+          name: 'Bob',
+        })
+      })
+
+      internal.subscribeQuery('fetchUser', ['1'], listener)
+
+      store.$queries.fetchUser.setData('1', { id: '1', name: 'Alice' })
+      store.$queries.fetchUser.setData('1', { id: '1', name: 'Bob' })
+
+      await nextTick()
+      expect(listener).toHaveBeenCalledTimes(1)
+    })
+
+    it('should skip subscribers removed before query notification flush', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const listener = jest.fn()
+      const unsub = (store as any)._.subscribeQuery('fetchUser', [], listener)
+
+      store.$queries.fetchUser.setData({ id: 1 })
+      unsub()
+
+      await nextTick()
+      expect(listener).not.toHaveBeenCalled()
+    })
+
+    it('should not expose an intermediate query/state snapshot in one continuation', async () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        actions: {
+          async inner() {
+            await Promise.resolve()
+            this.$queries.fetchData.setData(1)
+            this.value = 1
+          },
+          async test() {
+            await this.inner()
+          },
+        },
+        queries: {
+          fetchData: async () => 0,
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const snapshots: string[] = []
+      const readSnapshot = () => {
+        snapshots.push(
+          `${store.$queries.fetchData.getData() ?? 'none'}:${
+            store.$state.value
+          }`
+        )
+      }
+
+      store.$subscribe(readSnapshot)
+      ;(store as any)._.subscribeQuery('fetchData', [], readSnapshot)
+
+      const promise = store.test()
+      expect(snapshots).toEqual([])
+
+      await promise
+      await nextTick()
+
+      expect(snapshots).not.toContain('1:0')
+      expect(snapshots).toEqual(['1:1', '1:1'])
+    })
+  })
+
+  describe('destroy cleanup', () => {
+    it('should clear all query caches on destroy', () => {
+      const model = defineModel({
+        name: 'model',
+        state: { value: 0 },
+        queries: {
+          fetchUser: async () => ({ id: 1 }),
+        },
+      })
+
+      const store = modelMgr.getModel(model)
+      const instance = (store as any)._
+
+      store.$queries.fetchUser.setData({ id: 1 })
+
+      instance.destroy()
+
+      expect(instance.queryCache.size).toBe(0)
+      expect(instance.queryNotifiers.size).toBe(0)
+      expect(instance._queryIndex.size).toBe(0)
+    })
+  })
+
+  describe('observer notification after invalidation/reset', () => {
+    const model = defineModel({
+      name: 'model',
+      state: { value: 0 },
+      queries: {
+        fetchData: async (_ctx: any, id: string) => ({ id }),
+      },
+    })
+
+    it('handle.invalidate should notify observers and produce new entry reference', async () => {
+      const inst = modelMgr.getModel(model)
+      const internal = (inst as any)._
+
+      // Seed data
+      inst.$queries.fetchData.setData('1', { id: '1' })
+
+      // Capture original entry reference
+      const entryBefore = internal.getQueryState('fetchData', ['1'])
+
+      // Subscribe
+      const listener = jest.fn()
+      internal.subscribeQuery('fetchData', ['1'], listener)
+
+      // Invalidate
+      inst.$queries.fetchData.invalidate('1')
+      await nextTick()
+      expect(listener).toHaveBeenCalledTimes(1)
+
+      // Entry reference must change (for useSyncExternalStore)
+      const entryAfter = internal.getQueryState('fetchData', ['1'])
+      expect(entryAfter).not.toBe(entryBefore)
+      expect(entryAfter.dataUpdatedAt).toBe(0)
+      expect(entryAfter.data).toEqual({ id: '1' }) // data preserved
+    })
+
+    it('$invalidateQueries() without args should notify all observers', async () => {
+      const inst = modelMgr.getModel(model)
+      const internal = (inst as any)._
+
+      inst.$queries.fetchData.setData('1', { id: '1' })
+      inst.$queries.fetchData.setData('2', { id: '2' })
+
+      const listener1 = jest.fn()
+      const listener2 = jest.fn()
+      internal.subscribeQuery('fetchData', ['1'], listener1)
+      internal.subscribeQuery('fetchData', ['2'], listener2)
+
+      inst.$invalidateQueries()
+      await nextTick()
+      expect(listener1).toHaveBeenCalled()
+      expect(listener2).toHaveBeenCalled()
+    })
+
+    it('handle.reset should notify observers', async () => {
+      const inst = modelMgr.getModel(model)
+      const internal = (inst as any)._
+
+      inst.$queries.fetchData.setData('1', { id: '1' })
+
+      const listener = jest.fn()
+      internal.subscribeQuery('fetchData', ['1'], listener)
+
+      inst.$queries.fetchData.reset('1')
+      await nextTick()
+      expect(listener).toHaveBeenCalled()
+    })
+
+    it('$resetQueries() without args should notify all observers', async () => {
+      const inst = modelMgr.getModel(model)
+      const internal = (inst as any)._
+
+      inst.$queries.fetchData.setData('1', { id: '1' })
+
+      const listener = jest.fn()
+      internal.subscribeQuery('fetchData', ['1'], listener)
+
+      inst.$resetQueries()
+      await nextTick()
+      expect(listener).toHaveBeenCalled()
+    })
+  })
+
+  describe('onData exception safety', () => {
+    it('should restore _watchStateChange if onData throws', () => {
+      const model = defineModel(
+        {
+          name: 'model',
+          state: { value: 0 },
+          queries: {
+            broken: async () => 42,
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('broken', {
+            onData() {
+              throw new Error('onData exploded')
+            },
+          })
+        }
+      )
+
+      const inst = modelMgr.getModel(model)
+      const internal = (inst as any)._
+
+      expect(() => {
+        inst.$queries.broken.setData(42)
+      }).toThrow('onData exploded')
+
+      expect(internal._watchStateChange).toBe(true)
+      expect(inst.$queries.broken.getData()).toBeUndefined()
+
+      internal.stateRef.value.value = 99
+      internal._update()
+      expect(inst.$state.value).toBe(99)
+    })
+  })
+
+  describe('QueryHandle runtime methods', () => {
+    const voidModel = defineModel({
+      name: 'voidModel',
+      state: { sentinel: 0 },
+      queries: {
+        fetchData: (_ctx: any) => Promise.resolve(42),
+      },
+    })
+
+    const argsModel = defineModel({
+      name: 'argsModel',
+      state: { sentinel: 0 },
+      queries: {
+        fetchUser: (_ctx: any, id: string) =>
+          Promise.resolve({ id, name: 'User ' + id }),
+      },
+    })
+
+    it('direct query fetch differs from $queries handle on proxy and getApi()', async () => {
+      const inst = modelMgr.getModel(voidModel)
+      const viaQueries = inst.$queries.fetchData
+      const viaProxy = (inst as any).fetchData
+      const viaApi = (inst.$getApi() as any).fetchData
+
+      expect(viaProxy).toBe(viaApi)
+      expect(viaProxy).not.toBe(viaQueries)
+      expect(viaProxy).toBe((viaQueries as any).fetch)
+      expect((viaProxy as any)[DOURA_QUERY_HANDLE]).toBe(viaQueries)
+      expect(inst.$getApi().$queries.fetchData).toBe(viaQueries)
+      await expect(viaProxy()).resolves.toBe(42)
+      const internalHandle = viaQueries as any
+      expect(internalHandle._queryName).toBe('fetchData')
+      expect(internalHandle._model).toBe(inst)
+      expect(internalHandle._spec.fn).toBeInstanceOf(Function)
+    })
+
+    it('getData / getState — void query returns undefined before any cache write', () => {
+      const inst = modelMgr.getModel(voidModel)
+      expect(inst.$queries.fetchData.getData()).toBeUndefined()
+      expect(inst.$queries.fetchData.getState()).toBeUndefined()
+    })
+
+    it('getData / getState reflect setQueryData — void query', () => {
+      const inst = modelMgr.getModel(voidModel)
+      inst.$queries.fetchData.setData(7)
+      expect(inst.$queries.fetchData.getData()).toBe(7)
+      const state = inst.$queries.fetchData.getState()
+      expect(state).toBeDefined()
+      expect(state!.data).toBe(7)
+      expect(state!.fetchStatus).toBe('idle')
+      expect(state!.dataUpdatedAt).toBeGreaterThan(0)
+    })
+
+    it('getData / getState reflect setQueryData — args query', () => {
+      const inst = modelMgr.getModel(argsModel)
+      inst.$queries.fetchUser.setData('1', { id: '1', name: 'Alice' })
+      expect(inst.$queries.fetchUser.getData('1')).toEqual({
+        id: '1',
+        name: 'Alice',
+      })
+      expect(inst.$queries.fetchUser.getData('2')).toBeUndefined()
+    })
+
+    it('setData via handle — void case writes cache and triggers notifier', async () => {
+      const inst = modelMgr.getModel(voidModel)
+      const listener = jest.fn()
+      const internal = (inst as any)._
+      const unsub = internal.subscribeQuery('fetchData', [], listener)
+
+      inst.$queries.fetchData.setData(123)
+      await nextTick()
+      expect(listener).toHaveBeenCalled()
+      expect(inst.$queries.fetchData.getData()).toBe(123)
+
+      unsub()
+    })
+
+    it('setData via handle should preserve an in-flight fetch status', () => {
+      const inst = modelMgr.getModel(voidModel)
+      const internal = (inst as any)._
+
+      internal.setQueryState('fetchData', [], {
+        data: 'old',
+        error: undefined,
+        dataUpdatedAt: 1,
+        fetchStatus: 'fetching',
+      })
+
+      inst.$queries.fetchData.setData(123)
+
+      const state = inst.$queries.fetchData.getState()
+      expect(state!.data).toBe(123)
+      expect(state!.fetchStatus).toBe('fetching')
+    })
+
+    it('setData via handle — args case writes cache for the given args', () => {
+      const inst = modelMgr.getModel(argsModel)
+      inst.$queries.fetchUser.setData('x', { id: 'x', name: 'Xena' })
+      expect(inst.$queries.fetchUser.getData('x')).toEqual({
+        id: 'x',
+        name: 'Xena',
+      })
+    })
+
+    it('isFetching reflects fetchStatus transitions', () => {
+      const inst = modelMgr.getModel(voidModel)
+      expect(inst.$queries.fetchData.isFetching()).toBe(false)
+
+      const internal = (inst as any)._
+      internal.setQueryState('fetchData', [], {
+        data: undefined,
+        error: undefined,
+        dataUpdatedAt: 0,
+        fetchStatus: 'fetching',
+      })
+      expect(inst.$queries.fetchData.isFetching()).toBe(true)
+
+      internal.setQueryState('fetchData', [], {
+        data: 1,
+        error: undefined,
+        dataUpdatedAt: Date.now(),
+        fetchStatus: 'idle',
+      })
+      expect(inst.$queries.fetchData.isFetching()).toBe(false)
+    })
+
+    it('isStale — no data is always stale; fresh data under staleTime is not', () => {
+      const freshModel = defineModel(
+        {
+          name: 'stale',
+          state: {},
+          queries: {
+            fetchFresh: (_ctx: any) => Promise.resolve(1),
+          },
+        },
+        ({ model }) => {
+          model.setQueryOptions('fetchFresh', { staleTime: 60_000 })
+        }
+      )
+      const inst = modelMgr.getModel(freshModel)
+
+      // No data yet → stale
+      expect(inst.$queries.fetchFresh.isStale()).toBe(true)
+
+      // Populate with fresh timestamp
+      inst.$queries.fetchFresh.setData(1)
+      expect(inst.$queries.fetchFresh.isStale()).toBe(false)
+
+      // Simulate old timestamp → stale
+      const internal = (inst as any)._
+      const hash = computeQueryHash(
+        internal.name,
+        'fetchFresh',
+        computeArgsKey([])
+      )
+      const entry = internal.queryCache.get(hash)
+      internal.queryCache.set(hash, {
+        ...entry,
+        dataUpdatedAt: Date.now() - 120_000,
+      })
+      expect(inst.$queries.fetchFresh.isStale()).toBe(true)
+    })
+
+    it('fetch via handle — delegates to coordinator and populates cache', async () => {
+      const inst = modelMgr.getModel(argsModel)
+      const result = await inst.$queries.fetchUser.fetch('7')
+      expect(result).toEqual({ id: '7', name: 'User 7' })
+      expect(inst.$queries.fetchUser.getData('7')).toEqual({
+        id: '7',
+        name: 'User 7',
+      })
+    })
+
+    it('prefetch via handle — resolves void and populates cache', async () => {
+      const inst = modelMgr.getModel(argsModel)
+      const result = await inst.$queries.fetchUser.prefetch('8')
+
+      expect(result).toBeUndefined()
+      expect(inst.$queries.fetchUser.getData('8')).toEqual({
+        id: '8',
+        name: 'User 8',
+      })
+    })
+
+    it('fetch via handle — rejects on spec fn rejection', async () => {
+      const failModel = defineModel({
+        name: 'handleFetchFail',
+        state: {},
+        queries: {
+          fetchBroken: (_ctx: any) => Promise.reject(new Error('boom')),
+        },
+      })
+      const inst = modelMgr.getModel(failModel)
+      await expect(inst.$queries.fetchBroken.fetch()).rejects.toThrow('boom')
+      // Error is stored in cache
+      const state = inst.$queries.fetchBroken.getState()
+      expect(state?.error).toBeInstanceOf(Error)
+    })
+
+    it('invalidate via handle — marks specific args entry stale', () => {
+      const inst = modelMgr.getModel(argsModel)
+      inst.$queries.fetchUser.setData('1', { id: '1', name: 'A' })
+      inst.$queries.fetchUser.setData('2', { id: '2', name: 'B' })
+
+      inst.$queries.fetchUser.invalidate('1')
+      expect(inst.$queries.fetchUser.getState('1')!.dataUpdatedAt).toBe(0)
+      expect(
+        inst.$queries.fetchUser.getState('2')!.dataUpdatedAt
+      ).toBeGreaterThan(0)
+    })
+
+    it('invalidate via handle — no args marks all entries of this query stale', () => {
+      const inst = modelMgr.getModel(argsModel)
+      inst.$queries.fetchUser.setData('1', { id: '1', name: 'A' })
+      inst.$queries.fetchUser.setData('2', { id: '2', name: 'B' })
+
+      inst.$queries.fetchUser.invalidate()
+      expect(inst.$queries.fetchUser.getState('1')!.dataUpdatedAt).toBe(0)
+      expect(inst.$queries.fetchUser.getState('2')!.dataUpdatedAt).toBe(0)
+    })
+
+    it('cancel via handle — cancels a specific args slot', async () => {
+      const signals: Record<string, AbortSignal> = {}
+      const model = defineModel({
+        name: 'model',
+        state: {},
+        queries: {
+          fetchUser: (ctx: any, id: string) => {
+            signals[id] = ctx.signal
+            return new Promise((resolve) => setTimeout(resolve, 5000))
+          },
+        },
+      })
+      const inst = modelMgr.getModel(model)
+
+      const p1 = inst.$queries.fetchUser.fetch('1').catch(() => undefined)
+      const p2 = inst.$queries.fetchUser.fetch('2').catch(() => undefined)
+      await new Promise((r) => setTimeout(r, 5))
+
+      inst.$queries.fetchUser.cancel('1')
+      expect(signals['1'].aborted).toBe(true)
+      expect(signals['2'].aborted).toBe(false)
+
+      inst.$queries.fetchUser.cancel()
+      expect(signals['2'].aborted).toBe(true)
+      await Promise.all([p1, p2])
+    })
+
+    it('reset via handle — clears cache entry', () => {
+      const inst = modelMgr.getModel(argsModel)
+      inst.$queries.fetchUser.setData('1', { id: '1', name: 'A' })
+      expect(inst.$queries.fetchUser.getData('1')).toBeDefined()
+
+      inst.$queries.fetchUser.reset('1')
+      expect(inst.$queries.fetchUser.getData('1')).toBeUndefined()
+    })
+
+    it('composed model reaches child queries via models with typed handle', async () => {
+      const parent = defineModel({
+        name: 'handleParent',
+        state: { touched: 0 },
+        models: [argsModel],
+        actions: {
+          async prime() {
+            if (!this.argsModel.$queries.fetchUser.getData('p')) {
+              await this.argsModel.fetchUser('p')
+            }
+            this.touched = 1
+          },
+          invalidateChild() {
+            this.argsModel.$queries.fetchUser.invalidate('p')
+          },
+        },
+      })
+
+      const parentInst = modelMgr.getModel(parent)
+      const childInst = modelMgr.getModel(argsModel)
+
+      await parentInst.prime()
+      expect(parentInst.touched).toBe(1)
+      expect(childInst.$queries.fetchUser.getData('p')).toEqual({
+        id: 'p',
+        name: 'User p',
+      })
+
+      parentInst.invalidateChild()
+      expect(childInst.$queries.fetchUser.getState('p')!.dataUpdatedAt).toBe(0)
+    })
+  })
+
+  describe('cross-model invalidation via models', () => {
+    it('invalidates queries on multiple composed models via QueryHandle', () => {
+      const userModel = defineModel({
+        name: 'userModel',
+        state: {},
+        queries: {
+          fetchUser: (_ctx: any, id: string) => Promise.resolve({ id }),
+        },
+      })
+
+      const postModel = defineModel({
+        name: 'crossPosts',
+        state: {},
+        queries: {
+          fetchPosts: (_ctx: any) => Promise.resolve([] as string[]),
+        },
+      })
+
+      const composedModel = defineModel({
+        name: 'composedModel',
+        state: {},
+        models: [userModel, postModel],
+        actions: {
+          invalidateAll() {
+            this.userModel.$queries.fetchUser.invalidate()
+            this.crossPosts.$queries.fetchPosts.invalidate()
+          },
+        },
+      })
+
+      // Prime the child caches with data.
+      const usersInst = modelMgr.getModel(userModel)
+      const postsInst = modelMgr.getModel(postModel)
+      usersInst.$queries.fetchUser.setData('1', { id: '1' })
+      usersInst.$queries.fetchUser.setData('2', { id: '2' })
+      postsInst.$queries.fetchPosts.setData([])
+
+      // Confirm fresh before invalidating.
+      const usersInternal = (usersInst as any)._
+      const postsInternal = (postsInst as any)._
+      const userHash1 = computeQueryHash(
+        usersInternal.name,
+        'fetchUser',
+        computeArgsKey(['1'])
+      )
+      const userHash2 = computeQueryHash(
+        usersInternal.name,
+        'fetchUser',
+        computeArgsKey(['2'])
+      )
+      const postHash = computeQueryHash(
+        postsInternal.name,
+        'fetchPosts',
+        computeArgsKey([])
+      )
+      expect(
+        usersInternal.queryCache.get(userHash1).dataUpdatedAt
+      ).toBeGreaterThan(0)
+      expect(
+        usersInternal.queryCache.get(userHash2).dataUpdatedAt
+      ).toBeGreaterThan(0)
+      expect(
+        postsInternal.queryCache.get(postHash).dataUpdatedAt
+      ).toBeGreaterThan(0)
+
+      // Trigger cross-model invalidation from the composed model's action.
+      const composed = modelMgr.getModel(composedModel)
+      composed.invalidateAll()
+
+      // All matching entries across both children are now stale.
+      expect(usersInternal.queryCache.get(userHash1).dataUpdatedAt).toBe(0)
+      expect(usersInternal.queryCache.get(userHash2).dataUpdatedAt).toBe(0)
+      expect(postsInternal.queryCache.get(postHash).dataUpdatedAt).toBe(0)
+    })
+
+    it('QueryHandle.reset from composed action clears child entries entirely', () => {
+      const userModel = defineModel({
+        name: 'userModel',
+        state: {},
+        queries: {
+          fetchUser: (_ctx: any, id: string) => Promise.resolve({ id }),
+        },
+      })
+
+      const composedModel = defineModel({
+        name: 'composedModel',
+        state: {},
+        models: [userModel],
+        actions: {
+          resetUsers() {
+            this.userModel.$queries.fetchUser.reset()
+          },
+        },
+      })
+
+      const usersInst = modelMgr.getModel(userModel)
+      usersInst.$queries.fetchUser.setData('1', { id: '1' })
+      expect(usersInst.$queries.fetchUser.getData('1')).toEqual({
+        id: '1',
+      })
+
+      const composed = modelMgr.getModel(composedModel)
+      composed.resetUsers()
+
+      expect(usersInst.$queries.fetchUser.getData('1')).toBeUndefined()
+    })
+  })
+})

@@ -1,11 +1,11 @@
-import { AnyModel, AnyObjectModel, ModelActions } from './modelOptions'
-import { ModelInternal, ModelAPI } from './model'
-import { ModelPublicInstance } from './modelPublicInstance'
+import type { Model, ModelActions, ModelDefinition } from './modelOptions'
+import type { ModelInternal, ModelAPI } from './model'
+import type { ModelInstance } from './modelPublicInstance'
 import { removeUnordered } from '../utils'
 
-export type Selector<Model extends AnyModel, TReturn = any> = (
-  api: ModelAPI<Model>,
-  actions: ModelActions<Model>
+export type Selector<ModelDef extends ModelDefinition<Model>, TReturn = any> = (
+  api: ModelAPI<ModelDef>,
+  actions: ModelActions<ModelDef>
 ) => TReturn
 
 export interface ModelView<T extends (...args: any[]) => any = any> {
@@ -13,18 +13,23 @@ export interface ModelView<T extends (...args: any[]) => any = any> {
   destroy(): void
 }
 
-export function createView<IModel extends AnyObjectModel, TReturn>(
-  instance: ModelInternal<IModel>,
-  selector: Selector<IModel, TReturn>
-): ModelView<Selector<IModel, TReturn>> {
+export function createView<M extends Model, TReturn>(
+  instance: ModelInternal<M>,
+  selector: Selector<ModelDefinition<M>, TReturn>
+): ModelView<Selector<ModelDefinition<M>, TReturn>> {
   const view = instance.createView(function (
-    this: ModelPublicInstance<IModel>
+    this: ModelInstance<ModelDefinition<M>>
   ) {
-    return selector(this, this.$actions)
+    return selector(
+      this as unknown as ModelAPI<ModelDefinition<M>>,
+      this.$actions
+    )
   })
 
-  const res = view.getSnapshot as ModelView<Selector<IModel, TReturn>>
-  res.destroy = function () {
+  const res = view.getSnapshot as ModelView<
+    Selector<ModelDefinition<M>, TReturn>
+  >
+  res.destroy = () => {
     view.effect.stop()
     removeUnordered(instance.effectScope.effects, view.effect)
     removeUnordered(instance.viewInstances, view as any)

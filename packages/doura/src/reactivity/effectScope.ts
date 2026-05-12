@@ -1,4 +1,4 @@
-import { ReactiveEffect } from './effect'
+import type { ReactiveEffect } from './effect'
 import { warn } from '../warning'
 
 let activeEffectScope: EffectScope | undefined
@@ -44,7 +44,7 @@ export class EffectScope {
     }
   }
 
-  run<T>(fn: () => T): T | void {
+  run<T>(fn: () => T): T | undefined {
     if (this.active) {
       const currentEffectScope = activeEffectScope
       try {
@@ -56,6 +56,7 @@ export class EffectScope {
     } else if (__DEV__) {
       warn(`cannot run an inactive effect scope.`)
     }
+    return undefined
   }
 
   /**
@@ -76,7 +77,7 @@ export class EffectScope {
 
   stop(fromParent?: boolean) {
     if (this.active) {
-      let i, l
+      let i: number, l: number
       for (i = 0, l = this.effects.length; i < l; i++) {
         this.effects[i].stop()
       }
@@ -110,7 +111,7 @@ export function recordEffectScope(
   effect: ReactiveEffect,
   scope: EffectScope | undefined = activeEffectScope
 ) {
-  if (scope && scope.active) {
+  if (scope?.active) {
     scope.effects.push(effect)
   }
 }

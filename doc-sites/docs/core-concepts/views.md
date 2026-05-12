@@ -3,42 +3,36 @@ id: views
 title: Views
 ---
 
-Views are used for computing derived state of a model. They can be defined with the `views` property in `defineModel()`.
-
-```js
-export const counterModel = defineModel({
-  state: {
-    count: 0,
-  },
-  views: {
-    doubleCount: (state) => state.count * 2,
-  },
-})
-```
-
-Most of the time, views will only rely on the state, however, they might need to use other views. Because of this, we can get access to the _whole model instance_ through `this` when defining a regular function:
+Views are computed values declared under `views`. They are cached and
+recomputed when the state, view, or child-model values they read change.
 
 ```ts
+import { defineModel } from 'doura'
+
 export const counterModel = defineModel({
+  name: 'counter',
   state: {
     count: 0,
   },
   views: {
-    // automatically infers the return type as a number
-     doubleCount: (state) => state.count * 2,
-    // automatically infers the return type as a number
+    double(state) {
+      return state.count * 2
+    },
     doublePlusOne() {
-      // use this to access other views 
-      return this.doubleCount + 1
+      return this.double + 1
     },
   },
 })
 ```
 
-Then you can access the view directly on the model instance:
+Use the `state` parameter for simple state-only derivations. Use a regular
+function and `this` when a view needs other views or child models.
 
-```js
-const counter = store.getModel('counter', counterModel)
+```ts
+const counter = store.getModel(counterModel)
 
-console.log(counter.doubleCount)
+console.log(counter.double)
+console.log(counter.$views.double)
 ```
+
+Views are readonly. Mutate state in actions, not in views.

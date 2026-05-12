@@ -17,6 +17,8 @@ let isFlushPending = false
 
 const queue: SchedulerJob[] = []
 let flushIndex = 0
+const postQueue: SchedulerJob[] = []
+let postFlushIndex = 0
 
 const resolvedPromise = /*#__PURE__*/ Promise.resolve() as Promise<any>
 let currentFlushPromise: Promise<void> | null = null
@@ -63,6 +65,13 @@ export function queueJob(job: SchedulerJob) {
     } else {
       queue.splice(findInsertionIndex(job.id), 0, job)
     }
+    queueFlush()
+  }
+}
+
+export function queuePostJob(job: SchedulerJob) {
+  if (!postQueue.length || !postQueue.includes(job)) {
+    postQueue.push(job)
     queueFlush()
   }
 }
@@ -121,13 +130,45 @@ function flushJobs(seen?: CountMap) {
     flushIndex = 0
     queue.length = 0
 
+    flushPostJobs(seen)
+
     isFlushing = false
-    currentFlushPromise = null
     // some jobs may have been queued during flush — keep flushing until drained.
-    if (queue.length) {
+    if (queue.length || postQueue.length) {
       flushJobs(seen)
     }
+    currentFlushPromise = null
   }
+}
+
+function flushPostJobs(seen?: CountMap) {
+  if (!postQueue.length) {
+    return
+  }
+
+  const pending = postQueue.slice()
+  postQueue.length = 0
+
+  const check = __DEV__
+    ? (job: SchedulerJob) => checkRecursiveUpdates(seen!, job)
+    : NOOP
+
+  for (postFlushIndex = 0; postFlushIndex < pending.length; postFlushIndex++) {
+    const job = pending[postFlushIndex]
+    if (job && job.active !== false) {
+      if (__DEV__ && check(job)) {
+        continue
+      }
+      try {
+        job()
+      } catch (err) {
+        error(err, ErrorCodes.SCHEDULER)
+      }
+    }
+  }
+
+  postFlushIndex = 0
+  flushPostJobs(seen)
 }
 
 function checkRecursiveUpdates(seen: CountMap, fn: SchedulerJob) {

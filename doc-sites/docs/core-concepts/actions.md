@@ -3,53 +3,79 @@ id: actions
 title: Actions
 ---
 
-Actions can be defined with the `actions` property in `defineModel()` and **they are perfect to define business logic**:
+Actions are methods declared under `actions` in `defineModel()`. They are bound
+to the model's internal proxy, so `this` can read state, views, actions, direct
+query fetch functions, `$queries` handles, and child models.
 
-```js
+```ts
+import { defineModel } from 'doura'
+
 export const counterModel = defineModel({
+  name: 'counter',
   state: {
     count: 0,
   },
   actions: {
-    // since we rely on `this`, we cannot use an arrow function
-    increment() {
-      this.count++
+    increment(step = 1) {
+      this.count += step
     },
-    randomizeCounter() {
-      this.count = Math.round(100 * Math.random())
+    reset() {
+      this.$state = { count: 0 }
+    },
+    patchCount(count: number) {
+      this.$patch({ count })
     },
   },
 })
 ```
 
-Actions get access to the _whole model instance_ through `this` with **full typing (and autocompletion ✨) support**. **`actions` can be asynchronous**, you can `await` inside of actions any API call or even other actions!
+Do not use arrow functions for actions that need `this`.
 
-```js
-export const useUsers = defineModel({
+Queries split direct fetch from cache control:
+
+```ts
+actions: {
+  async loadUser(id: string) {
+    const user = await this.fetchUser(id)
+    this.userData = user
+  },
+  refreshUser(id: string) {
+    this.$queries.fetchUser.invalidate(id)
+  },
+}
+```
+
+## Async Actions
+
+Actions can be asynchronous and can call other actions:
+
+```ts
+export const userModel = defineModel({
+  name: 'user',
   state: {
-    userData: null,
+    userData: null as User | null,
+    loading: false,
   },
   actions: {
-    async registerUser(login, password) {
+    async registerUser(login: string, password: string) {
+      this.loading = true
       try {
         this.userData = await api.post({ login, password })
-        showTooltip(`Welcome back ${this.userData.name}!`)
-      } catch (error) {
-        showTooltip(error)
-        // let the form component display the error
-        return error
+      } finally {
+        this.loading = false
       }
     },
   },
 })
 ```
 
-You are also completely free to set whatever arguments you want and return anything. When calling actions, everything will be automatically inferred!
+Action return types and arguments are inferred from the model definition:
 
-Actions are invoked like methods:
+```ts
+const counter = store.getModel(counterModel)
 
-```js
-const counter = store.getModel('counter', counterModel)
-// call the action as a method of the model
-counter.randomizeCounter()
+counter.increment(2)
 ```
+
+React can track action lifecycle with `useAction(action, options?)`, which
+returns `run`, `runAsync`, local status flags, and `reset`.

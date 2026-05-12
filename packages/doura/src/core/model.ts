@@ -3,15 +3,16 @@ import {
   hasOwn,
   isObject,
   def,
+  NOOP,
   emptyArray,
   removeUnordered,
 } from '../utils'
 import { warn } from '../warning'
 import {
   view as reactiveView,
-  View,
+  type View,
   effectScope,
-  EffectScope,
+  type EffectScope,
   draft,
   watch,
   snapshot,
@@ -22,22 +23,34 @@ import {
   resetDraftChildren,
 } from '../reactivity'
 import {
-  Views,
-  State,
-  AnyModel,
-  AnyObjectModel,
-  ModelState,
-  ModelActions,
-  ModelViews,
+  type Views,
+  type State,
+  type ModelDefinition,
+  type Model,
+  type ModelStateFromModel,
+  type ModelActionsFromModel,
+  type ModelViewsFromModel,
   validateModelOptions,
 } from './modelOptions'
 import {
-  ModelPublicInstance,
+  type ModelInstance,
   InternalInstanceProxyHandlers,
   PublicInstanceProxyHandlers,
 } from './modelPublicInstance'
-import { queueJob, invalidateJob } from './scheduler'
-import { AnyObject } from '../types'
+import type { ModelApiSnapshot } from './modelApi'
+import { queueJob, queuePostJob, invalidateJob } from './scheduler'
+import type { AnyObject } from '../types'
+import type {
+  FetchStatus,
+  IQueryCoordinator,
+  QueryCacheEntry,
+  QueryHash,
+} from './queryTypes'
+import { isQuerySpecLike, type NormalizedQuerySpec } from './queryOptions'
+import type { InternalQueryHandle } from './internalQueryTypes'
+import { DOURA_QUERY_HANDLE } from './internalQueryTypes'
+import { computeQueryHash, computeArgsKey } from './queryUtils'
+import { QueryHashIndex, type QueryHashPrefixKey } from './queryHashIndex'
 
 export enum ActionType {
   REPLACE = 'replace',
@@ -58,13 +71,9 @@ export interface ModelAction {
   args: any[]
 }
 
-export interface ActionListener {
-  (action: ModelAction): any
-}
+export type ActionListener = (action: ModelAction) => any
 
-export interface SubscriptionCallback {
-  (event: ModelChangeEvent): any
-}
+export type SubscriptionCallback = (event: ModelChangeEvent) => any
 
 export interface ActionBase<T = any> {
   type: string
@@ -95,9 +104,9 @@ export type Action = ModifyAction | PatchAction | ReplaceAction
 export interface ModelChangeEventBase {
   type: ActionType
   // the model to which the event is attached.
-  model: ModelPublicInstance<AnyModel>
+  model: ModelInstance<ModelDefinition<Model>>
   // the model that triggered the event.
-  target: ModelPublicInstance<AnyModel>
+  target: ModelInstance<ModelDefinition<Model>>
 }
 
 export interface ModelModifyEvent extends ModelChangeEventBase {
@@ -117,29 +126,32 @@ export type ModelChangeEvent =
   | ModelPatchEvent
   | ModelReplaceEvent
 
-export const enum AccessContext {
+export enum AccessContext {
   DEFAULT,
   VIEW,
 }
 
-export const enum AccessTypes {
+export enum AccessTypes {
   STATE,
   ACTION,
   VIEW,
   CONTEXT,
+  QUERY,
+  MODEL,
 }
 
-export type ModelData<Model extends AnyModel> = ModelState<Model> &
-  ModelViews<Model>
+export type ModelData<ModelDef extends ModelDefinition<Model>> =
+  ModelDef extends ModelDefinition<infer M>
+    ? ModelStateFromModel<M> & ModelViewsFromModel<M>
+    : never
 
-export type ModelAPI<IModel extends AnyModel> = ModelData<IModel> &
-  ModelActions<IModel>
+export type ModelAPI<ModelDef extends ModelDefinition<Model>> =
+  ModelApiSnapshot<ModelDef>
 
 type ViewExt = View & {
   getSnapshot(): any
   __pre: any
   __snapshot: any
-  __externalArgs?: any[]
 }
 
 function patchObj(base: Record<string, any>, patch: Record<string, any>) {
@@ -164,15 +176,15 @@ function patchObj(base: Record<string, any>, patch: Record<string, any>) {
 export interface ModelInternalOptions {
   name?: string
   initState?: State
+  models?: Record<string, ModelInstance<any>>
+  modelProxies?: Record<string, ModelInstance<any>>
 }
 
-function markViewShouldRun(view: View) {
-  view.dirty = true
-}
+let detachedModelQueryScopeId = 0
 
-export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
+export class ModelInternal<M extends Model = Model> {
   name: string
-  options: IModel
+  options: M
 
   ctx: Record<string, any>
   accessCache: Record<string, AccessTypes>
@@ -180,16 +192,20 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   /**
    * proxy for this in the context of views and actions
    */
-  proxy: ModelPublicInstance<IModel>
+  proxy: ModelInstance<ModelDefinition<M>>
 
   /**
    * proxy this public api
    */
-  publicInst: ModelPublicInstance<IModel>
+  publicInst: ModelInstance<ModelDefinition<M>>
 
   // props
-  actions: ModelActions<IModel>
-  views: Views<ModelViews<IModel>>
+  actions: ModelActionsFromModel<M>
+  views: Views<ModelViewsFromModel<M>>
+  queries: Record<string, InternalQueryHandle>
+  queryFetches: Record<string, (...args: any[]) => Promise<any>>
+  models: Record<string, ModelInstance<any>>
+  modelProxies: Record<string, ModelInstance<any>>
   viewInstances: ViewExt[] = []
   private _modelViews: ViewExt[] = []
   accessContext: AccessContext
@@ -201,9 +217,11 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   effectScope: EffectScope
 
   private _actionDepth = 0
-  private _api: ModelAPI<IModel> | null = null
-  private _actionsApi: string[] | null = null
-  private _initState: ModelState<IModel>
+  private _api: ModelAPI<ModelDefinition<M>> | null = null
+  private _actionKeys: string[] = []
+  private _queryKeys: string[] = []
+  private _modelKeys: string[] = []
+  private _initState: ModelStateFromModel<M>
   private _currentState: any
   private _actionListeners: ActionListener[] = []
   private _subscribers: SubscriptionCallback[] = []
@@ -214,19 +232,32 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
   private _watchStateChange: boolean = true
   private _destroyed: boolean = false
   private _lastDraftToSnapshot: WeakMap<object, any> = new WeakMap()
+  private _queryHashScope: string
 
-  constructor(model: IModel, { name, initState }: ModelInternalOptions) {
+  // Query infrastructure
+  coordinator: IQueryCoordinator | undefined = undefined
+  queryCache: Map<QueryHash, QueryCacheEntry> = new Map()
+  queryNotifiers: Map<QueryHash, (() => void)[]> = new Map()
+  private _pendingQueryNotifierHashes: Set<QueryHash> = new Set()
+  private _queryIndex = new QueryHashIndex<null>()
+
+  constructor(
+    model: M,
+    { name, initState, models, modelProxies }: ModelInternalOptions
+  ) {
     this.patch = this.patch.bind(this)
     this.onAction = this.onAction.bind(this)
     this.subscribe = this.subscribe.bind(this)
     this.isolate = this.isolate.bind(this)
     this.getApi = this.getApi.bind(this)
     this._update = this._update.bind(this)
+    this._flushQueryListeners = this._flushQueryListeners.bind(this)
 
     this.options = model
     this.name = name || ''
+    this._queryHashScope = name || `@@detached:${++detachedModelQueryScopeId}`
     this._isDispatching = false
-    this._initState = initState || model.state
+    this._initState = (initState || model.state) as ModelStateFromModel<M>
     this.stateRef = draft({
       value: this._initState,
     })
@@ -240,6 +271,10 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
     this.actions = Object.create(null)
     this.views = Object.create(null)
+    this.queries = Object.create(null)
+    this.queryFetches = Object.create(null)
+    this.models = models || Object.create(null)
+    this.modelProxies = modelProxies || this.models
     this.accessContext = AccessContext.DEFAULT
     this.ctx = {}
     def(this.ctx, '_', this)
@@ -247,15 +282,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this.proxy = new Proxy(
       this.ctx,
       InternalInstanceProxyHandlers
-    ) as ModelPublicInstance<IModel>
+    ) as ModelInstance<ModelDefinition<M>>
     this.publicInst = new Proxy(
       this.ctx,
       PublicInstanceProxyHandlers
-    ) as ModelPublicInstance<IModel>
+    ) as ModelInstance<ModelDefinition<M>>
 
     this.effectScope = effectScope()
-    this._initActions()
+    this._initModels()
     this._initViews()
+    this._initActions()
+    this._initQueries()
   }
 
   patch(obj: AnyObject) {
@@ -288,11 +325,13 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
 
   replace(newState: AnyObject) {
     if (!isObject(newState)) {
-      warn(
-        `replace argument should be an object, but receive a ${Object.prototype.toString.call(
-          newState
-        )}`
-      )
+      if (__DEV__) {
+        warn(
+          `replace argument should be an object, but receive a ${Object.prototype.toString.call(
+            newState
+          )}`
+        )
+      }
       return
     }
 
@@ -345,17 +384,17 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
         ...this._currentState,
         ...this.views,
       })
+      def(data, '$queries', this.queries)
 
-      // Actions are immutable over the model's lifetime — cache the keys.
-      if (this._actionsApi === null) {
-        this._actionsApi = Object.keys(this.actions)
+      // Actions and queries are immutable over the model's lifetime —
+      // iterate pre-cached keys (built during _initActions/_initQueries).
+      for (let i = 0; i < this._queryKeys.length; i++) {
+        const key = this._queryKeys[i]
+        def(data, key, this.queryFetches[key])
       }
-      for (let i = 0; i < this._actionsApi.length; i++) {
-        def(
-          data,
-          this._actionsApi[i],
-          (this.actions as any)[this._actionsApi[i]]
-        )
+      for (let i = 0; i < this._actionKeys.length; i++) {
+        const key = this._actionKeys[i]
+        def(data, key, (this.actions as any)[key])
       }
     }
 
@@ -383,7 +422,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
    * but they cannot cause the reactive scope of the caller to be re-evaluated
    * when they change
    */
-  isolate<T>(fn: (s: ModelState<IModel>) => T): T {
+  isolate<T>(fn: (s: ModelStateFromModel<M>) => T): T {
     pauseTracking()
     const res = fn(this.stateValue)
     resetTracking()
@@ -395,7 +434,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     const unsub = dep.subscribe((event) => {
       this._triggerListener({
         ...event,
-        model: this.proxy,
+        model: this.proxy as any,
       })
     })
     this._depListenersHandlers.push(unsub)
@@ -407,19 +446,14 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     })
   }
 
-  createView(viewFn: (s: ModelState<IModel>) => any): ViewExt {
+  createView(viewFn: (s: any) => any): ViewExt {
     let view!: ViewExt
     this.effectScope.run(() => {
       view = reactiveView(() => {
         const oldCtx = this.accessContext
         this.accessContext = AccessContext.VIEW
-        const externalArgs = (view as ViewExt).__externalArgs
         try {
-          let value = viewFn.call(
-            this.proxy,
-            this.proxy,
-            ...(externalArgs ? (externalArgs as []) : emptyArray)
-          )
+          let value = viewFn.call(this.proxy, this.proxy)
           if (__DEV__) {
             if (isObject(value)) {
               if (value === this.proxy) {
@@ -458,7 +492,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     return view!
   }
 
-  reducer(state: ModelState<AnyModel>, action: Action) {
+  reducer(state: ModelStateFromModel<M>, action: Action) {
     switch (action.type) {
       case ActionType.MODIFY:
       case ActionType.PATCH: {
@@ -492,7 +526,7 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       return action
     }
 
-    let nextState
+    let nextState: any
 
     try {
       this._isDispatching = true
@@ -532,6 +566,12 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
     this._draftListenerHandler()
 
+    // clear query caches
+    this.queryCache.clear()
+    this.queryNotifiers.clear()
+    this._pendingQueryNotifierHashes.clear()
+    this._queryIndex.clear()
+
     // notify dependents so they can clean up references to this model
     for (const handler of this._onDestroyHandlers) {
       handler()
@@ -539,7 +579,15 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     this._onDestroyHandlers.length = 0
   }
 
-  private _setState(newState: ModelState<IModel>) {
+  get destroyed(): boolean {
+    return this._destroyed
+  }
+
+  get queryHashScope(): string {
+    return this._queryHashScope
+  }
+
+  private _setState(newState: ModelStateFromModel<M>) {
     this._api = null
     this._currentState = newState
     this.stateValue = this.stateRef.value
@@ -565,12 +613,50 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
     }
   }
 
+  private _runAction(
+    action: () => any,
+    options: {
+      name?: string
+      beforeAction?: () => void
+    } = {}
+  ) {
+    const { name, beforeAction } = options
+
+    if (name && this.accessContext === AccessContext.VIEW) {
+      if (__DEV__) {
+        warn(
+          `Action "${String(
+            name
+          )}" is called in view function, it will be ignored and has no effect.`
+        )
+      }
+      return
+    }
+
+    this._actionDepth++
+    let res: any
+    try {
+      beforeAction?.()
+      res = action()
+    } finally {
+      // Flush changes to the model synchronously after the outermost action.
+      // This prevents issues like https://github.com/pmndrs/valtio/issues/270.
+      if (--this._actionDepth === 0) {
+        invalidateJob(this._update)
+        this._update()
+      }
+    }
+
+    return res
+  }
+
   private _initActions() {
     // map actions names to dispatch actions
     const actions = this.options.actions
     if (actions) {
       for (const actionName of Object.keys(actions)) {
-        this.accessCache[actionName] = AccessTypes.ACTION
+        this._cacheAccess(actionName, AccessTypes.ACTION)
+        this._actionKeys.push(actionName)
         const action = actions[actionName]
 
         Object.defineProperty(this.actions, actionName, {
@@ -578,83 +664,45 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
           enumerable: true,
           writable: false,
           value: (...args: any[]) => {
-            if (this.accessContext === AccessContext.VIEW) {
-              if (__DEV__) {
-                warn(
-                  `Action "${String(
-                    actionName
-                  )}" is called in view function, it will be ignored and has no effect.`
-                )
-              }
-              return
-            }
-
-            this._actionDepth++
-            let res: any
-            try {
-              const actionListeners = this._actionListeners.slice()
-              for (let i = 0; i < actionListeners.length; i++) {
-                actionListeners[i]({
-                  name: actionName,
-                  args,
-                })
-              }
-              res = action.call(this.proxy, ...args)
-            } finally {
-              // flush changes to model synchronously right after an action.
-              // this prevent issues like https://github.com/pmndrs/valtio/issues/270
-
-              if (--this._actionDepth === 0) {
-                invalidateJob(this._update)
-                this._update()
-              }
-            }
-
-            return res
+            return this._runAction(() => action.apply(this.proxy, args), {
+              name: actionName,
+              beforeAction: () => {
+                const actionListeners = this._actionListeners.slice()
+                for (let i = 0; i < actionListeners.length; i++) {
+                  actionListeners[i]({
+                    name: actionName,
+                    args,
+                  })
+                }
+              },
+            })
           },
         })
       }
     }
   }
 
+  private _initModels() {
+    for (const modelName of Object.keys(this.models)) {
+      this._cacheAccess(modelName, AccessTypes.MODEL)
+      this._modelKeys.push(modelName)
+    }
+    Object.freeze(this.models)
+    Object.freeze(this.modelProxies)
+  }
+
   private _initViews() {
     const views = this.options.views
     if (views) {
       for (const viewName of Object.keys(views)) {
-        this.accessCache[viewName] = AccessTypes.VIEW
+        this._cacheAccess(viewName, AccessTypes.VIEW)
         const viewFn = views[viewName]
-        const hasExternalArgs = viewFn.length > 1
         const view = this.createView(viewFn)
         this._modelViews.push(view)
-        if (hasExternalArgs && __DEV__) {
-          warn(
-            `The ${viewName} in the views is using additional parameters. This feature will no longer be supported in the future, please make changes as soon as possible.`
-          )
-        }
-        const getResult = hasExternalArgs
-          ? () =>
-              (...args: any[]) => {
-                const oldArgs = view.__externalArgs
-                if (!oldArgs) {
-                  markViewShouldRun(view)
-                } else if (oldArgs.length !== args.length) {
-                  markViewShouldRun(view)
-                } else {
-                  for (let i = 0; i < oldArgs.length; i++) {
-                    if (oldArgs[i] !== args[i]) {
-                      markViewShouldRun(view)
-                      break
-                    }
-                  }
-                }
-                view.__externalArgs = args
-                return view.getSnapshot()
-              }
-          : view.getSnapshot
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
-          get: getResult,
+          get: view.getSnapshot,
           set() {
             if (__DEV__) {
               warn(`cannot change view property '${String(viewName)}'`)
@@ -665,15 +713,353 @@ export class ModelInternal<IModel extends AnyObjectModel = AnyObjectModel> {
       }
     }
   }
+
+  private _initQueries() {
+    const queries = (this.options as any).queries
+    if (queries) {
+      for (const queryName of Object.keys(queries)) {
+        const spec = queries[queryName]
+        if (!isQuerySpecLike(spec)) {
+          continue
+        }
+        this._cacheAccess(queryName, AccessTypes.QUERY)
+        this._queryKeys.push(queryName)
+        const handle = this._buildQueryHandle(queryName, spec)
+        ;(this.queries as any)[queryName] = handle
+        Object.defineProperty(handle.fetch, DOURA_QUERY_HANDLE, {
+          configurable: false,
+          enumerable: false,
+          writable: false,
+          value: handle,
+        })
+        ;(this.queryFetches as any)[queryName] = handle.fetch
+      }
+    }
+    Object.freeze(this.queries)
+    Object.freeze(this.queryFetches)
+  }
+
+  private _cacheAccess(key: string, type: AccessTypes) {
+    this.accessCache[key] = type
+  }
+
+  private _buildQueryHandle(
+    queryName: string,
+    spec: NormalizedQuerySpec
+  ): InternalQueryHandle {
+    const self = this
+    const shouldIgnoreQueryCallInView = (methodName: string) => {
+      if (self.accessContext !== AccessContext.VIEW) {
+        return false
+      }
+      if (__DEV__) {
+        warn(
+          `Query "${queryName}.${methodName}" is called in view function, it will be ignored and has no effect.`
+        )
+      }
+      return true
+    }
+    // fn.length > 1 means fn(ctx, args) — i.e. the query requires args.
+    const hasArgs = spec.fn.length > 1
+    const handle: any = {
+      _model: this.publicInst,
+      _queryName: queryName,
+      _spec: spec,
+      _hasArgs: hasArgs,
+    }
+
+    handle.getData = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('getData')) {
+        return undefined
+      }
+      return self.getQueryData(queryName, args)
+    }
+    handle.setData = hasArgs
+      ? (...argsAndData: any[]) => {
+          if (shouldIgnoreQueryCallInView('setData')) {
+            return
+          }
+          const data = argsAndData[argsAndData.length - 1]
+          const args = argsAndData.slice(0, -1)
+          self.setQueryData(queryName, args, data)
+        }
+      : (data: any) => {
+          if (shouldIgnoreQueryCallInView('setData')) {
+            return
+          }
+          self.setQueryData(queryName, emptyArray, data)
+        }
+    handle.getState = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('getState')) {
+        return undefined
+      }
+      return self.getQueryState(queryName, args)
+    }
+    handle.isFetching = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('isFetching')) {
+        return false
+      }
+      return self.getQueryState(queryName, args)?.fetchStatus === 'fetching'
+    }
+    handle.isStale = (...args: any[]): boolean => {
+      if (shouldIgnoreQueryCallInView('isStale')) {
+        return true
+      }
+      if (!self.coordinator) return true
+      return self.coordinator.isStale(self, queryName, args)
+    }
+    handle.fetch = (...args: any[]): Promise<any> => {
+      if (shouldIgnoreQueryCallInView('fetch')) {
+        return Promise.resolve(undefined)
+      }
+      if (!self.coordinator) return Promise.resolve(undefined)
+      return self.coordinator.fetch(self, queryName, args) as Promise<any>
+    }
+    handle.prefetch = (...args: any[]): Promise<void> => {
+      if (shouldIgnoreQueryCallInView('prefetch')) {
+        return Promise.resolve()
+      }
+      return self.prefetchQuery(queryName, args)
+    }
+    handle.cancel = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('cancel')) {
+        return
+      }
+      self.cancelQueries(queryName, args)
+    }
+    handle.invalidate = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('invalidate')) {
+        return
+      }
+      self.invalidateQueries(queryName, args)
+    }
+    handle.reset = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('reset')) {
+        return
+      }
+      self.resetQueries(queryName, args)
+    }
+
+    // Hook integration
+    handle.computeHash = (...args: any[]): QueryHash =>
+      self._queryHash(queryName, args)
+    handle.subscribe = (args: readonly unknown[], listener: () => void) => {
+      if (shouldIgnoreQueryCallInView('subscribe')) {
+        return NOOP
+      }
+      return self.subscribeQuery(queryName, args, listener)
+    }
+    handle.observe = (...args: any[]) => {
+      if (shouldIgnoreQueryCallInView('observe')) {
+        return
+      }
+      if (self.coordinator) {
+        self.coordinator.observeQuery(self._queryHash(queryName, args))
+      }
+    }
+    handle.unobserve = (args: readonly unknown[], cleanup: () => void) => {
+      if (shouldIgnoreQueryCallInView('unobserve')) {
+        return
+      }
+      if (self.coordinator) {
+        self.coordinator.unobserveQuery(
+          self._queryHash(queryName, args),
+          cleanup
+        )
+      }
+    }
+
+    return handle as InternalQueryHandle
+  }
+
+  private _queryHash(queryName: string, args?: readonly unknown[]): QueryHash {
+    return computeQueryHash(
+      this._queryHashScope,
+      queryName,
+      computeArgsKey(args)
+    )
+  }
+
+  subscribeQuery(
+    queryName: string,
+    args: readonly unknown[],
+    listener: () => void
+  ): () => void {
+    const hash = this._queryHash(queryName, args)
+    let listeners = this.queryNotifiers.get(hash)
+    if (!listeners) {
+      listeners = []
+      this.queryNotifiers.set(hash, listeners)
+    }
+    listeners.push(listener)
+    return () => {
+      removeUnordered(listeners!, listener)
+      if (listeners!.length === 0) {
+        this.queryNotifiers.delete(hash)
+      }
+    }
+  }
+
+  getQueryState(
+    queryName: string,
+    args: readonly unknown[]
+  ): QueryCacheEntry | undefined {
+    return this.queryCache.get(this._queryHash(queryName, args))
+  }
+
+  setQueryState(
+    queryName: string,
+    args: readonly unknown[],
+    entry: QueryCacheEntry
+  ): void {
+    const hash = this._queryHash(queryName, args)
+    this.queryCache.set(hash, entry)
+    this._queryIndex.set(hash, {
+      scope: this._queryHashScope,
+      queryName,
+      data: null,
+    })
+
+    this._notifyQueryListeners(hash)
+  }
+
+  private _notifyQueryListeners(hash: QueryHash) {
+    this._pendingQueryNotifierHashes.add(hash)
+    queuePostJob(this._flushQueryListeners)
+  }
+
+  private _flushQueryListeners() {
+    if (this._destroyed) {
+      this._pendingQueryNotifierHashes.clear()
+      return
+    }
+
+    const hashes = Array.from(this._pendingQueryNotifierHashes)
+    this._pendingQueryNotifierHashes.clear()
+
+    for (let i = 0; i < hashes.length; i++) {
+      const listeners = this.queryNotifiers.get(hashes[i])
+      if (listeners) {
+        const snapshot = listeners.slice()
+        for (let j = 0; j < snapshot.length; j++) {
+          snapshot[j]()
+        }
+      }
+    }
+  }
+
+  invalidateQueries(queryName?: string, args?: readonly unknown[]): void {
+    if (queryName && args !== undefined && args.length > 0) {
+      const hash = this._queryHash(queryName, args)
+      const entry = this.queryCache.get(hash)
+      if (entry) {
+        this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
+        this._notifyQueryListeners(hash)
+      }
+      return
+    }
+
+    this._queryIndex.forEach(this._prefixKey(queryName), (hash) => {
+      const entry = this.queryCache.get(hash)
+      if (entry) {
+        this.queryCache.set(hash, { ...entry, dataUpdatedAt: 0 })
+        this._notifyQueryListeners(hash)
+      }
+    })
+  }
+
+  setQueryData(
+    queryName: string,
+    args: readonly unknown[],
+    data: unknown,
+    fetchStatus?: FetchStatus
+  ): void {
+    const handle = this.queries[queryName]
+    const onData = handle?._spec.onData
+
+    // Always update the query cache entry
+    const writeQueryCache = () => {
+      const hash = this._queryHash(queryName, args)
+      const existing = this.queryCache.get(hash)
+      const entry: QueryCacheEntry = {
+        data,
+        error: undefined,
+        dataUpdatedAt: Date.now(),
+        fetchStatus: fetchStatus ?? existing?.fetchStatus ?? 'idle',
+      }
+      this.setQueryState(queryName, args, entry)
+    }
+
+    if (onData) {
+      const applyOnData = onData as Function
+      this._runAction(() => {
+        applyOnData({
+          api: this.proxy,
+          args,
+          data,
+        })
+        writeQueryCache()
+      })
+      return
+    }
+
+    writeQueryCache()
+  }
+
+  getQueryData(queryName: string, args?: readonly unknown[]): unknown {
+    return this.queryCache.get(this._queryHash(queryName, args))?.data
+  }
+
+  prefetchQuery(
+    queryName: string,
+    args: readonly unknown[] = emptyArray
+  ): Promise<void> {
+    if (this.coordinator) {
+      const prefetchPromise = this.coordinator
+        .fetch(this, queryName, args)
+        .then(() => undefined)
+      prefetchPromise.catch(NOOP)
+      return prefetchPromise
+    }
+    return Promise.resolve()
+  }
+
+  cancelQueries(queryName?: string, args?: readonly unknown[]): void {
+    if (this.coordinator) {
+      this.coordinator.cancel(this, queryName, args)
+    }
+  }
+
+  resetQueries(queryName?: string, args?: readonly unknown[]): void {
+    if (queryName && args !== undefined && args.length > 0) {
+      const hash = this._queryHash(queryName, args)
+      this.queryCache.delete(hash)
+      this._notifyQueryListeners(hash)
+      this._queryIndex.deleteHash(hash)
+      return
+    }
+
+    const hashes = this._queryIndex.delete(this._prefixKey(queryName))
+    for (const hash of hashes) {
+      this.queryCache.delete(hash)
+      this._notifyQueryListeners(hash)
+    }
+  }
+
+  private _prefixKey(queryName?: string): QueryHashPrefixKey {
+    return queryName === undefined
+      ? [this._queryHashScope]
+      : [this._queryHashScope, queryName]
+  }
 }
 
-export function createModelInstance<IModel extends AnyObjectModel>(
-  modelOptions: IModel,
+export function createModelInstance<M extends Model>(
+  modelOptions: M,
   options: ModelInternalOptions = {}
 ) {
   if (__DEV__) {
     validateModelOptions(modelOptions)
   }
 
-  return new ModelInternal<IModel>(modelOptions, options)
+  return new ModelInternal<M>(modelOptions, options)
 }

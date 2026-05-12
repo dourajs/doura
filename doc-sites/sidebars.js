@@ -49,7 +49,7 @@ const sidebars = {
     'introduction',
     {
       type: 'category',
-      label: 'Getting Stared',
+      label: 'Getting Started',
       items: ['installation', 'playground'],
       collapsed: false,
       collapsible: false,
@@ -83,9 +83,10 @@ const sidebars = {
       label: 'Guides',
       items: [
         'guides/compose-model',
+        'guides/queries',
         'guides/optimize-views',
+        'guides/persist-plugin',
         'guides/typescript',
-        'guides/hmr',
       ],
       collapsed: true,
       collapsible: true,

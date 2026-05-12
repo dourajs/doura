@@ -35,9 +35,9 @@ describe('persist plugin worked:', () => {
       ],
     })
     await delay(100)
-    const aStore = douraStore.getModel('a', a)
+    const aStore = douraStore.getModel(a)
     aStore.add()
-    const bStore = douraStore.getModel('b', b)
+    const bStore = douraStore.getModel(b)
     bStore.add()
     await delay(100)
     let StorageState = await getStoredState(config)
@@ -59,9 +59,9 @@ describe('persist plugin worked:', () => {
       ],
     })
     await delay(100)
-    const aStore = douraStore.getModel('a', a)
+    const aStore = douraStore.getModel(a)
     aStore.add()
-    const bStore = douraStore.getModel('b', b)
+    const bStore = douraStore.getModel(b)
     bStore.add()
     await delay(100)
     let StorageState = await getStoredState(config)
@@ -84,7 +84,7 @@ describe('persist plugin worked:', () => {
         ],
       ],
     })
-    const aStore = douraStore.getModel('a', a)
+    const aStore = douraStore.getModel(a)
     await delay(100)
     expect(aStore.$state).toStrictEqual({ a: 1 })
   })
@@ -102,7 +102,7 @@ describe('persist plugin worked:', () => {
       ],
     })
     await delay(100)
-    const aStore = douraStore.getModel('a', a)
+    const aStore = douraStore.getModel(a)
     aStore.add()
     await delay(100)
     let StorageState = await getStoredState(config)

@@ -6,7 +6,7 @@
     "paths": {
       "doura": ["packages/doura/src"],
       "react-doura": ["packages/react-doura/src"],
-      "doura-*": ["packages/doura-*/src"],
+      "doura-*": ["packages/doura-*/src"]
     }
   },
   "include": [

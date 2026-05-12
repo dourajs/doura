@@ -1,6 +1,6 @@
-import { State, AnyObjectModel } from './modelOptions'
-import { ModelPublicInstance } from './modelPublicInstance'
-import { ModelManager } from './modelManager'
+import type { State, Model, ModelDefinition } from './modelOptions'
+import type { ModelInstance } from './modelPublicInstance'
+import type { ModelManager } from './modelManager'
 
 export interface PluginContext {
   doura: ModelManager
@@ -11,9 +11,9 @@ export type PluginHook = {
     options: { initialState: Record<string, State> },
     context: PluginContext
   ): void
-  onModel?(name: string, model: AnyObjectModel, context: PluginContext): void
+  onModel?(name: string, model: Model, context: PluginContext): void
   onModelInstance?(
-    instance: ModelPublicInstance<AnyObjectModel>,
+    instance: ModelInstance<ModelDefinition<Model>>,
     context: PluginContext
   ): void
   onDestroy?(): void

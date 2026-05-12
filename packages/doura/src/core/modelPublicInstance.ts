@@ -1,43 +1,51 @@
 import { hasOwn, assign } from '../utils'
 import { warn } from '../warning'
 import {
-  PublicPropertiesMap,
-  ProxyContext,
+  type PublicPropertiesMap,
+  type ProxyContext,
   AccessContext,
-  ActionListener,
-  SubscriptionCallback,
-  UnSubscribe,
-  ModelAPI,
+  type ActionListener,
+  type SubscriptionCallback,
+  type UnSubscribe,
+  type ModelAPI,
   AccessTypes,
 } from './model'
-import {
+import type {
   State,
-  AnyModel,
+  Model,
+  ModelDefinition,
   ModelState,
   ModelActions,
   ModelViews,
+  ModelQueries,
+  ModelModels,
+  ModelQueryMethods,
 } from './modelOptions'
-import { createView, Selector, ModelView } from './view'
+import type { ModelPublicFields } from './modelApi'
+import { createView, type Selector, type ModelView } from './view'
 
 const isReservedPrefix = (key: string) => key === '_' || key === '$'
 
-export type ModelPublicInstance<IModel extends AnyModel> = {
+export type ModelInstance<
+  ModelDef extends ModelDefinition<Model> = ModelDefinition<Model>,
+> = {
   $name: string
-  $rawState: ModelState<IModel>
-  $state: ModelState<IModel>
-  $actions: ModelActions<IModel>
-  $views: ModelViews<IModel>
+  $rawState: ModelState<ModelDef>
+  $state: ModelState<ModelDef>
+  $actions: ModelActions<ModelDef>
+  $views: ModelViews<ModelDef>
+  $queries: ModelQueries<ModelDef>
+  $models: ModelModels<ModelDef>
   $patch(newState: State): void
   $onAction: (listener: ActionListener) => UnSubscribe
   $subscribe: (listener: SubscriptionCallback) => UnSubscribe
-  $isolate: <T>(fn: (s: ModelState<IModel>) => T) => T
-  $getApi(): ModelAPI<IModel>
+  $isolate: <T>(fn: (s: ModelState<ModelDef>) => T) => T
+  $getApi(): ModelAPI<ModelDef>
   $createView: <R>(
-    selector: Selector<IModel, R>
-  ) => ModelView<Selector<IModel, R>>
-} & ModelState<IModel> &
-  ModelViews<IModel> &
-  ModelActions<IModel>
+    selector: Selector<ModelDef, R>
+  ) => ModelView<Selector<ModelDef, R>>
+} & ModelQueryMethods &
+  ModelPublicFields<ModelDef>
 
 const publicPropertiesMap: PublicPropertiesMap =
   // Move PURE marker to new line to workaround compiler discarding it
@@ -50,19 +58,25 @@ const publicPropertiesMap: PublicPropertiesMap =
       $state: (i) => i.stateValue,
       $actions: (i) => i.actions,
       $views: (i) => i.views,
+      $queries: (i) => i.queries,
+      $models: (i) => i.models,
       $patch: (i) => i.patch,
       $onAction: (i) => i.onAction,
       $subscribe: (i) => i.subscribe,
       $isolate: (i) => i.isolate,
       $getApi: (i) => i.getApi,
       $createView: (i) => createView.bind(null, i),
+      $invalidateQueries: (i) => () => i.invalidateQueries(),
+      $cancelQueries: (i) => () => i.cancelQueries(),
+      $resetQueries: (i) => () => i.resetQueries(),
     } as PublicPropertiesMap
   )
 
 const createGetter =
   (isPublicInstance: boolean) =>
   ({ _: instance }: ProxyContext, key: string) => {
-    const { actions, views, accessCache, ctx } = instance
+    const { views, actions, queries, queryFetches, accessCache, ctx, models } =
+      instance
 
     let state: any
     if (isPublicInstance) {
@@ -72,6 +86,13 @@ const createGetter =
     }
 
     if (key[0] !== '$') {
+      if (hasOwn(state, key)) {
+        if (accessCache[key] === undefined) {
+          accessCache[key] = AccessTypes.STATE
+        }
+        return state[key]
+      }
+
       const n = accessCache[key]
       if (n !== undefined) {
         switch (n) {
@@ -83,11 +104,24 @@ const createGetter =
             return actions[key]
           case AccessTypes.CONTEXT:
             return ctx[key]
+          case AccessTypes.QUERY:
+            return queryFetches[key]
+          case AccessTypes.MODEL:
+            return isPublicInstance ? models[key] : instance.modelProxies[key]
           // default: just fallthrough
         }
-      } else if (hasOwn(state, key)) {
-        accessCache[key] = AccessTypes.STATE
-        return state[key]
+      } else if (hasOwn(models, key)) {
+        accessCache[key] = AccessTypes.MODEL
+        return isPublicInstance ? models[key] : instance.modelProxies[key]
+      } else if (hasOwn(views, key)) {
+        accessCache[key] = AccessTypes.VIEW
+        return views[key]
+      } else if (hasOwn(actions, key)) {
+        accessCache[key] = AccessTypes.ACTION
+        return actions[key]
+      } else if (hasOwn(queries, key)) {
+        accessCache[key] = AccessTypes.QUERY
+        return queryFetches[key]
       } else if (hasOwn(ctx, key)) {
         accessCache[key] = AccessTypes.CONTEXT
         return ctx[key]
@@ -102,7 +136,7 @@ const createGetter =
       return ctx[key]
     }
 
-    if (isReservedPrefix(key[0]) && hasOwn(state, key)) {
+    if (__DEV__ && isReservedPrefix(key[0]) && hasOwn(state, key)) {
       warn(
         `Property ${JSON.stringify(
           key
@@ -119,8 +153,10 @@ const set = (
 ): boolean => {
   const {
     ctx,
-    actions,
+    models,
     views,
+    actions,
+    queries,
     accessContext,
     stateRef: { value: state },
   } = instance
@@ -137,6 +173,19 @@ const set = (
 
     state[key] = value
     return true
+  } else if (hasOwn(models, key)) {
+    if (__DEV__) {
+      warn(
+        `Attempting to mutate model "${key}". Models are readonly.`,
+        instance
+      )
+    }
+    return false
+  } else if (hasOwn(views, key)) {
+    if (__DEV__) {
+      warn(`Attempting to mutate view "${key}". Views are readonly.`, instance)
+    }
+    return false
   } else if (hasOwn(actions, key)) {
     if (__DEV__) {
       warn(
@@ -145,9 +194,12 @@ const set = (
       )
     }
     return false
-  } else if (hasOwn(views, key)) {
+  } else if (hasOwn(queries, key)) {
     if (__DEV__) {
-      warn(`Attempting to mutate view "${key}". Views are readonly.`, instance)
+      warn(
+        `Attempting to mutate query "${key}". Queries are readonly.`,
+        instance
+      )
     }
     return false
   }

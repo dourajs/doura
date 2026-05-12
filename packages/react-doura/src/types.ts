@@ -1,30 +1,29 @@
-import { AnyModel, Selector, ModelAPI } from 'doura'
+import type { Model, ModelDefinition, Selector, ModelAPI } from 'doura'
 
-export interface UseAnonymousModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
+export interface UseDetachedModel {
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selectors: S,
     depends?: any[]
   ): ReturnType<S>
 }
 
-export interface UseNamedModel {
-  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    name: string,
-    model: IModel,
+export interface UseModel {
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
     selectors: S,
     depends?: any[]
   ): ReturnType<S>
 }
 
-export interface UseModel extends UseAnonymousModel, UseNamedModel {}
+export interface UseSharedModel extends UseModel {}
 
-export interface useAnonymousStaticModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-}
+export type UseDetachedStaticModel = <ModelDef extends ModelDefinition<Model>>(
+  model: ModelDef
+) => ModelAPI<ModelDef>
 
-export interface UseStaticModel {
-  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
-}
+export type UseStaticModel = <ModelDef extends ModelDefinition<Model>>(
+  model: ModelDef
+) => ModelAPI<ModelDef>

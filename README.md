@@ -18,12 +18,6 @@ Install with npm:
 npm install doura
 ```
 
-Install with yarn
-
-```
-yarn add doura
-```
-
 ## Usage
 
 ### Define Model
@@ -103,6 +97,10 @@ export function TodoApp() {
   )
 }
 ```
+
+## For AI Agents
+
+Machine-readable documentation: https://dourajs.github.io/doura/llms.txt
 
 ## Credits
 

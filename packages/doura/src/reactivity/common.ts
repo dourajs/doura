@@ -1,6 +1,6 @@
-import { AnyObject, AnySet, AnyMap } from '../types'
+import type { AnyObject, AnySet, AnyMap } from '../types'
 import { def, objectToString } from '../utils'
-import {
+import type {
   DraftState,
   ObjectDraftState,
   MapDraftState,
@@ -9,7 +9,7 @@ import {
 
 export declare const RawSymbol: unique symbol
 
-export const enum ReactiveFlags {
+export enum ReactiveFlags {
   RAW = '__r_raw',
   STRICT = '__r_strict',
   STATE = '__r_state',
@@ -24,7 +24,7 @@ export type Drafted = {
   [ReactiveFlags.STATE]: DraftState
 }
 
-export const enum TargetType {
+export enum TargetType {
   INVALID = 0,
   COMMON = 1,
   ARRAY = 2,
@@ -91,10 +91,10 @@ export function latest<T extends DraftState>(
 ): T extends MapDraftState
   ? AnyMap
   : T extends SetDraftState
-  ? AnySet
-  : T extends ObjectDraftState
-  ? AnyObject
-  : AnyObject {
+    ? AnySet
+    : T extends ObjectDraftState
+      ? AnyObject
+      : AnyObject {
   return state.copy || (state.base as any)
 }
 

@@ -3,148 +3,9 @@ id: react-doura
 title: React Doura
 ---
 
-## useModel
-
-### Types
-
-```ts
-declare interface UseModel extends UseAnonymousModel, UseNamedModel {}
-```
-
-:::caution
-With the param `name` or not, `useModel` has very different behavior.
-:::
-
-## useModel Without Name
-
-`useModel` can replace `useState`, and enjoy doura features.
-
-### Types
-
-```ts
-declare interface UseAnonymousModel {
-  <IModel extends AnyModel>(model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    model: IModel,
-    selectors: S,
-    depends?: any[]
-  ): ReturnType<S>
-}
-```
-
-### Example
-
-Easy to replace `useState`, no need care about warp `add` with `useCallback`.
-
-```js
-const count = defineModel({
-  state: {
-    value: 1,
-  },
-  actions: {
-    add(payload: number = 1) {
-      this.value += payload
-    },
-  },
-})
-const App = () => {
-  const counter = useModel(count)
-
-  return (
-    <>
-      <div id="value">{counter.value}</div>
-      <button id="button" type="button" onClick={() => counter.add()}>
-        add
-      </button>
-    </>
-  )
-}
-```
-
-Use selector to pick exact what we want
-
-### Selector Types
-
-```ts
-type Selector<Model extends AnyModel, TReturn = any> = (
-  api: ModelAPI<Model>,
-  actions: ModelActions<Model>
-) => TReturn
-```
-
-#### Example
-
-```ts
-import { Selector } from 'react-doura'
-const countSelector: Selector<
-  typeof countModel,
-  { count: number; add: () => void }
-> = (s, actions) => {
-  return { count: s.count, add: actions.add }
-}
-```
-
-```ts
-import { ModelAPI， ModelActions } from 'doura'
-const countSelector = (
-  s: ModelAPI<typeof countModel>,
-  actions: ModelActions<typeof countModel>
-) => {
-  return { count: s.count, add: actions.add }
-}
-```
-
-when depends not changed, the `selectors` function will be old one, it works like `useCallback`.
-
-```tsx
-const countModel = defineModel({
-  state: {
-    value: 1,
-  },
-  actions: {
-    add(payload: number = 1) {
-      this.value += payload
-    },
-    async asyncAdd(n: number) {
-      await sleep(200)
-      this.add(n)
-    },
-  },
-  views: {
-    test() {
-      return this.value + 1
-    },
-  },
-})
-
-const App = () => {
-  const counter = useModel(
-    countModel,
-    (state, actions) => {
-      return {
-        value: state.value,
-        test: state.test,
-        ...actions,
-      }
-    },
-    []
-  )
-
-  return (
-    <>
-      <div id="v">{counter.value}</div>
-      <div id="t">{counter.test}</div>
-      <button id="button" type="button" onClick={() => counter.add(2)}>
-        add
-      </button>
-    </>
-  )
-}
-```
-
 ## DouraRoot
 
-Provider context for `useModel` and `useStaticModel`.
+Provider context for `useModel` and `useStaticModel`. Creates and manages a global store automatically.
 
 :::info
 In development mode (`__DEV__`), `DouraRoot` automatically enables the `devtool` plugin, which connects to the [Redux DevTools Extension](https://github.com/reduxjs/redux-devtools) for state inspection and action tracking. No extra configuration is needed.
@@ -155,7 +16,7 @@ In development mode (`__DEV__`), `DouraRoot` automatically enables the `devtool`
 ```ts
 declare const DouraRoot: (
   props: PropsWithChildren<{
-    store?: Doura
+    store?: Doura // optional — auto-creates a store if omitted
   }>
 ) => JSX.Element
 ```
@@ -163,24 +24,37 @@ declare const DouraRoot: (
 ### Example
 
 ```tsx
-<DouraRoot store={doura()}>
+import { DouraRoot } from 'react-doura'
+
+// Simplest usage — store is created internally
+;<DouraRoot>
+  <App />
+</DouraRoot>
+
+// Or pass a pre-created store (useful for SSR/testing)
+import { doura } from 'doura'
+;<DouraRoot store={doura({ initialState: { counter: { count: 10 } } })}>
   <App />
 </DouraRoot>
 ```
 
-## useModel With Name
+## useModel
 
-Get global state by anywhere.
+Reactive hook connected to the global `DouraRoot` store. The component re-renders when accessed state or views change.
+
+`useModel` accepts the model definition directly. It does not accept a separate
+name and returns `ModelAPI` directly, not a tuple. `ModelAPI` includes state,
+views, actions, direct query fetch functions, and `$queries`; it does not
+include child models or `$models`.
 
 ### Types
 
 ```ts
-declare interface UseNamedModel {
-  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
-  <IModel extends AnyModel, S extends Selector<IModel>>(
-    name: string,
-    model: IModel,
-    selectors: S,
+declare interface UseModel {
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
+    selector: S,
     depends?: any[]
   ): ReturnType<S>
 }
@@ -189,30 +63,92 @@ declare interface UseNamedModel {
 ### Example
 
 ```tsx
-const App = () => {
-  const counter = useModel(
-    'count',
+import { useModel } from 'react-doura'
+import { countModel } from './models/count'
+
+function Counter() {
+  // Without selector — ModelAPI
+  const counter = useModel(countModel)
+  return <button onClick={() => counter.add(1)}>{counter.value}</button>
+}
+
+function CounterWithSelector() {
+  // With selector — only re-renders when selected values change
+  const { value, add } = useModel(
     countModel,
-    (s, actions) => {
-      fn()
-      return { count: s.count, add: actions.add }
+    (api, actions) => ({ value: api.value, add: actions.add }),
+    [] // deps — empty means selector function won't change
+  )
+  return <button onClick={() => add(1)}>{value}</button>
+}
+```
+
+## useDetachedModel
+
+Creates a component-scoped detached model instance. Each component instance gets its own independent model — it can replace `useState` while enjoying Doura features.
+
+### Types
+
+```ts
+declare interface UseDetachedModel {
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
+  <ModelDef extends ModelDefinition<Model>, S extends Selector<ModelDef>>(
+    model: ModelDef,
+    selector: S,
+    depends?: any[]
+  ): ReturnType<S>
+}
+```
+
+### Example
+
+```tsx
+import { useDetachedModel } from 'react-doura'
+
+const count = defineModel({
+  name: 'count',
+  state: { value: 1 },
+  actions: {
+    add(payload: number = 1) {
+      this.value += payload
     },
+  },
+})
+
+const App = () => {
+  const counter = useDetachedModel(count)
+
+  return (
+    <>
+      <div>{counter.value}</div>
+      <button onClick={() => counter.add()}>add</button>
+    </>
+  )
+}
+```
+
+With a selector:
+
+```tsx
+const App = () => {
+  const { value, add } = useDetachedModel(
+    countModel,
+    (api, actions) => ({
+      value: api.value,
+      add: actions.add,
+    }),
     []
   )
 
-  return (
-    <button id="count" onClick={() => counter.add()}>
-      {counter.count}
-    </button>
-  )
+  return <button onClick={() => add(2)}>{value}</button>
 }
 ```
 
 ## useStaticModel
 
-:::caution
-State changes will **not** trigger re-renders. The returned object is a snapshot from `$getApi()` at the time of the hook call.
+Returns a non-reactive snapshot of the model. State changes will **not** trigger re-renders. Useful for reading stable references like action methods.
 
+:::caution
 In development mode, the returned object is wrapped in a read-only Proxy — directly mutating its properties will log a warning.
 :::
 
@@ -220,37 +156,267 @@ In development mode, the returned object is wrapped in a read-only Proxy — dir
 
 ```ts
 declare interface UseStaticModel {
-  <IModel extends AnyModel>(name: string, model: IModel): ModelAPI<IModel>
+  <ModelDef extends ModelDefinition<Model>>(model: ModelDef): ModelAPI<ModelDef>
 }
 ```
 
 ### Example
 
 ```tsx
+import { useStaticModel } from 'react-doura'
+
 const model = defineModel({
+  name: 'test',
   state: { value: 1 },
   views: {
-    test() {
+    double() {
       return this.value * 2
     },
   },
 })
 
 const App = () => {
-  const state = useStaticModel('test', model)
+  const state = useStaticModel(model)
 
   return (
     <>
-      <div id="v">{state.value}</div>
-      <div id="t">{state.test}</div>
+      <div>{state.value}</div>
+      <div>{state.double}</div>
     </>
+  )
+}
+```
+
+## useQuery
+
+Subscribes to a query's cache entry and triggers fetches based on staleness.
+Built on `useSyncExternalStore`.
+
+The first argument can be:
+
+- a direct `QueryFetch`, such as `api.fetchById`
+- a `QueryHandle`, such as `api.$queries.fetchById`
+- a definition ref, such as `userModel.fetchById`
+
+Definition refs resolve through the nearest Provider store and rebind when the
+Provider `store` changes.
+
+### Types
+
+```ts
+// No-args query
+function useQuery<TData, TSelected = TData>(
+  query: QueryFetch<[], TData> | QueryHandle<[], TData>,
+  options?: QueryOverrides<TData, TSelected>
+): UseQueryResult<TData, TSelected>
+
+// Query with args
+function useQuery<TArgs extends readonly unknown[], TData, TSelected = TData>(
+  query: QueryFetch<TArgs, TData> | QueryHandle<TArgs, TData>,
+  args: TArgs,
+  options?: QueryOverrides<TData, TSelected>
+): UseQueryResult<TData, TSelected>
+```
+
+### `QueryOverrides`
+
+```ts
+interface QueryOverrides<TData, TSelected = TData> {
+  enabled?: boolean | (() => boolean) // control whether fetch runs
+  staleTime?: number // override per-entry/global staleTime
+  select?: (data: TData) => TSelected // transform data before returning
+  placeholderData?: TData | ((prev?: TData) => TData | undefined)
+}
+```
+
+### `UseQueryResult`
+
+```ts
+interface UseQueryResult<TData, TSelected = TData> {
+  data: TSelected | undefined
+  error: unknown
+  isLoading: boolean // no data, no error, enabled
+  isPending: boolean // no data yet
+  isFetching: boolean // fetch in progress
+  isSuccess: boolean // has data, no error
+  isError: boolean // has error
+  isStale: boolean // data missing or older than staleTime
+  isRefetching: boolean // has data AND currently fetching
+  isPlaceholderData: boolean
+  refetch: () => Promise<TData>
+}
+```
+
+### Example
+
+```tsx
+import { useQuery } from 'react-doura'
+import { userModel } from './models/user'
+
+function UserProfile({ userId }: { userId: string }) {
+  const { data, isLoading, error } = useQuery(userModel.fetchById, [userId], {
+    staleTime: 60_000,
+  })
+
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Error: {String(error)}</div>
+  return <div>{data.name}</div>
+}
+```
+
+## useAction
+
+Tracks the lifecycle of calling an action function. Provides
+loading/success/error states with race-condition safety.
+
+Pass either a bound action from `useModel()` or a definition ref such as
+`formModel.submit`. Definition refs resolve through the nearest Provider store
+and rebind when the Provider `store` changes.
+
+### Types
+
+```ts
+function useAction<TFn extends (...args: any[]) => any>(
+  action: TFn,
+  options?: UseActionOptions<Awaited<ReturnType<TFn>>>
+): UseActionResult<TFn>
+```
+
+### `UseActionOptions`
+
+```ts
+interface UseActionOptions<TData> {
+  onSuccess?: (data: TData) => void
+  onError?: (error: unknown) => void
+  onSettled?: (data: TData | undefined, error: unknown | null) => void
+  pendingDelay?: number // ms before showing pending state (default: 300)
+}
+```
+
+### `UseActionResult`
+
+```ts
+interface UseActionResult<TFn extends (...args: any[]) => any> {
+  run: (...args: Parameters<TFn>) => void // fire-and-forget
+  runAsync: (...args: Parameters<TFn>) => Promise<Awaited<ReturnType<TFn>>>
+  data: Awaited<ReturnType<TFn>> | undefined
+  error: unknown
+  isIdle: boolean
+  isPending: boolean
+  isSuccess: boolean
+  isError: boolean
+  reset: () => void
+}
+```
+
+### Semantics
+
+- **Synchronous actions** skip pending entirely — state jumps directly to success/error.
+- **Async actions** use a `pendingDelay` (default 300ms) — within this window, the previous settled state stays visible (no loading flash for fast operations).
+- **Race-safe** — only the most recent `run`/`runAsync` call can write state. Earlier in-flight runs are abandoned.
+
+### Example
+
+```tsx
+import { useAction } from 'react-doura'
+import { formModel } from './models/form'
+
+function SubmitButton() {
+  const { run, isPending, isError, error } = useAction(formModel.submit, {
+    onSuccess: () => alert('Saved!'),
+  })
+
+  return (
+    <>
+      <button onClick={() => run()} disabled={isPending}>
+        {isPending ? 'Saving...' : 'Save'}
+      </button>
+      {isError && <span>Error: {String(error)}</span>}
+    </>
+  )
+}
+```
+
+## useInfiniteQuery
+
+Paginated query hook that accumulates pages fetched from the same query across
+different args. Pass a `QueryFetch`, `QueryHandle`, or definition ref. If a
+definition ref resolves to a different handle after a Provider store switch,
+the local pages reset and the initial page loads again.
+
+### Types
+
+```ts
+function useInfiniteQuery<TArgs extends readonly unknown[], TData>(
+  query: QueryFetch<TArgs, TData> | QueryHandle<TArgs, TData>,
+  config: InfiniteQueryConfig<TArgs, TData>
+): UseInfiniteQueryResult<TArgs, TData>
+```
+
+### `InfiniteQueryConfig`
+
+```ts
+interface InfiniteQueryConfig<TArgs, TData> {
+  initialArgs: TArgs
+  getNextArgs: (lastPage: TData, allPages: TData[]) => TArgs | undefined
+  getPreviousArgs?: (firstPage: TData, allPages: TData[]) => TArgs | undefined
+}
+```
+
+### `UseInfiniteQueryResult`
+
+```ts
+interface UseInfiniteQueryResult<TArgs, TData> {
+  data: { pages: TData[]; args: TArgs[] } | undefined
+  error: unknown
+  isLoading: boolean
+  isFetching: boolean
+  isSuccess: boolean
+  isError: boolean
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+  isFetchingNextPage: boolean
+  isFetchingPreviousPage: boolean
+  fetchNextPage: () => Promise<void>
+  fetchPreviousPage: () => Promise<void>
+  refetch: () => Promise<void>
+}
+```
+
+### Example
+
+```tsx
+import { useInfiniteQuery } from 'react-doura'
+import { postsModel } from './models/posts'
+
+function PostList() {
+  const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useInfiniteQuery(postsModel.fetchPage, {
+      initialArgs: [1] as [number],
+      getNextArgs: (lastPage, allPages) =>
+        lastPage.hasMore ? ([allPages.length + 1] as [number]) : undefined,
+    })
+
+  if (isLoading) return <div>Loading...</div>
+
+  return (
+    <div>
+      {data?.pages.flatMap((page) =>
+        page.items.map((post) => <div key={post.id}>{post.title}</div>)
+      )}
+      {hasNextPage && (
+        <button onClick={fetchNextPage} disabled={isFetchingNextPage}>
+          {isFetchingNextPage ? 'Loading more...' : 'Load more'}
+        </button>
+      )}
+    </div>
   )
 }
 ```
 
 ## createContainer
 
-Create a group api for share states.
+Creates an isolated store scope with its own `Provider`, `useSharedModel`, and `useStaticModel`. Useful for independent state contexts within the same app.
 
 ### Types
 
@@ -258,19 +424,42 @@ Create a group api for share states.
 declare const createContainer: (options?: DouraOptions) => {
   Provider: (
     props: PropsWithChildren<{
-      store?: Doura
+      store?: Doura // optional — auto-creates if omitted
     }>
   ) => JSX.Element
-  useSharedModel: UseNamedModel
+  useSharedModel: UseModel
   useStaticModel: UseStaticModel
 }
 ```
+
 ### Example
 
 ```ts
+import { createContainer } from 'react-doura'
+
 const {
-  Provider, // context as same as DouraRoot
-  useSharedModel, // as same as useModel and it first param must be `name`
-  useStaticModel, // as same as useStaticModel
+  Provider, // scoped context provider
+  useSharedModel, // reactive hook scoped to this container
+  useStaticModel, // non-reactive hook scoped to this container
 } = createContainer()
+```
+
+## Selector Types
+
+```ts
+type Selector<ModelDef extends ModelDefinition<Model>, TReturn = any> = (
+  api: ModelAPI<ModelDef>,
+  actions: ModelActions<ModelDef>
+) => TReturn
+```
+
+### Example
+
+```ts
+import { Selector } from 'react-doura'
+import { ModelAPI, ModelActions } from 'doura'
+
+const countSelector: Selector<typeof countModel> = (s, actions) => {
+  return { count: s.count, add: actions.add }
+}
 ```

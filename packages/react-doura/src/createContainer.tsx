@@ -1,65 +1,81 @@
-import React, {
+import {
   createContext,
   useContext,
-  PropsWithChildren,
+  type PropsWithChildren,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react'
-import { Doura, AnyModel, DouraOptions, Selector, doura } from 'doura'
+import {
+  type Doura,
+  type Model,
+  type ModelDefinition,
+  type DouraOptions,
+  type Selector,
+  doura,
+  nextTick,
+} from 'doura'
 import { createUseModel, createUseStaticModel } from './createUseModel'
-import { UseNamedModel, UseStaticModel } from './types'
+import type { UseSharedModel, UseStaticModel } from './types'
 import { DouraContext } from './context'
+import { MISSING_PROVIDER_MESSAGE } from './errors'
 
-function checkName(name: any) {
-  if (!name) {
-    throw new Error(`[react-doura]: "name" is required and can not be empty.`)
-  }
-}
-
-const createContainer = function (options?: DouraOptions) {
+const createContainer = (options?: DouraOptions) => {
   const Context = createContext<{
     store: Doura
   }>(null as any)
   function Provider(props: PropsWithChildren<{ store?: Doura }>) {
     const { children, store: propsStore } = props
     const internalStoreRef = useRef<Doura | null>(null)
+    const pendingDestroyStoreRef = useRef<Doura | null>(null)
 
-    const memoContext = useMemo(
-      function () {
-        let store: Doura
-        if (propsStore) {
-          store = propsStore
-        } else {
-          store = doura(options)
-          internalStoreRef.current = store
+    const memoContext = useMemo(() => {
+      let store: Doura
+      if (propsStore) {
+        store = propsStore
+      } else {
+        if (!internalStoreRef.current) {
+          internalStoreRef.current = doura(options)
         }
-        return {
-          store,
-        }
-      },
-      [propsStore]
-    )
+        store = internalStoreRef.current
+      }
+      return {
+        store,
+        ownsStore: !propsStore,
+      }
+    }, [propsStore])
 
     const [contextValue, setContextValue] = useState(memoContext) // for hmr keep contextValue
 
-    useEffect(
-      function () {
-        setContextValue(memoContext)
-      },
-      [propsStore]
-    )
+    useEffect(() => {
+      setContextValue(memoContext)
+    }, [memoContext])
 
-    useEffect(
-      function () {
-        return function () {
-          internalStoreRef.current?.destroy()
-          internalStoreRef.current = null
+    useEffect(() => {
+      if (pendingDestroyStoreRef.current === memoContext.store) {
+        pendingDestroyStoreRef.current = null
+      }
+
+      return () => {
+        if (
+          memoContext.ownsStore &&
+          internalStoreRef.current === memoContext.store
+        ) {
+          pendingDestroyStoreRef.current = memoContext.store
+          nextTick(() => {
+            if (
+              pendingDestroyStoreRef.current === memoContext.store &&
+              internalStoreRef.current === memoContext.store
+            ) {
+              memoContext.store.destroy()
+              internalStoreRef.current = null
+              pendingDestroyStoreRef.current = null
+            }
+          })
         }
-      },
-      [memoContext]
-    )
+      }
+    }, [memoContext])
 
     return (
       <DouraContext.Provider value={contextValue}>
@@ -72,45 +88,34 @@ const createContainer = function (options?: DouraOptions) {
     const context = useContext(Context)
 
     if (__DEV__ && !context) {
-      throw new Error(
-        `[react-doura]: could not find react-doura context value; please ensure the component is wrapped in a <Provider>.`
-      )
+      throw new Error(MISSING_PROVIDER_MESSAGE)
     }
     return context
   }
 
-  const useSharedModel: UseNamedModel = <
-    IModel extends AnyModel,
-    S extends Selector<IModel>
+  const useSharedModel: UseSharedModel = <
+    ModelDef extends ModelDefinition<Model>,
+    S extends Selector<ModelDef>,
   >(
-    name: string,
-    model: IModel,
+    model: ModelDef,
     selector?: S,
     depends?: any[]
   ) => {
-    if (__DEV__) {
-      checkName(name)
-    }
-
     const { store } = useDouraContext()
     return useMemo(() => createUseModel(store), [store])(
-      name,
       model,
       selector,
       depends
     )
   }
 
-  const useStaticModel: UseStaticModel = <IModel extends AnyModel>(
-    name: string,
-    model: IModel
+  const useStaticModel: UseStaticModel = <
+    ModelDef extends ModelDefinition<Model>,
+  >(
+    model: ModelDef
   ) => {
-    if (__DEV__) {
-      checkName(name)
-    }
-
     const { store } = useDouraContext()
-    return useMemo(() => createUseStaticModel(store), [store])(name, model)
+    return useMemo(() => createUseStaticModel(store), [store])(model)
   }
 
   return {

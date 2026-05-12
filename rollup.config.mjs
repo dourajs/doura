@@ -113,9 +113,15 @@ function createConfig(format, output, plugins = []) {
   let entryFile = `src/index.ts`
 
   let external = []
+  const reactRuntimeExternals = ['react/jsx-runtime', 'react/jsx-dev-runtime']
 
   if (isGlobalBuild || isBrowserESMBuild) {
-    external = ['react', 'react-dom', 'use-sync-external-store/shim']
+    external = [
+      'react',
+      'react-dom',
+      'use-sync-external-store/shim',
+      ...reactRuntimeExternals,
+    ]
   } else if (isBundlerESMBuild || isNodeBuild) {
     // Node / esm-bundler builds.
     // externalize all direct deps
@@ -124,6 +130,7 @@ function createConfig(format, output, plugins = []) {
       ...Object.keys(pkg.peerDependencies || {}),
       // submodule used by react-doura
       'use-sync-external-store/shim',
+      ...reactRuntimeExternals,
     ]
   }
 

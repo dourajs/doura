@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { defineModel } from 'doura'
 import { createContainer, useStaticModel } from '../src/index'
-import { UseNamedModel, UseStaticModel } from '../src/types'
+import { UseSharedModel, UseStaticModel } from '../src/types'
 
 import { expectType } from './index'
 
@@ -18,10 +18,11 @@ function Test() {
     </_Provider>
   )
   expectType<JSX.Element>(testElement)
-  expectType<UseNamedModel>(_useSharedModel)
+  expectType<UseSharedModel>(_useSharedModel)
   expectType<UseStaticModel>(_useStaticModel)
 
   const tempModel = defineModel({
+    name: 'temp',
     state: {
       value: {
         n: 1,
@@ -34,7 +35,7 @@ function Test() {
       },
     },
   })
-  const model = useStaticModel('temp', tempModel)
+  const model = useStaticModel(tempModel)
 
   expectType<{ n: number; s: string }>(model.current.value)
   expectType<void>(model.add(1))

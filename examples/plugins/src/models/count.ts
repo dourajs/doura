@@ -4,12 +4,10 @@ import { delay } from './utils'
 export const count = defineModel({
   name: 'count',
   state: { value: 0 },
-  reducers: {
-    add: (state, payload: number) => {
-      state.value += payload // change state by immer way
-    },
-  },
   actions: {
+    add(payload: number) {
+      this.value += payload
+    },
     async addAsync() {
       await delay(2)
       this.add(1)

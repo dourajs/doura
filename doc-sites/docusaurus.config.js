@@ -88,6 +88,36 @@ const config = {
     }),
 
   plugins: [
+    function rawMarkdownPlugin() {
+      return {
+        name: 'raw-markdown',
+        async postBuild({ outDir }) {
+          const fs = require('fs/promises')
+          const path = require('path')
+          const docsDir = path.join(__dirname, 'docs')
+
+          async function copyMd(dir, rel) {
+            const entries = await fs.readdir(dir, { withFileTypes: true })
+            for (const entry of entries) {
+              const srcPath = path.join(dir, entry.name)
+              const relPath = path.join(rel, entry.name)
+              if (entry.isDirectory()) {
+                await copyMd(srcPath, relPath)
+              } else if (
+                entry.name.endsWith('.md') ||
+                entry.name.endsWith('.mdx')
+              ) {
+                const destPath = path.join(outDir, 'docs', relPath)
+                await fs.mkdir(path.dirname(destPath), { recursive: true })
+                await fs.copyFile(srcPath, destPath)
+              }
+            }
+          }
+
+          await copyMd(docsDir, '')
+        },
+      }
+    },
     [
       'client-redirects',
       /** @type {import('@docusaurus/plugin-client-redirects').Options} */

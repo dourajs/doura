@@ -1,16 +1,17 @@
 import * as React from 'react'
-import { ModelData } from 'doura'
-import { useModel } from '../../../../packages/react-doura/esm'
+import { ModelAPI } from 'doura'
+import { useModel } from 'react-doura'
 
 import { fetchA, fetchB } from '../models/fetchData'
 
-export type fetchASelectorParams = ModelData<typeof fetchA>
-export type fetchBSelectorParams = ModelData<typeof fetchB>
+export type fetchASelectorParams = ModelAPI<typeof fetchA>
+export type fetchBSelectorParams = ModelAPI<typeof fetchB>
 
 const fetchASelector = function (stateAndViews: fetchASelectorParams) {
   return {
     data: stateAndViews.data,
     isLoading: stateAndViews.isLoading,
+    fetchAData: stateAndViews.fetchAData,
   }
 }
 
@@ -18,28 +19,33 @@ const fetchBSelector = function (stateAndViews: fetchBSelectorParams) {
   return {
     data: stateAndViews.data,
     isLoading: stateAndViews.isLoading,
+    fetchBData: stateAndViews.fetchBData,
   }
 }
 
 function Fetch() {
-  const [{ data: Adata, isLoading: isALoading }, { fetchAData }] = useModel(
-    fetchA,
-    fetchASelector
-  )
-  const [{ data: Bdata, isLoading: isBLoading }, { fetchBData }] = useModel(
-    fetchB,
-    fetchBSelector
-  )
+  const fetchAState = useModel(fetchA, fetchASelector)
+  const fetchBState = useModel(fetchB, fetchBSelector)
   return (
     <div>
       <h3>fetch example</h3>
       <div>
-        <div>{isALoading ? 'A is loading' : JSON.stringify(Adata)}</div>
-        <button onClick={() => fetchAData('string')}>fetchAData</button>
+        <div>
+          {fetchAState.isLoading
+            ? 'A is loading'
+            : JSON.stringify(fetchAState.data)}
+        </div>
+        <button onClick={() => fetchAState.fetchAData('string')}>
+          fetchAData
+        </button>
       </div>
       <div>
-        <div>{isBLoading ? 'B is loading' : JSON.stringify(Bdata)}</div>
-        <button onClick={() => fetchBData(1)}>fetchBData</button>
+        <div>
+          {fetchBState.isLoading
+            ? 'B is loading'
+            : JSON.stringify(fetchBState.data)}
+        </div>
+        <button onClick={() => fetchBState.fetchBData(1)}>fetchBData</button>
       </div>
       <hr />
     </div>

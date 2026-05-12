@@ -1,11 +1,17 @@
 import {
   draft,
-  MapDraftState,
-  SetDraftState,
+  type MapDraftState,
+  type SetDraftState,
   DraftType,
-  DraftState,
+  type DraftState,
 } from './draft'
-import { ReactiveFlags, latest, markChanged, isDraft, Drafted } from './common'
+import {
+  ReactiveFlags,
+  latest,
+  markChanged,
+  isDraft,
+  type Drafted,
+} from './common'
 import {
   track,
   trackDraft,
@@ -15,7 +21,13 @@ import {
 } from './effect'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import { hasOwn, is, isObject } from '../utils'
-import { AnyMap, AnySet, CollectionTypes, Iterable, Iterator } from '../types'
+import type {
+  AnyMap,
+  AnySet,
+  CollectionTypes,
+  Iterable,
+  Iterator,
+} from '../types'
 
 export type CollectionState = MapDraftState | SetDraftState
 
@@ -265,7 +277,7 @@ function mapForEach(
     // important: make sure the callback is
     // 1. invoked with the reactive map as `this` and 3rd arg
     // 2. the value received should be a corresponding draft.
-    return callback.call(thisArg, (state.proxy as AnyMap).get(key), key, self)
+    callback.call(thisArg, (state.proxy as AnyMap).get(key), key, self)
   })
 }
 

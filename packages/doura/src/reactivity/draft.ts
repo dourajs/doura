@@ -1,17 +1,17 @@
 import {
-  Target,
+  type Target,
   TargetType,
   ReactiveFlags,
   isDraft,
-  Drafted,
+  type Drafted,
   getTargetType,
 } from './common'
 import { mutableHandlers } from './baseHandlers'
 import { mutableCollectionHandlers } from './collectionHandlers'
 import { isObject, isArray, shallowCopy, removeUnordered } from '../utils'
-import { AnyObject, Objectish, AnySet, AnyMap } from '../types'
+import type { AnyObject, Objectish, AnySet, AnyMap } from '../types'
 
-export const enum DraftType {
+export enum DraftType {
   Object,
   Map,
   Set,
@@ -148,8 +148,10 @@ function initDraftState(
 export function draft<T extends Objectish>(
   target: T & Target,
   parent?: DraftState,
-  key?: any
+  ...rest: [key?: any]
 ): T & Drafted {
+  const key = rest[0]
+
   // only specific value types can be observed.
   const targetType = getTargetType(target)
   if (targetType === TargetType.INVALID) {
@@ -165,7 +167,7 @@ export function draft<T extends Objectish>(
     return target as any
   }
 
-  const keyValue = arguments.length >= 3 ? key : NO_KEY
+  const keyValue = rest.length >= 1 ? key : NO_KEY
   let proxyTarget: DraftState
   let proxyHandlers: ProxyHandler<any>
 
@@ -385,7 +387,7 @@ function resolveStates(
           if (!childState) return
           const res =
             resolved.get(childState) ||
-            (cache && cache.get(childProxy)) ||
+            cache?.get(childProxy) ||
             childState.base
           target.set(key, res)
         })
@@ -395,7 +397,7 @@ function resolveStates(
           if (!childState) return
           const res =
             resolved.get(childState) ||
-            (cache && cache.get(childProxy)) ||
+            cache?.get(childProxy) ||
             childState.base
           target[key as any] = res
         })
@@ -486,7 +488,7 @@ function collectModified(
   if (state.childDrafts) {
     state.childDrafts.forEach((proxy) => {
       const childState: DraftState | undefined = proxy[ReactiveFlags.STATE]
-      if (childState && childState.modified) {
+      if (childState?.modified) {
         collectModified(childState, result, visited)
       }
     })
@@ -498,7 +500,7 @@ function collectModified(
     if (setState.drafts && setState.drafts.size > 0) {
       setState.drafts.forEach((draftProxy) => {
         const ds: DraftState | undefined = draftProxy[ReactiveFlags.STATE]
-        if (ds && ds.modified) {
+        if (ds?.modified) {
           collectModified(ds, result, visited)
         }
       })

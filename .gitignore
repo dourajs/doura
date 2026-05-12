@@ -16,7 +16,6 @@ node_modules
 
 # build output
 dist/
-temp/
 packages/*/dist/
 examples/*/build
 benchmark.csv
@@ -25,4 +24,5 @@ benchmark.csv
 .claude
 
 # other
-.tmp
+.docs/superpowers
+.local

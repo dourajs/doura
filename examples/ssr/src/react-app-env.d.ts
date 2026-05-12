@@ -1,4 +1,4 @@
 /// <reference types="react-scripts" />
 interface Window {
-	clientEnv: Record<string, any>
+  clientEnv: Record<string, any>
 }

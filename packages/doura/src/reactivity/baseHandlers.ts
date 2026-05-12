@@ -1,8 +1,8 @@
-import { ObjectDraftState, DraftState, draft } from './draft'
+import { type ObjectDraftState, type DraftState, draft } from './draft'
 import { TrackOpTypes, TriggerOpTypes } from './operations'
 import {
   ReactiveFlags,
-  Drafted,
+  type Drafted,
   toBase,
   toState,
   latest,
@@ -146,7 +146,7 @@ function createGetter(): ProxyGetter {
       // Check childDrafts first — a previous read may have already created
       // a draft for this key without triggering prepareCopy.
       // draft() auto-writes to parent.childDrafts when key is provided.
-      let childDraft = state.childDrafts && state.childDrafts.get(prop)
+      let childDraft = state.childDrafts?.get(prop)
       if (!childDraft) {
         childDraft = draft(value, state, prop)
       }
@@ -169,9 +169,11 @@ function createSetter() {
     receiver: object
   ): boolean {
     const target = latest(state)
+    const oldArrayLength =
+      isArray(target) && prop === 'length' ? target.length : undefined
     // Inline peek: target is already latest(state), a plain object
     // (not a proxy), so direct property access is sufficient.
-    const current = target[prop]
+    const current = (target as any)[prop]
 
     const hadKey =
       isArray(target) && isIntegerKey(prop)
@@ -242,6 +244,19 @@ function createSetter() {
     }
 
     state.copy![prop] = value
+
+    if (
+      oldArrayLength !== undefined &&
+      state.copy!.length < oldArrayLength &&
+      state.childDrafts
+    ) {
+      const newArrayLength = state.copy!.length
+      state.childDrafts.forEach((_childDraft, key) => {
+        if (isIntegerKey(key) && Number(key) >= newArrayLength) {
+          state.childDrafts!.delete(key)
+        }
+      })
+    }
 
     // Track user-assigned keys for finalization (resolveStates).
     // Only object values need tracking — they may contain draft proxies
@@ -325,7 +340,7 @@ function getOwnPropertyDescriptor(state: ObjectDraftState, key: any) {
     writable: true,
     configurable: !isArray(target) || key !== 'length',
     enumerable: desc.enumerable,
-    value: target[key],
+    value: (target as any)[key],
   }
 }
 

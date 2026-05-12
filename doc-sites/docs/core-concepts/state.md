@@ -3,15 +3,15 @@ id: state
 title: State
 ---
 
-The state is, most of the time, the central part of your model. People often start by defining the state that represents their app.
+State is the initial data shape of a model. It must be present in
+`defineModel()` and should include every state property you plan to use.
 
-```js
+```ts
 import { defineModel } from 'doura'
 
 export const countModel = defineModel({
-  // arrow function recommended for full type inference
+  name: 'counter',
   state: {
-    // all these properties will have their type inferred automatically
     count: 0,
     name: 'test',
     max: 100,
@@ -19,28 +19,64 @@ export const countModel = defineModel({
 })
 ```
 
-## Accessing the `state`
+## Accessing State
 
-By default, you can directly read and write to the state by accessing it through the `model` instance:
+Model instances expose state keys directly:
 
-```js
-const counter = store.getModel('counter', countModel)
+```ts
+const counter = store.getModel(countModel)
 
-counter.count++
+console.log(counter.count)
 ```
 
-Note you cannot add a new state property **if you don't define it in `state`**, it must contain the initial state. e.g.: we can't do `counter.secondCount = 2` if `secondCount` is not defined in `state`.
+Actions can update state through `this`:
 
-## Replacing the `state`
-
-You **cann replace** the state of a model by assgining the new state to `$state`:
-
-```js
-const model = store.getModel('counter', countModel)
-
-model.$state = { count: 24 }
+```ts
+actions: {
+  increment() {
+    this.count += 1
+  },
+}
 ```
 
-## Subscribing to the state
+External consumers should update state by calling actions. Direct writes to a
+public instance are intended for low-level use; model state changes are normally
+centralized in actions.
 
-Documentation coming soon...
+## Replacing State
+
+Assign to `$state` to replace the whole state object:
+
+```ts
+const counter = store.getModel(countModel)
+
+counter.$state = { count: 24, name: 'test', max: 100 }
+```
+
+Use `$patch()` to deep-merge a partial object:
+
+```ts
+counter.$patch({ count: 25 })
+```
+
+## Subscribing
+
+Use `$subscribe` for one model instance:
+
+```ts
+const unsubscribe = counter.$subscribe(() => {
+  console.log(counter.$rawState)
+})
+
+unsubscribe()
+```
+
+Use `store.subscribe()` to listen to changes from any named model in the store:
+
+```ts
+const unsubscribe = store.subscribe(() => {
+  console.log(store.getState())
+})
+
+unsubscribe()
+```

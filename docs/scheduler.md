@@ -2,7 +2,7 @@
 
 源码位置：`packages/doura/src/core/scheduler.ts`
 
-Doura 的调度器直接移植自 Vue 3，基于 microtask 的异步批处理队列。它在 doura 中承担两个职责：
+Doura 的调度器基于 microtask 的异步批处理队列。它在 doura 中承担两个职责：
 
 1. **延迟合并**：draft 的多次 trigger 只产生一次 `_update` 调用
 2. **被 action 绕过**：action depth=0 时同步刷新，确保调用者立即拿到新 state
@@ -12,13 +12,14 @@ Doura 的调度器直接移植自 Vue 3，基于 microtask 的异步批处理队
 ## 核心状态
 
 ```ts
-// scheduler.ts:28-43
+// scheduler.ts:15-24
 let isFlushing = false        // 正在执行队列
 let isFlushPending = false    // 已安排 microtask 但尚未执行
 
-const queue: SchedulerJob[] = []              // 主队列
-const pendingPreFlushCbs: SchedulerJob[] = [] // pre-flush 回调
-const pendingPostFlushCbs: SchedulerJob[] = [] // post-flush 回调
+const queue: SchedulerJob[] = []       // 主队列
+let flushIndex = 0
+const postQueue: SchedulerJob[] = []   // post-flush 队列
+let postFlushIndex = 0
 
 const resolvedPromise = Promise.resolve()
 let currentFlushPromise: Promise<void> | null = null
@@ -28,7 +29,7 @@ let currentFlushPromise: Promise<void> | null = null
 
 ## queueJob — 入队
 
-`scheduler.ts:76-98`:
+`scheduler.ts:55-70`:
 
 ```ts
 function queueJob(job) {
@@ -44,7 +45,7 @@ function queueJob(job) {
 }
 ```
 
-`queueFlush()` (`scheduler.ts:100-105`): 如果还没有 pending microtask，安排一个：
+`queueFlush()` (`scheduler.ts:79-84`): 如果还没有 pending microtask，安排一个：
 
 ```ts
 function queueFlush() {
@@ -59,7 +60,7 @@ function queueFlush() {
 
 ## invalidateJob — 取消排队
 
-`scheduler.ts:107-112`:
+`scheduler.ts:86-91`:
 
 ```ts
 function invalidateJob(job) {
@@ -76,39 +77,34 @@ function invalidateJob(job) {
 
 ## flushJobs — 执行队列
 
-`scheduler.ts:217-276`:
+`scheduler.ts:96-141`:
 
 ```
 flushJobs()
-    │
-    ├── flushPreFlushCbs()       ← 执行 pre-flush 回调
     │
     ├── queue.sort(by id)        ← 按 id 排序保证执行顺序
     │
     ├── for each job in queue:
     │     job()                  ← 执行任务
     │
-    ├── flushPostFlushCbs()      ← 执行 post-flush 回调
+    ├── flushPostJobs()          ← 执行 post-flush 回调
     │
-    └── if (queue.length || pending*Cbs.length)
+    └── if (queue.length || postQueue.length)
           flushJobs()            ← 递归排干（有些 post-flush 可能产生新 job）
 ```
 
-### 三阶段设计
+### 两阶段设计
 
 | 阶段 | 队列 | 典型用途 |
 |------|------|---------|
-| Pre-flush | `pendingPreFlushCbs` | 在主任务前执行的准备工作 |
 | Main | `queue` | Model `_update`、ModelManager 全局通知 |
-| Post-flush | `pendingPostFlushCbs` | 主任务完成后的清理/副作用 |
-
-Doura 目前主要使用 main queue（`queueJob`）。Pre/Post flush 机制保留自 Vue 3 移植，为未来扩展预留。
+| Post-flush | `postQueue` | 主任务完成后的清理/副作用 |
 
 ---
 
 ## 递归保护
 
-`scheduler.ts:278-297`:
+`scheduler.ts:174-193`:
 
 ```ts
 const RECURSION_LIMIT = 100
@@ -129,7 +125,7 @@ function checkRecursiveUpdates(seen, fn) {
 
 ## nextTick
 
-`scheduler.ts:50-56`:
+`scheduler.ts:29-35`:
 
 ```ts
 function nextTick(fn?) {

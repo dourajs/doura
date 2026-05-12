@@ -6,40 +6,35 @@ type item = {
   content: string
 }
 
-export const listA = defineModel(
-  {
-    name: 'listA',
-    state: {
-      arr: [
-        {
-          id: 0,
-          content: 'content 0',
-        },
-        {
-          id: 1,
-          content: 'content 1',
-        },
-      ],
+export const listA = defineModel({
+  name: 'listA',
+  models: [id],
+  state: {
+    arr: [
+      {
+        id: 0,
+        content: 'content 0',
+      },
+      {
+        id: 1,
+        content: 'content 1',
+      },
+    ],
+  },
+  actions: {
+    addList(payload: Partial<item> & { content: string }) {
+      this.arr.push({
+        id: this.arr.length + 1,
+        content: payload.content,
+      })
     },
-    reducers: {
-      addList(state, payload: Partial<item> & { content: string }) {
-        state.arr.push({
-          id: state.arr.length + 1,
-          content: payload.content,
-        })
-      },
-      removeById(state, payload: number) {
-        state.arr = state.arr.filter((item) => item.id !== payload)
-      },
+    removeById(payload: number) {
+      this.arr = this.arr.filter((item) => item.id !== payload)
     },
-    actions: {
-      async addContentAsync(payload: string) {
-        const id = this.$dep.id
-        await id.setId(id.$state.id + 1)
-        const tempId = id.$state.id
-        this.addList({ content: `${payload}-id:${tempId}` })
-      },
+    async addContentAsync(payload: string) {
+      await this.id.setId(this.id.id + 1)
+      const tempId = this.id.id
+      this.addList({ content: `${payload}-id:${tempId}` })
     },
   },
-  [id]
-)
+})

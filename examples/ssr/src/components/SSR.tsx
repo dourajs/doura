@@ -1,22 +1,22 @@
 import * as React from 'react'
-import { useRootModel } from 'react-doura'
+import { useModel } from 'react-doura'
 
 import { test } from '../models/test'
 import { count } from '../models/count'
 
 function Count() {
-  const [{ value }, { increment, incrementAsync }] = useRootModel(count)
-  const [{ value: testString }, _] = useRootModel(test)
+  const counter = useModel(count)
+  const testState = useModel(test)
   return (
     <div>
       <h1>SSR data form server</h1>
       <div>
-        <h3>test: {testString}</h3>
+        <h3>test: {testState.value}</h3>
       </div>
       <div>
-        <h3>count: {value}</h3>
-        <button onClick={() => increment(1)}>Immer reducer +1</button>
-        <button onClick={incrementAsync}>Async action +1</button>
+        <h3>count: {counter.value}</h3>
+        <button onClick={() => counter.increment(1)}>Immer reducer +1</button>
+        <button onClick={counter.incrementAsync}>Async action +1</button>
       </div>
       <hr />
     </div>

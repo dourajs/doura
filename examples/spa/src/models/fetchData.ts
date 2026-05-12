@@ -4,58 +4,50 @@ import { delay } from './utils'
 
 // loading is part of the fetchA and fetchB, use depend to compose
 
-export const fetchA = defineModel(
-  {
-    name: 'fetchA',
-    state: {
-      data: [] as string[],
+export const fetchA = defineModel({
+  name: 'fetchA',
+  models: [loading],
+  state: {
+    data: [] as string[],
+  },
+  actions: {
+    setData(payload: string[] = []) {
+      this.data = payload
     },
-    reducers: {
-      setData: (state, payload: string[] = []) => {
-        state.data = payload
-      },
-    },
-    actions: {
-      fetchAData(arg: string) {
-        this.$dep.loading.isLoading()
-        delay(200)
-        this.setData([arg])
-        this.$dep.loading.notLoading()
-      },
-    },
-    views: {
-      isLoading() {
-        return this.$dep.loading.isLoading
-      },
+    fetchAData(arg: string) {
+      this.loading.setLoading(true)
+      void delay(200)
+      this.setData([arg])
+      this.loading.setLoading(false)
     },
   },
-  [loading]
-)
+  views: {
+    isLoading() {
+      return this.loading.isLoading
+    },
+  },
+})
 
-export const fetchB = defineModel(
-  {
-    name: 'fetchB',
-    state: {
-      data: [] as number[],
+export const fetchB = defineModel({
+  name: 'fetchB',
+  models: [loading],
+  state: {
+    data: [] as number[],
+  },
+  actions: {
+    setData(payload: number[] = []) {
+      this.data = payload
     },
-    reducers: {
-      setData: (state, payload: number[] = []) => {
-        state.data = payload
-      },
-    },
-    actions: {
-      fetchBData(arg: number) {
-        this.$dep.loading.isLoading()
-        delay(200)
-        this.setData([arg])
-        this.$dep.loading.notLoading()
-      },
-    },
-    views: {
-      isLoading() {
-        return this.$dep.loading.isLoading
-      },
+    fetchBData(arg: number) {
+      this.loading.setLoading(true)
+      void delay(200)
+      this.setData([arg])
+      this.loading.setLoading(false)
     },
   },
-  [loading]
-)
+  views: {
+    isLoading() {
+      return this.loading.isLoading
+    },
+  },
+})

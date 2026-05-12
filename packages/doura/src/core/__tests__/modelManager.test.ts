@@ -1,4 +1,4 @@
-import { defineModel, modelManager, Plugin, use } from '../index'
+import { defineModel, modelManager, Plugin } from '../index'
 import { nextTick } from '../scheduler'
 
 describe('modelManager', () => {
@@ -11,6 +11,7 @@ describe('modelManager', () => {
   it('should have the proper api', () => {
     const modelMgr = modelManager()
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         actionOne() {},
@@ -20,7 +21,7 @@ describe('modelManager', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(typeof store.$state).toBe('object')
     expect(typeof store.$actions).toBe('object')
     expect(typeof store.$views).toBe('object')
@@ -34,31 +35,43 @@ describe('modelManager', () => {
   })
 
   it('should init store by initialStage', () => {
-    const modelMgr = modelManager({
-      initialState: {
-        one: {
-          value: 'one',
-        },
-        two: {
-          value: 'two',
-        },
+    const initialState = {
+      one: {
+        value: 'one',
       },
+      two: {
+        value: 'two',
+      },
+    }
+    const modelMgr = modelManager({
+      initialState,
     })
     const modelOne = defineModel({
+      name: 'one',
       state: { value: 0 },
     })
     const modelTwo = defineModel({
+      name: 'two',
       state: { value: 0 },
     })
-    const storeOne = modelMgr.getModel('one', modelOne)
-    const storeTwo = modelMgr.getModel('two', modelTwo)
+    const storeOne = modelMgr.getModel(modelOne)
+    const storeTwo = modelMgr.getModel(modelTwo)
     expect(storeOne.$state.value).toBe('one')
     expect(storeTwo.$state.value).toBe('two')
+    expect(initialState).toEqual({
+      one: {
+        value: 'one',
+      },
+      two: {
+        value: 'two',
+      },
+    })
   })
 
   it('getState should return the newest state', async () => {
     const modelMgr = modelManager()
     const count0 = defineModel({
+      name: 'count0',
       state: { value: 0 },
       actions: {
         increment(v: number) {
@@ -67,6 +80,7 @@ describe('modelManager', () => {
       },
     })
     const count1 = defineModel({
+      name: 'count1',
       state: { value: 0 },
       actions: {
         increment(v: number) {
@@ -75,8 +89,8 @@ describe('modelManager', () => {
       },
     })
 
-    const store0 = modelMgr.getModel('count0', count0)
-    const store1 = modelMgr.getModel('count1', count1)
+    const store0 = modelMgr.getModel(count0)
+    const store1 = modelMgr.getModel(count1)
     expect(modelMgr.getState()).toEqual({
       count0: { value: 0 },
       count1: { value: 0 },
@@ -93,6 +107,7 @@ describe('modelManager', () => {
   it('should destroy', () => {
     const modelMgr = modelManager()
     const model = defineModel({
+      name: 'model',
       state: { value: 0 },
       actions: {
         increment(v: number) {
@@ -101,14 +116,96 @@ describe('modelManager', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     store.increment(1)
     expect(store.$state.value).toBe(1)
 
     modelMgr.destroy()
-    const newStore = modelMgr.getModel('test', model)
+    const newStore = modelMgr.getModel(model)
     expect(newStore).not.toBe(store)
     expect(newStore.$state.value).toBe(0)
+  })
+
+  it('should get a model by its defineModel name option', () => {
+    const modelMgr = modelManager()
+    const model = defineModel({
+      name: 'named',
+      state: { value: 0 },
+      actions: {
+        increment() {
+          this.value += 1
+        },
+      },
+    })
+
+    const store = modelMgr.getModel(model)
+    store.increment()
+    expect(store.$name).toBe('named')
+    expect(modelMgr.getState()).toEqual({
+      named: { value: 1 },
+    })
+  })
+
+  it('should use the defineModel name option as the shared model name', () => {
+    const modelMgr = modelManager()
+    const model = defineModel({
+      name: 'declared',
+      state: { value: 0 },
+    })
+
+    const store = modelMgr.getModel(model)
+    expect(store.$name).toBe('declared')
+    expect(modelMgr.getState()).toEqual({
+      declared: { value: 0 },
+    })
+  })
+
+  it('should reject raw object model options', () => {
+    const modelMgr = modelManager()
+
+    expect(() => modelMgr.getModel({ state: { value: 0 } } as any)).toThrow(
+      'invalid model definition'
+    )
+    expect(() =>
+      modelMgr.getModel({ name: '', state: { value: 0 } } as any)
+    ).toThrow('invalid model definition')
+    expect(() =>
+      modelMgr.getDetachedModel({ state: { value: 0 } } as any)
+    ).toThrow('invalid model definition')
+  })
+
+  it('should warn when the same name is requested with a different model options reference', () => {
+    const modelMgr = modelManager()
+    const first = defineModel({
+      name: 'shared',
+      state: { value: 1 },
+    })
+    const second = defineModel({
+      name: 'shared',
+      state: { value: 2 },
+    })
+
+    const firstStore = modelMgr.getModel(first)
+    const secondStore = modelMgr.getModel(second)
+
+    expect(secondStore).toBe(firstStore)
+    expect(
+      `model "shared" has already been initialized with a different model options reference`
+    ).toHaveBeenWarned()
+  })
+
+  it('should not warn when detached models have a name option', () => {
+    const modelMgr = modelManager()
+    const model = defineModel({
+      name: 'detached',
+      state: { value: 0 },
+    })
+
+    const first = modelMgr.getDetachedModel(model)
+    const second = modelMgr.getDetachedModel(model)
+
+    expect(first).not.toBe(second)
+    expect(modelMgr.getState()).toEqual({})
   })
 
   it('should trigger change when dependencies have changed', async () => {
@@ -121,6 +218,7 @@ describe('modelManager', () => {
     })
 
     const firstModel = defineModel({
+      name: 'first',
       state: { value: 0 },
       actions: {
         addOne() {
@@ -128,24 +226,23 @@ describe('modelManager', () => {
         },
       },
     })
-    const fisrt = modelMgr.getModel('first', firstModel)
+    const fisrt = modelMgr.getModel(firstModel)
 
     fisrt.$subscribe(() => {
       dependCount++
     })
-    const secondModel = defineModel(() => {
-      void use('first', firstModel)
-      return {
-        state: { value: 0 },
-        actions: {
-          add(n: number) {
-            this.value += n
-          },
+    const secondModel = defineModel({
+      name: 'second',
+      state: { value: 0 },
+      models: [firstModel],
+      actions: {
+        add(n: number) {
+          this.value += n
         },
-      }
+      },
     })
 
-    const second = modelMgr.getModel('second', secondModel)
+    const second = modelMgr.getModel(secondModel)
     second.$subscribe(() => {
       modelCount++
     })
@@ -172,6 +269,7 @@ describe('modelManager', () => {
       const fn = jest.fn()
       const modelMgr = modelManager()
       const modelA = defineModel({
+        name: 'modelA',
         state: { value: 0 },
         actions: {
           increment(n: number) {
@@ -179,21 +277,20 @@ describe('modelManager', () => {
           },
         },
       })
-      const modelB = defineModel(() => {
-        const a = use(modelA)
-        return {
-          state: { value: 0 },
-          actions: {
-            increment(n: number) {
-              a.increment(n)
-              this.value += n
-            },
+      const modelB = defineModel({
+        name: 'b',
+        state: { value: 0 },
+        models: [modelA],
+        actions: {
+          increment(n: number) {
+            this.modelA.increment(n)
+            this.value += n
           },
-        }
+        },
       })
 
       modelMgr.subscribe(fn)
-      const store = modelMgr.getModel('b', modelB)
+      const store = modelMgr.getModel(modelB)
 
       expect(fn).toHaveBeenCalledTimes(0)
       store.increment(1)
@@ -227,10 +324,13 @@ describe('modelManager', () => {
       expect(onInit).toHaveBeenCalledWith({ initialState }, { doura: modelMgr })
 
       const model = defineModel({
+        name: 'model',
         state: { value: '' },
       })
-      modelMgr.getModel('test', model)
-      expect(onModel).toHaveBeenCalledWith('test', model, { doura: modelMgr })
+      modelMgr.getModel(model)
+      expect(onModel).toHaveBeenCalledWith('model', model.$options, {
+        doura: modelMgr,
+      })
       expect(typeof onModelInstance.mock.calls[0][0].$name).toBe('string')
       expect(typeof onModelInstance.mock.calls[0][0].$state).toBe('object')
       expect(typeof onModelInstance.mock.calls[0][0].$subscribe).toBe(

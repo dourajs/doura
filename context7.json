@@ -1,0 +1,14 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/dourajs/doura",
+  "public_key": "pk_erF2bOKjjGSM4L1HtaxIF",
+  "projectTitle": "Doura",
+  "description": "A lightweight, intuitive and reactive state management library for React",
+  "folders": ["doc-sites/docs", "docs"],
+  "rules": [
+    "State must be a plain object; property names across state, actions, views, queries, and child model names must not conflict",
+    "Use useModel() for reactive access; use useStaticModel() for stable action references that don't trigger re-renders",
+    "Async actions are supported natively — just declare async methods in actions, no middleware needed",
+    "TypeScript inference requires strict: true or noImplicitThis: true in tsconfig.json"
+  ]
+}

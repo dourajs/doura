@@ -20,6 +20,7 @@ const timeout = (n: number = 0) => new Promise((r) => setTimeout(r, n))
 describe('defineModel/actions', () => {
   it('should change the state', () => {
     const count = defineModel({
+      name: 'count',
       state: { value: 0 },
       actions: {
         add() {
@@ -28,7 +29,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('count', count)
+    const store = modelMgr.getModel(count)
     expect(typeof store.add).toBe('function')
 
     store.add()
@@ -40,6 +41,7 @@ describe('defineModel/actions', () => {
 
   it('should accept params', () => {
     const model = defineModel({
+      name: 'test',
       state: { values: [] } as any,
       actions: {
         push(...values: any[]) {
@@ -48,7 +50,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     store.push(1)
     expect(store.$state.values).toEqual([1])
@@ -59,6 +61,7 @@ describe('defineModel/actions', () => {
 
   it('should return value', () => {
     const model = defineModel({
+      name: 'test',
       state: { values: null },
       actions: {
         set() {
@@ -67,12 +70,13 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
     expect(store.set()).toBe('result')
   })
 
   it('should support async actions', async () => {
     const model = defineModel({
+      name: 'test',
       state: { value: 0 },
       actions: {
         async asyncAction(): Promise<void> {
@@ -83,7 +87,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     store.asyncAction()
     expect(store.$state.value).toBe(1)
@@ -94,6 +98,7 @@ describe('defineModel/actions', () => {
   it('should batch updates and emit change event once', async () => {
     const fn = jest.fn()
     const count = defineModel({
+      name: 'count',
       state: { value: 0 },
       actions: {
         inc() {
@@ -103,7 +108,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('count', count)
+    const store = modelMgr.getModel(count)
     store.$subscribe(fn)
     store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
@@ -115,6 +120,7 @@ describe('defineModel/actions', () => {
   it('should batch updates and emit change event once (nested actions)', async () => {
     const fn = jest.fn()
     const count = defineModel({
+      name: 'count',
       state: { value: 0 },
       actions: {
         inc() {
@@ -129,7 +135,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('count', count)
+    const store = modelMgr.getModel(count)
     store.$subscribe(fn)
     store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
@@ -141,6 +147,7 @@ describe('defineModel/actions', () => {
   it('should batch update and only triggered once (async action)', async () => {
     const fn = jest.fn()
     const count = defineModel({
+      name: 'count',
       state: { value: 0 },
       actions: {
         async inc() {
@@ -153,7 +160,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('count', count)
+    const store = modelMgr.getModel(count)
     store.$subscribe(fn)
     store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
@@ -165,9 +172,47 @@ describe('defineModel/actions', () => {
     expect(store.$state).toEqual({ value: 4 })
   })
 
+  it('should flush nested async action continuations separately', async () => {
+    const snapshots: Array<{ status: string; count: number }> = []
+    const model = defineModel({
+      name: 'nested-async-action',
+      state: { status: 'idle', count: 0 },
+      actions: {
+        async load() {
+          await this.otherAction()
+          this.count++
+        },
+        async otherAction() {
+          await Promise.resolve()
+          this.status = 'xx'
+        },
+      },
+    })
+
+    const store = modelMgr.getModel(model)
+    store.$subscribe(() => {
+      snapshots.push({ ...store.$state })
+    })
+
+    const promise = store.load()
+    expect(snapshots).toEqual([])
+
+    await promise
+    await nextTick()
+
+    // This matches Vue 3's microtask update queue behavior. The inner
+    // continuation queues the status flush before the outer await continuation
+    // resumes and increments count, so these are two expected notifications.
+    expect(snapshots).toEqual([
+      { status: 'xx', count: 0 },
+      { status: 'xx', count: 1 },
+    ])
+  })
+
   it("should not trigger change event if state doesn't change", async () => {
     const fn = jest.fn()
     const count = defineModel({
+      name: 'count',
       state: { value: 0 },
       actions: {
         inc() {
@@ -179,7 +224,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('count', count)
+    const store = modelMgr.getModel(count)
     store.$subscribe(fn)
     store.inc()
     expect(fn).toHaveBeenCalledTimes(1)
@@ -200,6 +245,7 @@ describe('defineModel/actions', () => {
         c: 0,
       }
       const model = defineModel({
+        name: 'test',
         state,
         actions: {
           changeC() {
@@ -208,7 +254,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.changeC()
       expect(store.$rawState.anObj).toBe(state.anObj)
       expect(store.$rawState.anObj.aNestObj).toBe(state.anObj.aNestObj)
@@ -221,6 +267,7 @@ describe('defineModel/actions', () => {
         anArr: [1],
       }
       const model = defineModel({
+        name: 'test',
         state,
         actions: {
           change() {
@@ -230,7 +277,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.change()
       // modified path: root → anObj → aNestObj all get new references
       expect(store.$rawState.anObj).not.toBe(state.anObj)
@@ -240,6 +287,7 @@ describe('defineModel/actions', () => {
 
     it('unmodified subtrees keep same reference across multiple actions', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           step: 1,
           anArr: [{ key: 1 }],
@@ -254,7 +302,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.changeArr()
       const arr = store.anArr
       // change another prop but not arr
@@ -264,6 +312,7 @@ describe('defineModel/actions', () => {
 
     it('modified subtree gets new reference, sibling keeps same reference', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           a: { value: 1 },
           b: { value: 2 },
@@ -275,7 +324,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const oldA = store.a
       const oldB = store.b
 
@@ -286,6 +335,7 @@ describe('defineModel/actions', () => {
 
     it('reference changes on modify then stabilizes on subsequent read-only actions', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           data: { value: 1 },
           count: 0,
@@ -300,7 +350,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       // modify data
       store.changeData()
@@ -315,6 +365,7 @@ describe('defineModel/actions', () => {
 
     it('deeply nested modification only changes references on the modified path', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           branch1: { nested: { deep: { value: 1 } } },
           branch2: { nested: { deep: { value: 2 } } },
@@ -326,7 +377,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       const oldBranch1 = store.branch1
       const oldBranch1Nested = store.branch1.nested
       const oldBranch1Deep = store.branch1.nested.deep
@@ -346,6 +397,7 @@ describe('defineModel/actions', () => {
 
     it('old snapshot is immutable — not affected by new actions', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           step: 1,
           anArr: [{ key: 1 }],
@@ -357,7 +409,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.changeArr()
       const snapshot1 = store.$rawState
       const arr1 = snapshot1.anArr
@@ -376,6 +428,7 @@ describe('defineModel/actions', () => {
 
     it('draft nested in plain object: subsequent action updates are reflected', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           nested: { a: 1 },
           wrapper: null as any,
@@ -391,7 +444,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       // action 1: wrap draft in plain object
       store.wrapNested()
@@ -413,6 +466,7 @@ describe('defineModel/actions', () => {
 
     it('draft nested in plain object with re-wrap: picks up new value', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           nested: { a: 1 },
           wrapper: null as any,
@@ -428,7 +482,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       store.wrapNested()
       const snap1 = store.$rawState
@@ -448,6 +502,7 @@ describe('defineModel/actions', () => {
 
     it('draft referenced by multiple props in root: all resolve correctly in first snapshot', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           nested: { a: 1 },
           ref: null as any,
@@ -464,7 +519,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       // action 1: multiple references to same draft
       store.setup()
@@ -488,6 +543,7 @@ describe('defineModel/actions', () => {
 
     it('direct draft alias: ref tracks nested across multiple snapshots', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           nested: { a: 1 },
           ref: null as any,
@@ -503,7 +559,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       store.setup()
       const snap1 = store.$rawState
@@ -525,6 +581,7 @@ describe('defineModel/actions', () => {
 
     it('unmodified subtrees share reference between consecutive snapshots', () => {
       const model = defineModel({
+        name: 'test',
         state: {
           step: 1,
           anArr: [{ key: 1 }],
@@ -536,7 +593,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
       store.changeStep()
       const snapshot1 = store.$rawState
       store.changeStep()
@@ -551,6 +608,7 @@ describe('defineModel/actions', () => {
 
   it('should access views by `this`', () => {
     const model = defineModel({
+      name: 'test',
       state: { value: 0 },
       actions: {
         set(n: number) {
@@ -564,7 +622,7 @@ describe('defineModel/actions', () => {
       },
     })
 
-    const store = modelMgr.getModel('test', model)
+    const store = modelMgr.getModel(model)
 
     store.set(5)
     expect(store.valuePlusN).toBe(6)
@@ -573,6 +631,7 @@ describe('defineModel/actions', () => {
   describe('this.$state', () => {
     it('should change value by $state', () => {
       const model = defineModel({
+        name: 'test',
         state: { value: 1 },
         actions: {
           add(n: number) {
@@ -581,7 +640,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', model)
+      const store = modelMgr.getModel(model)
 
       store.add(9)
       expect(store.$state.value).toBe(10)
@@ -590,6 +649,7 @@ describe('defineModel/actions', () => {
     it('should always return the newest state', () => {
       const state: number[] = []
       const count = defineModel({
+        name: 'count',
         state: { value: 0 },
         actions: {
           plusOne() {
@@ -604,7 +664,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('count', count)
+      const store = modelMgr.getModel(count)
 
       store.makeCall(2)
       expect(state).toEqual([1, 2])
@@ -613,10 +673,11 @@ describe('defineModel/actions', () => {
     // todo: fixme
     it.skip('should throw error if changed state not by reducer in development', async () => {
       const count = defineModel({
+        name: 'count',
         state: { value: 0 },
       })
 
-      const store = modelMgr.getModel('count', count)
+      const store = modelMgr.getModel(count)
 
       const state = store.$state
       state.value = 1
@@ -628,6 +689,7 @@ describe('defineModel/actions', () => {
 
     it('should replace state by assgining to this.$state', () => {
       const count = defineModel({
+        name: 'count',
         state: { a: 1, b: 1 },
         actions: {
           replace(newState: any): void {
@@ -636,7 +698,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('count', count)
+      const store = modelMgr.getModel(count)
 
       const newState1 = {
         a: 2,
@@ -651,6 +713,7 @@ describe('defineModel/actions', () => {
 
     it('should error when assign Symbol or BigInt to this.$state', () => {
       const count = defineModel({
+        name: 'count',
         state: { value: 0 },
         actions: {
           replace(value: any): void {
@@ -659,7 +722,7 @@ describe('defineModel/actions', () => {
         },
       })
 
-      const store = modelMgr.getModel('test', count)
+      const store = modelMgr.getModel(count)
       expect(store.$state).toEqual({ value: 0 })
 
       expect(() => store.replace(Symbol('foo') as any)).toThrow()

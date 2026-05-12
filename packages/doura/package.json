@@ -1,20 +1,15 @@
 {
   "name": "doura",
-  "version": "0.1.2",
+  "version": "0.2.0-beta.2",
   "description": "Reactive and intuitive state management",
   "main": "index.js",
   "module": "dist/doura.esm-bundler.js",
   "types": "dist/doura.d.ts",
   "unpkg": "dist/doura.global.js",
   "jsdelivr": "dist/doura.global.js",
-  "files": [
-    "index.js",
-    "dist"
-  ],
+  "files": ["index.js", "dist"],
   "sideEffects": false,
-  "authors": [
-    "liximomo"
-  ],
+  "authors": ["liximomo"],
   "keywords": [
     "doura",
     "reactive",
@@ -33,12 +28,7 @@
   },
   "buildOptions": {
     "name": "Doura",
-    "formats": [
-      "esm-bundler",
-      "esm-browser",
-      "cjs",
-      "global"
-    ]
+    "formats": ["esm-bundler", "esm-browser", "cjs", "global"]
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",

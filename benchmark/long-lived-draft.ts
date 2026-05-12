@@ -192,8 +192,7 @@ for (const width of [100, 1000]) {
   console.log(`  Snapshot avg: ${r3Avg.toFixed(4)} ms`)
   console.log(
     `  If O(tree): ~${(r3Avg * 1000).toFixed(0)} µs for ${width} items (${(
-      (r3Avg * 1000) /
-      width
+      (r3Avg * 1000) / width
     ).toFixed(2)} µs/item)`
   )
   console.log(`  If O(modified path): should be constant regardless of width\n`)

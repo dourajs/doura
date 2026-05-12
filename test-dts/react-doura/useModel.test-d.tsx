@@ -1,10 +1,11 @@
 import { defineModel } from 'doura'
-import { useModel, Selector } from 'react-doura'
+import { useDetachedModel, useModel, Selector } from 'react-doura'
 import { expectType } from '../helper'
 
 type customType = 'custom' | 'custom0'
 
 const count = defineModel({
+  name: 'count',
   state: {
     value: 1,
     s: '',
@@ -35,6 +36,53 @@ const count = defineModel({
   },
 })
 
+const namedCount = defineModel({
+  name: 'count',
+  state: {
+    value: 1,
+    s: '',
+  },
+  actions: {
+    addValue(payload: number = 1) {
+      this.value += payload
+    },
+    setString(payload: customType) {
+      this.s = payload
+    },
+    async asyncAdd(arg0: number) {
+      this.addValue(arg0)
+    },
+    async asyncStr(arg0: number, arg1?: customType) {
+      if (arg1) {
+        this.addValue(arg0)
+      }
+    },
+  },
+  views: {
+    viewNumber() {
+      return this.value
+    },
+    viewString() {
+      return this.s + ''
+    },
+  },
+})
+
+const standaloneCount = defineModel({
+  name: 'standaloneCount',
+  state: {
+    value: 1,
+  },
+})
+
+const parentCount = defineModel({
+  name: 'parentCount',
+  state: {
+    parentValue: 1,
+  },
+  models: [standaloneCount],
+})
+
 const countSelector: Selector<typeof count> = function (
   stateAndViews,
   actions
@@ -49,7 +97,9 @@ const countSelector: Selector<typeof count> = function (
 }
 
 export function Test() {
-  const model = useModel(count, countSelector)
+  const model = useDetachedModel(count, countSelector)
+  const detachedStandaloneModel = useDetachedModel(standaloneCount)
+  expectType<number>(detachedStandaloneModel.value)
   expectType<number>(model.n)
   expectType<number>(model.v)
   expectType<string>(model.s)
@@ -58,7 +108,20 @@ export function Test() {
   expectType<void>(model.setString('custom'))
   expectType<Promise<void>>(model.asyncAdd(0))
 
-  const namedModel = useModel('count', count, countSelector)
+  const implicitNamedModel = useModel(namedCount, countSelector)
+  expectType<number>(implicitNamedModel.n)
+  expectType<void>(implicitNamedModel.addValue())
+  expectType<number>(useModel(standaloneCount).value)
+  expectType<number>(useModel(parentCount).parentValue)
+  // @ts-expect-error — child models are not exposed in ModelAPI snapshots
+  useModel(parentCount).standaloneCount
+  // @ts-expect-error — child models are only available on ModelInstance.$models
+  useModel(parentCount).$models
+
+  // @ts-expect-error — explicit name overloads were removed
+  useModel('count', count)
+
+  const namedModel = useModel(count, countSelector)
   expectType<number>(namedModel.n)
   expectType<number>(namedModel.v)
   expectType<string>(namedModel.s)

@@ -3,7 +3,7 @@ import type { IStorageState, PersistOptions } from './types'
 
 export default function getStoredState(
   options: PersistOptions
-): Promise<any | void> {
+): Promise<any | undefined> {
   const storageKey = options.key
   const storage = options.storage
   return storage.getItem(storageKey).then((serialized: any) => {
