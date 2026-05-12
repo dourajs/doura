@@ -12,8 +12,7 @@ Models keep state, actions, views, composed child models, and async queries in a
 single definition. A `doura()` store creates model instances, and React apps use
 `DouraRoot` plus hooks from `react-doura`.
 
-Current packages are published as `0.2.0-beta.1`. `react-doura` has peer
-dependencies on `doura@0.2.0-beta.1` and `react >=18`.
+`react-doura` has peer dependencies on `doura` and `react >=18`.
 
 ## Example
 
@@ -49,10 +48,12 @@ const todoModel = defineModel({
   },
 })
 
+// access model directly
 const store = doura()
 const todos = store.getModel(todoModel)
 todos.setFilter('unfinished')
 
+// work with react
 function TodoList() {
   const { filteredTodos, setFilter, toggle } = useModel(todoModel)
 

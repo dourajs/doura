@@ -16,8 +16,7 @@ yarn add doura react-doura
 npm install doura react-doura
 ```
 
-`react-doura` requires `react >=18` and a matching `doura` peer. Current Doura
-packages are `0.2.0-beta.1`.
+`react-doura` requires `react >=18` and a matching `doura` peer.
 
 ## Core Usage
 
