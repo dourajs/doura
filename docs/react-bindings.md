@@ -17,18 +17,32 @@ function createContainer(options?: DouraOptions) {
 
   function Provider({ children, store: propsStore }) {
     const memoContext = useMemo(() => ({
-      store: propsStore || doura(options),
+      doura: { store: propsStore || doura(options) },
+      ownsStore: !propsStore,
     }), [propsStore])
 
     // 同时提供局部 Context 和全局 DouraContext
     return (
-      <DouraContext.Provider value={memoContext}>
-        <Context.Provider value={memoContext}>{children}</Context.Provider>
+      <DouraContext.Provider value={memoContext.doura}>
+        <Context.Provider value={memoContext.doura}>{children}</Context.Provider>
       </DouraContext.Provider>
     )
   }
 
-  return { Provider, useSharedModel, useStaticModel }
+  // 所有 hook 从局部 Context 读取 store，再委托给 *Impl 函数
+  const useSharedModel = (model, selector?, depends?) => {
+    const context = useDouraContext() // 局部 Context
+    return useModelImpl(context, model, selector, depends)
+  }
+
+  const useQuery = (queryHandle, argsOrOptions?, maybeOptions?) => {
+    const context = useDouraContext()
+    return useQueryImpl(context, queryHandle, argsOrOptions, maybeOptions)
+  }
+
+  // useStaticModel, useAction, useInfiniteQuery 同理...
+
+  return { Provider, useSharedModel, useStaticModel, useQuery, useAction, useInfiniteQuery }
 }
 ```
 
@@ -43,6 +57,9 @@ function createContainer(options?: DouraOptions) {
 | `Provider`                                   | 挂载到组件树，提供 store context            |
 | `useSharedModel(model, selector?, depends?)` | 订阅 model 变更，触发 re-render             |
 | `useStaticModel(model)`                      | 获取 model 实例的只读引用，不触发 re-render |
+| `useQuery(query, args?, options?)`           | 订阅 query 状态，自动 fetch                 |
+| `useAction(action, options?)`                | 追踪 action 生命周期                        |
+| `useInfiniteQuery(query, config)`            | 分页 query，累积页面                        |
 
 ---
 
@@ -56,12 +73,15 @@ const {
   Provider: DouraRoot,
   useSharedModel: useRootModel,
   useStaticModel: useRootStaticModel,
+  useQuery: useRootQuery,
+  useAction: useRootAction,
+  useInfiniteQuery: useRootInfiniteQuery,
 } = createContainer({
   plugins: __DEV__ ? [[devtool]] : [],
 })
 ```
 
-`DouraRoot` 是预构建的全局 Provider，本质上就是 `createContainer` 的 `Provider`。开发模式下自动注入 `devtool` 插件。
+`DouraRoot` 是预构建的全局 Provider，本质上就是 `createContainer` 的 `Provider`。开发模式下自动注入 `devtool` 插件。所有全局 hook（`useModel`、`useQuery`、`useAction`、`useInfiniteQuery` 等）都来自这个全局 container，因此**必须在组件树中有 `<DouraRoot>` 祖先**。
 
 **为什么不让用户自己 createContainer？** 大多数应用只需要一个全局 store。`DouraRoot` 提供开箱即用的体验，减少样板代码。需要多 store 隔离（SSR、微前端等）时再使用 `createContainer`。
 
@@ -101,10 +121,7 @@ const useDetachedModel: UseDetachedModel = (model, selector?, depends?) => {
     context.current = { douraStore: doura() } // 组件级独立 store
   }
 
-  return useMemo(
-    () => createUseModel(context.current!.douraStore),
-    [context.current.douraStore]
-  )(model, selector, depends)
+  return useModelImpl({ store: context.current.douraStore }, model, selector, depends)
 }
 ```
 
@@ -124,14 +141,14 @@ const useStaticModel: UseStaticModel = (model) => {
 
 ---
 
-## 4. createUseModel — 核心 hook 逻辑
+## 4. useModelImpl — 核心 hook 逻辑
 
-> `createUseModel.tsx`
+> `useModel.tsx`
 
 ### useModelInstance
 
 ```ts
-// createUseModel.tsx
+// useModel.tsx
 function useModelInstance(model, doura) {
   const modelKey = getModelCacheKey(model) // → model.$options.name
   const { modelInstance, subscribe } = useMemo(() => {
@@ -211,25 +228,18 @@ function useModelWithSelector(model, subscribe, selector, depends) {
 
 ---
 
-## 5. useStaticModel — 无订阅模式
+## 5. useStaticModelImpl — 无订阅模式
 
-> `createUseModel.tsx`
+> `useModel.tsx`
 
 ```ts
-const createUseStaticModel = (doura) => (model) => {
-  const modelKey = getModelCacheKey(model)
-  const modelInstance = useMemo(() => doura.getModel(model), [doura, modelKey])
-
-  const store = useMemo(() => {
-    if (__DEV__) return readonlyModel(modelInstance) // 开发模式只读 proxy
-    return modelInstance
-  }, [modelInstance])
-
-  return store
+function useStaticModelImpl(context: { store: Doura }, model) {
+  const { modelInstance } = useModelInstance(model, context.store)
+  return modelInstance as ModelAPI
 }
 ```
 
-返回 model 的 `publicInst`，不订阅变更。开发模式下包一层 `readonlyModel` proxy，set trap 输出警告，防止意外修改。
+返回 model 的 `publicInst`，不订阅变更。开发模式下 `useModelInstance` 内部包一层 `readonlyModel` proxy，set trap 输出警告，防止意外修改。
 
 ---
 

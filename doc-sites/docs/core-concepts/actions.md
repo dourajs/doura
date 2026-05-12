@@ -76,6 +76,3 @@ const counter = store.getModel(counterModel)
 
 counter.increment(2)
 ```
-
-React can track action lifecycle with `useAction(action, options?)`, which
-returns `run`, `runAsync`, local status flags, and `reset`.

@@ -15,10 +15,10 @@ doura (核心)
   └── doura.ts       工厂函数
 
 react-doura (React 集成，peer: doura)
-  ├── createContainer    Context + Provider
+  ├── createContainer    Context + Provider + 所有 hook（useSharedModel, useStaticModel, useQuery, useAction, useInfiniteQuery）
   ├── DouraRoot          预构建的全局 Provider（dev 模式自动注入 devtool）
-  ├── createUseModel     useSyncExternalStore 驱动
-  └── useQuery / useAction / useInfiniteQuery  Query/Action React 集成
+  ├── useModelImpl       useSyncExternalStore 驱动（接受 context 参数）
+  └── useQueryImpl / useActionImpl / useInfiniteQueryImpl  Query/Action 实现层
 
 doura-plugin-log    (peer: doura)  Action 日志
 doura-plugin-persist (peer: doura) 持久化 + 迁移

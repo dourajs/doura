@@ -220,6 +220,8 @@ instance.$resetQueries() // clear all cache entries
 
 ## React Integration
 
+> All hooks below (`useQuery`, `useInfiniteQuery`, `useAction`) require a `<DouraRoot>` ancestor in the component tree (or a custom container's `<Provider>`).
+
 ### useQuery
 
 Subscribe to a query's cache and auto-fetch when data is stale:
