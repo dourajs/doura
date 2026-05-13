@@ -512,7 +512,9 @@ describe('model', () => {
 
       expect(api.actionKey()).toBe('action')
       expect(api.actionKey).toBe((model.actions as any).actionKey)
+      expect(Object.prototype.hasOwnProperty.call(api, 'actionKey')).toBe(false)
       expect(api.queryKey).not.toBe((model.queries as any).queryKey)
+      expect(Object.prototype.hasOwnProperty.call(api, 'queryKey')).toBe(false)
       await expect(api.queryKey()).resolves.toBeUndefined()
     })
 

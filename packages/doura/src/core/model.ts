@@ -218,8 +218,7 @@ export class ModelInternal<M extends Model = Model> {
 
   private _actionDepth = 0
   private _api: ModelAPI<ModelDefinition<M>> | null = null
-  private _actionKeys: string[] = []
-  private _queryKeys: string[] = []
+  private _apiProto: Record<string, any> = Object.create(null)
   private _modelKeys: string[] = []
   private _initState: ModelStateFromModel<M>
   private _currentState: any
@@ -380,21 +379,8 @@ export class ModelInternal<M extends Model = Model> {
     }
 
     if (this._api === null) {
-      const data = (this._api = {
-        ...this._currentState,
-        ...this.views,
-      })
-
-      // Actions and queries are immutable over the model's lifetime —
-      // iterate pre-cached keys (built during _initActions/_initQueries).
-      for (let i = 0; i < this._queryKeys.length; i++) {
-        const key = this._queryKeys[i]
-        def(data, key, this.queryFetches[key])
-      }
-      for (let i = 0; i < this._actionKeys.length; i++) {
-        const key = this._actionKeys[i]
-        def(data, key, (this.actions as any)[key])
-      }
+      const data = Object.create(this._apiProto)
+      this._api = Object.assign(data, this._currentState, this.views)
     }
 
     return this._api
@@ -655,28 +641,29 @@ export class ModelInternal<M extends Model = Model> {
     if (actions) {
       for (const actionName of Object.keys(actions)) {
         this._cacheAccess(actionName, AccessTypes.ACTION)
-        this._actionKeys.push(actionName)
         const action = actions[actionName]
+        const actionFn = (...args: any[]) => {
+          return this._runAction(() => action.apply(this.proxy, args), {
+            name: actionName,
+            beforeAction: () => {
+              const actionListeners = this._actionListeners.slice()
+              for (let i = 0; i < actionListeners.length; i++) {
+                actionListeners[i]({
+                  name: actionName,
+                  args,
+                })
+              }
+            },
+          })
+        }
 
         Object.defineProperty(this.actions, actionName, {
           configurable: true,
           enumerable: true,
           writable: false,
-          value: (...args: any[]) => {
-            return this._runAction(() => action.apply(this.proxy, args), {
-              name: actionName,
-              beforeAction: () => {
-                const actionListeners = this._actionListeners.slice()
-                for (let i = 0; i < actionListeners.length; i++) {
-                  actionListeners[i]({
-                    name: actionName,
-                    args,
-                  })
-                }
-              },
-            })
-          },
+          value: actionFn,
         })
+        def(this._apiProto, actionName, actionFn)
       }
     }
   }
@@ -722,7 +709,6 @@ export class ModelInternal<M extends Model = Model> {
           continue
         }
         this._cacheAccess(queryName, AccessTypes.QUERY)
-        this._queryKeys.push(queryName)
         const handle = this._buildQueryHandle(queryName, spec)
         ;(this.queries as any)[queryName] = handle
         Object.defineProperty(handle.fetch, DOURA_QUERY_HANDLE, {
@@ -732,10 +718,12 @@ export class ModelInternal<M extends Model = Model> {
           value: handle,
         })
         ;(this.queryFetches as any)[queryName] = handle.fetch
+        def(this._apiProto, queryName, handle.fetch)
       }
     }
     Object.freeze(this.queries)
     Object.freeze(this.queryFetches)
+    Object.freeze(this._apiProto)
   }
 
   private _cacheAccess(key: string, type: AccessTypes) {
