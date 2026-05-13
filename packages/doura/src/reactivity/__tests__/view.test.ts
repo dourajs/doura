@@ -42,6 +42,52 @@ describe('reactivity/view', () => {
     expect(getter).toHaveBeenCalledTimes(2)
   })
 
+  it('should not call onDirty on creation or first read', () => {
+    const value = draft({ foo: 0 })
+    const onDirty = jest.fn()
+    const cValue = view(() => value.foo, { onDirty })
+
+    expect(onDirty).not.toHaveBeenCalled()
+    expect(cValue.value).toBe(0)
+    expect(onDirty).not.toHaveBeenCalled()
+  })
+
+  it('should call onDirty once when becoming dirty', () => {
+    const value = draft({ foo: 0 })
+    const onDirty = jest.fn()
+    const cValue = view(() => value.foo, { onDirty })
+
+    expect(cValue.value).toBe(0)
+    value.foo = 1
+    expect(onDirty).toHaveBeenCalledTimes(1)
+
+    value.foo = 2
+    expect(onDirty).toHaveBeenCalledTimes(1)
+
+    expect(cValue.value).toBe(2)
+    value.foo = 3
+    expect(onDirty).toHaveBeenCalledTimes(2)
+  })
+
+  it('should call onDirty before dependent effects rerun', () => {
+    const value = draft({ foo: 0 })
+    const events: string[] = []
+    const cValue = view(() => value.foo, {
+      onDirty: () => {
+        events.push('dirty')
+      },
+    })
+
+    effect(() => {
+      events.push(`effect:${cValue.value}`)
+    })
+    expect(events).toEqual(['effect:0'])
+
+    events.length = 0
+    value.foo = 1
+    expect(events).toEqual(['dirty', 'effect:1'])
+  })
+
   it('should trigger effect', () => {
     const value = draft<{ foo?: number }>({})
     const cValue = view(() => value.foo)

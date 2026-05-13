@@ -973,17 +973,21 @@ describe('createView', () => {
 
       const child = modelMgr.getModel(childModel)
       const parent = modelMgr.getModel(parentModel)
+      const parentInternal = (modelMgr as any)._models.get('parent')
 
       // Initial: parent view reads child.count = 0
       const api1 = parent.$getApi()
       expect(api1.childCount).toBe(0)
+      expect(parentInternal._api).toBe(api1)
 
       // Mutate child
       child.inc()
+      expect(parentInternal._api).toBe(null)
       await nextTick()
 
       // Parent's $getApi() should return updated view reflecting child.count = 1
       const api2 = parent.$getApi()
+      expect(api2).not.toBe(api1)
       expect(api2.childCount).toBe(1)
     })
   })

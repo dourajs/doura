@@ -13,6 +13,7 @@ export interface View<T = any> {
 
 export interface ViewOptions {
   disableCache?: boolean
+  onDirty?: () => void
 }
 
 export type ViewGetter<T> = (...args: any[]) => T
@@ -30,10 +31,14 @@ export class ViewImpl<T> {
 
   private _cacheable: boolean
 
-  constructor(getter: ViewGetter<T>, { disableCache = false }: ViewOptions) {
+  constructor(
+    getter: ViewGetter<T>,
+    { disableCache = false, onDirty }: ViewOptions
+  ) {
     this.effect = new ReactiveEffect(getter, () => {
       if (!this.dirty) {
         this.dirty = true
+        onDirty?.()
         triggerView(this)
       }
     })

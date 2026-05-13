@@ -11,6 +11,7 @@ import { warn } from '../warning'
 import {
   view as reactiveView,
   type View,
+  type ViewOptions,
   effectScope,
   type EffectScope,
   draft,
@@ -207,7 +208,6 @@ export class ModelInternal<M extends Model = Model> {
   models: Record<string, ModelInstance<any>>
   modelProxies: Record<string, ModelInstance<any>>
   viewInstances: ViewExt[] = []
-  private _modelViews: ViewExt[] = []
   accessContext: AccessContext
 
   stateRef: {
@@ -250,6 +250,7 @@ export class ModelInternal<M extends Model = Model> {
     this.isolate = this.isolate.bind(this)
     this.getApi = this.getApi.bind(this)
     this._update = this._update.bind(this)
+    this._invalidateApiSnapshot = this._invalidateApiSnapshot.bind(this)
     this._flushQueryListeners = this._flushQueryListeners.bind(this)
 
     this.options = model
@@ -367,17 +368,6 @@ export class ModelInternal<M extends Model = Model> {
   }
 
   getApi() {
-    // Invalidate cache if any model-defined view is dirty (e.g. from
-    // cross-model dependency changes that bypass _setState).
-    if (this._api !== null) {
-      for (let i = 0; i < this._modelViews.length; i++) {
-        if (this._modelViews[i].dirty) {
-          this._api = null
-          break
-        }
-      }
-    }
-
     if (this._api === null) {
       const data = Object.create(this._apiProto)
       this._api = Object.assign(data, this._currentState, this.views)
@@ -431,7 +421,7 @@ export class ModelInternal<M extends Model = Model> {
     })
   }
 
-  createView(viewFn: (s: any) => any): ViewExt {
+  createView(viewFn: (s: any) => any, options: ViewOptions = {}): ViewExt {
     let view!: ViewExt
     this.effectScope.run(() => {
       view = reactiveView(() => {
@@ -458,7 +448,7 @@ export class ModelInternal<M extends Model = Model> {
         } finally {
           this.accessContext = oldCtx
         }
-      }) as ViewExt
+      }, options) as ViewExt
     })
 
     view.getSnapshot = () => {
@@ -535,7 +525,7 @@ export class ModelInternal<M extends Model = Model> {
   destroy() {
     // reset props
     this._destroyed = true
-    this._api = null
+    this._invalidateApiSnapshot()
     this._lastDraftToSnapshot = new WeakMap()
 
     this._currentState = null
@@ -572,8 +562,12 @@ export class ModelInternal<M extends Model = Model> {
     return this._queryHashScope
   }
 
-  private _setState(newState: ModelStateFromModel<M>) {
+  private _invalidateApiSnapshot() {
     this._api = null
+  }
+
+  private _setState(newState: ModelStateFromModel<M>) {
+    this._invalidateApiSnapshot()
     this._currentState = newState
     this.stateValue = this.stateRef.value
   }
@@ -683,8 +677,9 @@ export class ModelInternal<M extends Model = Model> {
       for (const viewName of Object.keys(views)) {
         this._cacheAccess(viewName, AccessTypes.VIEW)
         const viewFn = views[viewName]
-        const view = this.createView(viewFn)
-        this._modelViews.push(view)
+        const view = this.createView(viewFn, {
+          onDirty: this._invalidateApiSnapshot,
+        })
         Object.defineProperty(this.views, viewName, {
           configurable: true,
           enumerable: true,
